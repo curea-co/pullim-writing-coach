@@ -1,26 +1,55 @@
 @import "tailwindcss";
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css");
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* 시맨틱 토큰 — fe-styling 기준(하드코딩 컬러 금지). 값은 데모용 근사치이며,
+   apps/web 이관 시 @pullim/design-system 토큰으로 대체한다. */
+@theme {
+  --font-sans:
+    "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+    system-ui, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic",
+    sans-serif;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-background: oklch(0.985 0 0);
+  --color-surface: oklch(1 0 0);
+  --color-foreground: oklch(0.21 0.006 285.9);
+  --color-muted-foreground: oklch(0.55 0.014 285.9);
+  --color-subtle-foreground: oklch(0.7 0.014 285.9);
+  --color-border: oklch(0.92 0.004 286.3);
+  --color-muted: oklch(0.967 0.001 286.4);
+  --color-primary: oklch(0.27 0.012 285.9);
+  --color-primary-foreground: oklch(0.985 0 0);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* 점수 밴드 (rubric §2.2 색상 가이드: 0~9 주의 / 10~14 보통 / 15~20 양호) */
+  --color-band-good: oklch(0.7 0.15 162);
+  --color-band-good-foreground: oklch(0.5 0.13 162);
+  --color-band-good-surface: oklch(0.96 0.03 162);
+  --color-band-normal: oklch(0.77 0.16 70);
+  --color-band-normal-foreground: oklch(0.55 0.13 70);
+  --color-band-normal-surface: oklch(0.96 0.04 83);
+  --color-band-warn: oklch(0.64 0.21 19);
+  --color-band-warn-foreground: oklch(0.51 0.19 19);
+  --color-band-warn-surface: oklch(0.96 0.02 17);
+
+  /* 총점 구간 / 카테고리 액센트 */
+  --color-accent-gap: oklch(0.55 0.18 295);
+  --color-accent-gap-surface: oklch(0.96 0.03 295);
+  --color-accent-mid: oklch(0.62 0.17 250);
+  --color-accent-mid-surface: oklch(0.96 0.03 250);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+}
+
+/* 점수 막대 등장 애니메이션 */
+@keyframes growBar {
+  from {
+    width: 0;
+  }
+}
+
+.score-bar {
+  animation: growBar 600ms ease-out;
 }
