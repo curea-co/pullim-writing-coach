@@ -70,7 +70,7 @@ app/
 ├── lib/utils.ts             # cn()
 ├── layout.tsx
 └── globals.css              # 시맨틱 토큰 정의
-docs/                        # 기획 산출물 01~11 (09 prompt-verification은 미작성)
+docs/                        # 기획 산출물 01~11
 ```
 
 ## 기획 문서 (docs/)
@@ -85,6 +85,7 @@ docs/                        # 기획 산출물 01~11 (09 prompt-verification은
 | 06 | [ai_feedback_outputs v.4](docs/06_ai_feedback_outputs_v.4_2026-05-19.md) | F3 채점 출력 5건 |
 | 07 | [pm_review v.2](docs/07_pm_review_v.2_2026-05-19.md) | EPO 수동 검수 코멘트 |
 | 08 | [ai_prompt v0.1](docs/08_ai_prompt_v.1_2026-05-19.md) | AI 첨삭 프롬프트 + 강제 룰 |
+| 09 | [prompt_verification](docs/09_prompt_verification_2026-05-21.md) | 프롬프트 v0.1 재현 검증 (25건 실호출) |
 | 10 | [freeze_review_request](docs/10_freeze_review_request_2026-05-20.md) | freeze 리뷰 요청 패키지 |
 | 11 | [demo_design_ux_audit](docs/11_demo_design_ux_audit_2026-05-20.md) | 데모 디자인·UX writing audit |
 
