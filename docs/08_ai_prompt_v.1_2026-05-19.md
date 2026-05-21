@@ -336,7 +336,9 @@ export async function gradeWriting(input: {
    - **DUPLICATION_CHECK**: 동일 정정·액션이 feedback_fix와 revision_guides에 중복 (rubric §5.2)
    특히 샘플 C는 FIX_COUNT·DUPLICATION의 회귀 테스트 케이스다 — 표현·문장 fix가 '~게 된다' 1건만, 정정 4건은 revision_guides[3]에만 나와야 통과.
 
-**기록 형식**: `09_prompt_verification_2026-05-DD.md`(예정)에 5회 호출 × 5샘플 = 25건 결과의 점수·feedback 발췌·일탈 사례를 기록. 강제 룰 위반은 건별 표기.
+**기록 형식**: `09_prompt_verification_2026-05-21.md`에 5회 호출 × 5샘플 = 25건 결과의 점수·분산·강제 룰 위반을 기록.
+
+> **✅ 실행 완료 (2026-05-21) — 결과: HARD PASS ❌ (`09_prompt_verification`).** 재현 분산은 목표 충족(총점 폭 ≤2)·FIX_COUNT 위반 0건이나, **EPO 정답 점수 재현 실패**(상위권 B −24·E −13·A −12, 고품질 글이 ~62로 수렴)이고 **응답시간 ~25초로 15초 목표 초과**. → 프롬프트 v0.2(few-shot 캘리브레이션) 보정 후 재검증 필요. 상세는 09 §2·§4.
 
 ---
 
@@ -372,8 +374,8 @@ export async function gradeWriting(input: {
 ## 8. 다음 작업
 
 - [x] [FIX_COUNT_CHECK]·[DUPLICATION_CHECK] 강제 룰 추가 (07 v.2 §5 #1·#2) ✅ 2026-05-20
-- [ ] 시스템 프롬프트 §2를 그대로 Anthropic API에 호출해 06 v.4 5건을 5회씩(25건) 재현 검증 — 강제 룰 3종 위반 0건 + 분산 ±3점 확인. 특히 샘플 C로 FIX_COUNT·DUPLICATION 회귀 테스트
-- [ ] 분산 초과 또는 강제 룰 위반 발견 시 §2 해당 룰 보강 → v0.2
+- [x] 시스템 프롬프트 §2를 그대로 Anthropic API에 호출해 06 v.4 5건을 5회씩(25건) 재현 검증 ✅ 2026-05-21 (09) — 분산·FIX_COUNT는 PASS, 단 EPO 점수 보정 FAIL·응답시간 초과로 HARD PASS ❌
+- [ ] 분산은 충족했으나 EPO 점수 보정 실패 → §2 상위 구간 앵커 보강 + §4 5건을 few-shot으로 추가 → v0.2 (09 §4.2 #1·#2)
 - [ ] (보강 검토) 강제 룰을 100% 보장하려면 클라이언트 후처리 가드 추가 — 'A→B' 패턴 정규식 카운트 후 초과분을 코드로 revision_guides 이동(§7 #2)
 - [ ] 응답 시간 측정 — 15초 목표 달성 여부 (Sonnet 4.6 vs Haiku 4.5)
 - [ ] 클라이언트 라이브러리 (`gradeWriting()` §5 함수) Next.js 데모 프로젝트에 연결
