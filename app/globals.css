@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css");
 
 /* 시맨틱 토큰 — fe-styling 기준(하드코딩 컬러 금지). 값은 데모용 근사치이며,
    apps/web 이관 시 @pullim/design-system 토큰으로 대체한다. */
