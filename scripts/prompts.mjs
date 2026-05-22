@@ -1,7 +1,9 @@
 // 08_ai_prompt §2 시스템 프롬프트 + §3 사용자 프롬프트 템플릿
 // v0.2 (2026-05-22) — P0.3 캘리브레이션: 상위 구간 상향 재서술 + 오타 저비중(#1) + on-task(#3) + few-shot anchor. 근거 docs/13.
 
-export const SYSTEM_PROMPT = `You are "Pullim Writing Coach", an AI essay reviewer for Korean middle/high school
+import { SAMPLES } from "../app/data/samples.ts";
+
+const SYSTEM_PROMPT_BASE = `You are "Pullim Writing Coach", an AI essay reviewer for Korean middle/high school
 students. You score student writing on FIVE areas (each 0~20, total 0~100) and
 write coaching-toned feedback in Korean.
 
@@ -183,6 +185,43 @@ write coaching-toned feedback in Korean.
 □ FIX_COUNT_CHECK — 각 feedback_fix의 'A→B' 정정 항목 ≤ 3개 (초과분은 revision_guides로)
 □ DUPLICATION_CHECK — 동일 정정·액션이 feedback_fix와 revision_guides에 중복되지 않음
 □ 분량 임계(원칙 4-a, 4-b) 발동 시 상한 14점 적용 + 과제 이해에 분량 부족 명시`;
+
+// ── v0.2 few-shot anchor (P0.3) ──────────────────────────────────────
+// EPO 확정 정답 5건 전부 anchor. P1.1 hold-out(3+2) 결과 A(−6)·E(−10)가 일반화 ±3 미달 → 09 v.2 결정에 따라 전부 승격.
+// 단, 이로써 25건 재검증은 회로적(anchor=시험셋) — 일반화 신호는 P2.4(임의 글)·P5(사용자 테스트)로 이관. docs/09 v.2 §4.
+const ANCHOR_IDS = ["d", "c", "a", "e", "b"];
+
+function buildAnchorBlock() {
+  return ANCHOR_IDS.map((id, i) => {
+    const s = SAMPLES.find((x) => x.id === id);
+    const a = s.assignment;
+    const target = a.target_char_count == null ? "제한 없음" : `${a.target_char_count}자`;
+    // meta는 서버가 덮어쓰므로(12 §4.2) 예시에서는 model_version만 v0.2로 정렬
+    const out = {
+      total_score: s.output.total_score,
+      scores: s.output.scores,
+      revision_guides: s.output.revision_guides,
+      meta: { ...s.output.meta, model_version: "writing-coach-prompt-v0.2" },
+    };
+    return `[예시 ${i + 1} — ${s.category} · 총점 ${s.output.total_score}]
+입력:
+- 학년 ${a.school_level} / 과목 ${a.subject} / 장르 ${a.genre} / 목표 분량 ${target}
+- 과제문: ${a.prompt_text}
+- 본문(${s.submission.char_count}자): ${s.submission.body}
+정답 출력:
+${JSON.stringify(out, null, 2)}`;
+  }).join("\n\n");
+}
+
+export const SYSTEM_PROMPT = `${SYSTEM_PROMPT_BASE}
+
+──────────────────────────────────────────────────────────────────────
+[채점 캘리브레이션 예시 — few-shot anchor (EPO 확정 정답 5건: 저~고 전 구간)]
+아래 3건은 EPO가 확정한 정답 채점이다. 같은 기준·톤·점수 눈높이로 채점하라. 특히 상위 구간
+(총점 70~86)의 눈높이를 이 예시에 맞춰, 잘 쓴 글을 60대로 과도하게 낮추지 말 것.
+주의: 예시 점수를 그대로 베끼지 말고, 채점 대상 글의 실제 품질에 같은 눈높이를 적용하라.
+
+${buildAnchorBlock()}`;
 
 export function buildUserPrompt(a, sub) {
   const targetStr = a.target_char_count == null ? "제한 없음" : `${a.target_char_count} 자`;
