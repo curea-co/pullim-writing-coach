@@ -345,7 +345,7 @@ export async function gradeWriting(input: {
 ## 7. 한계·미검증
 
 ```text
-1. 본 v0.1은 06 v.4의 EPO 자체 채점값을 '정답'으로 가정한다. 실제 박승훈·김아진 채점과의 정합은
+1. 본 v0.1은 06 v.4의 EPO 자체 채점값을 '정답'으로 가정한다. 실제 기준 B·기준 A 채점과의 정합은
    외부 검수에서 별도 검증해야 한다.
 
 2. POSITION_CHECK는 프롬프트 단계에서 강제하지만 LLM이 100% 지킨다는 보장은 없다. 출력 후
@@ -379,4 +379,4 @@ export async function gradeWriting(input: {
 - [ ] (보강 검토) 강제 룰을 100% 보장하려면 클라이언트 후처리 가드 추가 — 'A→B' 패턴 정규식 카운트 후 초과분을 코드로 revision_guides 이동(§7 #2)
 - [ ] 응답 시간 측정 — 15초 목표 달성 여부 (Sonnet 4.6 vs Haiku 4.5)
 - [ ] 클라이언트 라이브러리 (`gradeWriting()` §5 함수) Next.js 데모 프로젝트에 연결
-- [ ] 박승훈·김아진 freeze 리뷰
+- [ ] 기준 B·기준 A freeze 리뷰
