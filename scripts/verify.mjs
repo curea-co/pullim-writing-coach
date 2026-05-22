@@ -17,7 +17,9 @@ if (!KEY) {
   process.exit(1);
 }
 
-async function callApi(userPrompt) {
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function callApi(userPrompt, attempt = 0) {
   const t0 = Date.now();
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -34,6 +36,13 @@ async function callApi(userPrompt) {
       messages: [{ role: "user", content: userPrompt }],
     }),
   });
+  // 429/오버로드(529)/5xx → 백오프 재시도. Haiku는 빨라 호출 밀도가 높아 RPM에 걸리기 쉽다.
+  if ((res.status === 429 || res.status === 529 || res.status >= 500) && attempt < 6) {
+    const ra = Number(res.headers.get("retry-after"));
+    const wait = ra ? ra * 1000 : Math.min(2000 * 2 ** attempt, 30000);
+    await sleep(wait);
+    return callApi(userPrompt, attempt + 1);
+  }
   const ms = Date.now() - t0;
   const data = await res.json();
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${data?.error?.message || JSON.stringify(data)}`);
@@ -125,6 +134,7 @@ async function main() {
     process.stdout.write(`[${sample.label}] ${sample.title} (정답 ${expectedTotal})  `);
 
     for (let r = 0; r < RUNS; r++) {
+      await sleep(1200); // 호출 간격 — RPM 여유 확보
       try {
         const { text, ms, usage } = await callApi(userPrompt);
         const o = parseJson(text);
