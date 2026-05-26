@@ -9,7 +9,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { cn } from "@/app/lib/utils";
-import { SAMPLES } from "@/app/data/samples";
+
+// 사이드바는 라벨/카테고리/총점만 필요하다. 전체 SAMPLES(본문·피드백)를 client 번들로
+// 끌어오지 않도록, 서버 레이아웃에서 경량 메타데이터만 props로 받는다(curea-review-ai 지적).
+export type NavSample = {
+  id: string;
+  label: string;
+  category: string;
+  total: number;
+};
 
 // 카테고리 점 색 — page.tsx 칩과 같은 시맨틱 밴드/액센트 토큰
 const CATEGORY_DOT: Record<string, string> = {
@@ -20,7 +28,13 @@ const CATEGORY_DOT: Record<string, string> = {
   고점: "bg-band-good",
 };
 
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+function NavLinks({
+  samples,
+  onNavigate,
+}: {
+  samples: NavSample[];
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
   const itemCls = (active: boolean) =>
     cn(
@@ -49,7 +63,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
       <div className="text-subtle-foreground mt-4 mb-1 px-3 text-[11px] font-semibold">
         샘플 채점 결과
       </div>
-      {SAMPLES.map((s) => {
+      {samples.map((s) => {
         const href = `/samples/${s.id}`;
         return (
           <Link
@@ -69,7 +83,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
               {s.label} · {s.category}
             </span>
             <span className="text-subtle-foreground ml-auto text-xs tabular-nums">
-              {s.output.total_score}
+              {s.total}
             </span>
           </Link>
         );
@@ -78,7 +92,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-export default function Sidebar() {
+export default function Sidebar({ samples }: { samples: NavSample[] }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
 
@@ -96,7 +110,7 @@ export default function Sidebar() {
           </span>
         </Link>
         <div className="flex-1 overflow-y-auto p-3">
-          <NavLinks />
+          <NavLinks samples={samples} />
         </div>
         <p className="border-border text-subtle-foreground border-t px-4 py-3 text-[10px] leading-relaxed">
           ※ AI 자동 채점 — 교사의 실제 채점과 다를 수 있어요.
@@ -155,7 +169,7 @@ export default function Sidebar() {
                 </svg>
               </button>
             </div>
-            <NavLinks onNavigate={close} />
+            <NavLinks samples={samples} onNavigate={close} />
           </aside>
         </div>
       )}

@@ -6,6 +6,7 @@
 
 import type { ReactNode } from "react";
 import { cn } from "@/app/lib/utils";
+// SAMPLES와 분리된 scoring.ts에서 타입·헬퍼만 import → 클라 번들에 샘플 본문 미포함(curea-review-ai 지적).
 import {
   type Assignment,
   type F3Output,
@@ -13,7 +14,7 @@ import {
   getScoreColor,
   getTotalScoreBand,
   hasLargeAreaGap,
-} from "../data/samples";
+} from "../data/scoring";
 import CopyButton from "./CopyButton";
 
 // 결과 복사 텍스트 (functional_spec §5 포맷). 화면·복사 동일 disclaimer.

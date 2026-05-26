@@ -27,7 +27,7 @@ import {
   TARGET_MAX,
   TARGET_MIN,
 } from "@/app/lib/grading";
-import type { F3Output } from "@/app/data/samples";
+import type { F3Output } from "@/app/data/scoring";
 import ResultView from "./ResultView";
 import { DEMO_TOKEN_KEY } from "./TokenGate";
 
@@ -57,6 +57,7 @@ type ScoreRequest = {
 };
 
 // 서버 에러 중 재시도가 의미 있는 코드(전송/업스트림 일시 장애·타임아웃·재호출 후 무효). 12 §5.2.
+// E-NET = 클라이언트 네트워크 단절(오프라인). 서버 계약 코드(E8 등)와 구분해 로그·문의 혼선 방지(curea-review-ai 지적).
 const RETRYABLE: ReadonlySet<string> = new Set([
   "E4",
   "E5",
@@ -64,6 +65,7 @@ const RETRYABLE: ReadonlySet<string> = new Set([
   "E8",
   "E-PARSE",
   "E-CAP",
+  "E-NET",
 ]);
 
 type SubmitState =
@@ -84,7 +86,9 @@ export default function ScoreForm({
   const [promptText, setPromptText] = useState("");
   const [body, setBody] = useState(""); // 학생이 본 원본 — 정규화 전(화면 보존)
   const [submit, setSubmit] = useState<SubmitState>({ phase: "idle" });
-  const attemptNo = useRef(1);
+  // 제출 횟수(첫 제출=1, 새 제출마다 +1). 재시도(transient 재호출)는 같은 시도라 증가 안 함.
+  // 메인 CTA·"글 고치고 다시 받기" 어느 경로로 재제출해도 새 시도로 카운트되게 제출 시점에 증가(curea-review-ai 지적).
+  const submitCount = useRef(0);
   const lastPayload = useRef<ScoreRequest | null>(null); // 재시도용
   const formTopRef = useRef<HTMLDivElement>(null);
   const outcomeRef = useRef<HTMLDivElement>(null);
@@ -149,10 +153,11 @@ export default function ScoreForm({
       });
     } catch (e) {
       // fetch 자체 실패. AbortSignal.timeout → TimeoutError(클라 타임아웃), 그 외 → 진짜 오프라인.
+      // 오프라인은 서버 계약 코드(E8 등)와 겹치지 않게 클라 전용 코드 E-NET로 구분(curea-review-ai 지적).
       const isTimeout = e instanceof DOMException && e.name === "TimeoutError";
       setSubmit({
         phase: "error",
-        code: isTimeout ? "E4" : "E8",
+        code: isTimeout ? "E4" : "E-NET",
         message: isTimeout
           ? "지금 첨삭이 지연되고 있어요. 다시 시도해 주세요"
           : "인터넷 연결을 확인하고 다시 시도해 주세요", // 서버 503 E8 아닌 '진짜 오프라인' (EPO ①)
@@ -191,6 +196,7 @@ export default function ScoreForm({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSubmit) return;
+    submitCount.current += 1; // 새 제출마다 +1 (첫 제출=1). 경로 무관 — 메인 CTA로 재제출해도 카운트.
     const payload: ScoreRequest = {
       assignment: {
         school_level: schoolLevel,
@@ -203,7 +209,7 @@ export default function ScoreForm({
       meta: {
         client_version: "v0.1",
         submitted_at: new Date().toISOString(),
-        attempt_no: attemptNo.current,
+        attempt_no: submitCount.current, // functional_spec E9 재제출 추적
       },
     };
     lastPayload.current = payload;
@@ -211,11 +217,12 @@ export default function ScoreForm({
   }
 
   function retry() {
+    // transient 오류 재호출 = 같은 시도 → attempt_no 증가 없이 동일 payload 재전송.
     if (lastPayload.current) void runScore(lastPayload.current);
   }
 
   function handleResubmit() {
-    attemptNo.current += 1; // 재제출 시 +1 (functional_spec E9)
+    // 입력으로 복귀만. 다음 실제 제출(handleSubmit)에서 attempt_no가 증가한다.
     setSubmit({ phase: "idle" });
     formTopRef.current?.scrollIntoView({ behavior: "smooth" });
   }
