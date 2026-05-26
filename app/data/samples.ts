@@ -1,65 +1,24 @@
-// Pullim Writing Coach — 데모 데이터
+// Pullim Writing Coach — 데모 데이터 (SAMPLES 상수 · 서버 전용 소비)
 // 출처: 06_ai_feedback_outputs_v.3 (A·B·C) + 06_ai_feedback_outputs_v.4 (D·E)
 // rubric v.5 적용 / functional_spec v.3 §4 스키마
+//
+// 타입·표시 헬퍼는 SAMPLES와 분리된 data/scoring.ts에 있다(클라 번들에 본문 유출 방지).
+// 하위 호환을 위해 여기서 재노출 — 단 클라이언트 컴포넌트는 scoring.ts에서 직접 import해야
+// 이 모듈(SAMPLES 포함)이 클라 그래프에 들어오지 않는다.
 
-export type AreaName =
-  | "과제 이해"
-  | "내용 충실도"
-  | "구조·논리"
-  | "표현·문장"
-  | "성장 가능성";
+import type { Sample } from "./scoring";
 
-export type Score = {
-  area: AreaName;
-  score: number;
-  max: 20;
-  feedback_good: string;
-  feedback_fix: string;
-};
-
-export type RevisionGuide = {
-  priority: number;
-  action: string;
-  reason: string;
-};
-
-export type Assignment = {
-  school_level: string;
-  subject: string;
-  genre: string;
-  target_char_count: number | null;
-  prompt_text: string;
-};
-
-export type Submission = {
-  body: string;
-  char_count: number;
-};
-
-export type F3Output = {
-  total_score: number;
-  scores: Score[];
-  revision_guides: RevisionGuide[];
-  meta: {
-    model_version: string;
-    generated_at: string;
-    is_verified: boolean;
-    disclaimer: string;
-  };
-};
-
-export type Category = "저점" | "편차" | "중점" | "중상" | "고점";
-
-export type Sample = {
-  id: string;
-  label: string; // A, B, C, D, E
-  category: Category;
-  title: string;
-  intent: string;
-  assignment: Assignment;
-  submission: Submission;
-  output: F3Output;
-};
+export type {
+  AreaName,
+  Score,
+  RevisionGuide,
+  Assignment,
+  Submission,
+  F3Output,
+  Category,
+  Sample,
+} from "./scoring";
+export { getTotalScoreBand, getScoreColor, hasLargeAreaGap } from "./scoring";
 
 const DISCLAIMER =
   "이 채점은 AI 자동 채점입니다. 학교 교사의 실제 채점과 다를 수 있습니다.";
@@ -529,72 +488,4 @@ export const SAMPLES: Sample[] = [
 
 export function getSample(id: string): Sample | undefined {
   return SAMPLES.find((s) => s.id === id);
-}
-
-// 총점 해석 구간 (rubric v.5 §4). textClass는 시맨틱 토큰 기반(fe-styling).
-export function getTotalScoreBand(total: number): {
-  label: string;
-  message: string;
-  textClass: string;
-} {
-  if (total >= 90)
-    return {
-      label: "완성 단계",
-      message: "마무리 다듬기만 하면 제출할 수 있어요.",
-      textClass: "text-band-good-foreground",
-    };
-  if (total >= 75)
-    return {
-      label: "보완하면 좋은 글",
-      message: "한두 영역만 손보면 확실히 좋아져요.",
-      textClass: "text-band-good-foreground",
-    };
-  if (total >= 55)
-    return {
-      label: "기본 토대는 있음",
-      message: "2~3개 영역을 함께 보완해 보세요.",
-      textClass: "text-band-normal-foreground",
-    };
-  if (total >= 35)
-    return {
-      label: "토대 보강 필요",
-      message: "과제 이해·내용부터 다시 살펴보세요.",
-      textClass: "text-band-warn-foreground",
-    };
-  return {
-    label: "다시 쓰기 권장",
-    message: "과제 조건을 확인하고 새로 시작해 보세요.",
-    textClass: "text-band-warn-foreground",
-  };
-}
-
-// 영역별 색상 가이드 (rubric v.5 §2.2). 시맨틱 밴드 토큰 사용(fe-styling).
-export function getScoreColor(score: number): {
-  bar: string;
-  text: string;
-  band: "주의" | "보통" | "양호";
-} {
-  if (score >= 15)
-    return {
-      bar: "bg-band-good",
-      text: "text-band-good-foreground",
-      band: "양호",
-    };
-  if (score >= 10)
-    return {
-      bar: "bg-band-normal",
-      text: "text-band-normal-foreground",
-      band: "보통",
-    };
-  return {
-    bar: "bg-band-warn",
-    text: "text-band-warn-foreground",
-    band: "주의",
-  };
-}
-
-// 영역 편차 6점 이상 검사 (functional_spec v0.3 §3 F4)
-export function hasLargeAreaGap(scores: { score: number }[]): boolean {
-  const values = scores.map((s) => s.score);
-  return Math.max(...values) - Math.min(...values) >= 6;
 }

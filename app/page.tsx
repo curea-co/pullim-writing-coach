@@ -53,9 +53,9 @@ export default function Home() {
           href="/try"
           className="border-border text-foreground hover:bg-muted mt-3 inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium"
         >
-          글 입력 화면 보기
+          직접 글 입력해 채점받기
           <span className="bg-accent-mid-surface text-accent-mid rounded-full px-1.5 py-0.5 text-[10px] font-semibold">
-            P3.1 골격
+            라이브
           </span>
         </Link>
       </section>

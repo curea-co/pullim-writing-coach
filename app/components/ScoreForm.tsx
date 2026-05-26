@@ -1,23 +1,23 @@
 "use client";
 
-// Pullim Writing Coach — 학생 글 입력 폼 (WBS P3.1 컴포넌트 골격)
+// Pullim Writing Coach — 학생 글 입력 폼 + 라이브 채점 (WBS P3.1 + P3.2)
 //
 // 근거: 03_wireframe_first_screen_v.3 (블록 A·B·마이크로카피) ·
-//       02_functional_spec_v.3 §3 F1·F2·§6 에러 · 12_api_contract §3(요청 계약)
+//       02_functional_spec_v.3 §3 F1·F2·§6 에러 · 12_api_contract §3(요청)·§4(응답)·§5(에러)
 //
-// 범위(오늘 = M1 이전 골격): 입력 UI · 검증 · F3 게이트 · 요청 페이로드 직렬화까지.
-//   라이브 연동(`POST /api/score` fetch·토큰·로딩/재시도 결과 바인딩)은 **P3.2(05-29)**.
-//   route.ts 는 M1(05-28)에 생기므로 지금 fetch 하면 404 → 제출 시 직렬화 페이로드를
-//   미리보기로 보여 주어 "FE가 계약과 정합하게 직렬화하는가"를 검수 가능하게 한다.
+// P3.2: 제출 → POST /api/score (x-demo-token 헤더) → 로딩/에러/재시도 UX →
+//   200이면 결과를 공유 ResultView(=/samples UI)에 바인딩(P3.3). 401이면 TokenGate 재입력.
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/app/lib/utils";
-// 단일 소스 = 트랙 A의 순수 모듈(grading.ts, 계약 §9 S4). enum·길이정책·정규화·char_count를
+// 단일 소스 = 트랙 A의 순수 모듈(grading.ts, 계약 §9 S4). enum·길이정책·정규화·char_count·에러카피를
 // FE가 그대로 import해 서버와 한 곳에서 맞춘다(중복 구현 = 분기 위험 제거).
 import {
   BODY_MAX,
   BODY_MIN,
   charCount,
+  type ErrorCode,
+  ERROR_MESSAGE,
   GENRES,
   normalizeBody,
   PROMPT_MAX,
@@ -27,6 +27,9 @@ import {
   TARGET_MAX,
   TARGET_MIN,
 } from "@/app/lib/grading";
+import type { F3Output } from "@/app/data/scoring";
+import ResultView from "./ResultView";
+import { DEMO_TOKEN_KEY } from "./TokenGate";
 
 // 자주 쓰는 조합 프리셋 (F09, wireframe B1). FE 전용 — 장르는 기본값, 학생이 바꿀 수 있다.
 const PRESETS = [
@@ -53,13 +56,29 @@ type ScoreRequest = {
   meta: { client_version: string; submitted_at: string; attempt_no: number };
 };
 
+// 서버 에러 중 재시도가 의미 있는 코드(전송/업스트림 일시 장애·타임아웃·재호출 후 무효). 12 §5.2.
+// E-NET = 클라이언트 네트워크 단절(오프라인). 서버 계약 코드(E8 등)와 구분해 로그·문의 혼선 방지(curea-review-ai 지적).
+const RETRYABLE: ReadonlySet<string> = new Set([
+  "E4",
+  "E5",
+  "E6",
+  "E8",
+  "E-PARSE",
+  "E-CAP",
+  "E-NET",
+]);
+
 type SubmitState =
   | { phase: "idle" }
   | { phase: "loading" }
-  | { phase: "preview"; payload: ScoreRequest } // P3.2에서 phase:"result" 로 대체
-  | { phase: "error"; code: string; message: string };
+  | { phase: "result"; output: F3Output; assignment: ScoreRequest["assignment"] }
+  | { phase: "error"; code: string; message: string; retryable: boolean };
 
-export default function ScoreForm() {
+export default function ScoreForm({
+  onAuthExpired,
+}: {
+  onAuthExpired?: () => void; // 401(E-AUTH) 시 TokenGate가 토큰 폐기 + 재입력 노출
+}) {
   const [schoolLevel, setSchoolLevel] = useState("");
   const [subject, setSubject] = useState("");
   const [genre, setGenre] = useState("");
@@ -67,8 +86,19 @@ export default function ScoreForm() {
   const [promptText, setPromptText] = useState("");
   const [body, setBody] = useState(""); // 학생이 본 원본 — 정규화 전(화면 보존)
   const [submit, setSubmit] = useState<SubmitState>({ phase: "idle" });
-  const attemptNo = useRef(1);
+  // 제출 횟수(첫 제출=1, 새 제출마다 +1). 새 제출(메인 CTA)만 증가, 재시도(transient 재호출)는 유지.
+  const submitCount = useRef(0);
+  // 직전에 실제 전송한 payload — '다시 시도하기'는 이걸 그대로 재전송한다(같은 요청·같은 attempt_no).
+  const lastPayload = useRef<ScoreRequest | null>(null);
   const formTopRef = useRef<HTMLDivElement>(null);
+  const outcomeRef = useRef<HTMLDivElement>(null);
+
+  // 블록 C(로딩·결과·에러)가 나오면 그 위치로 스크롤 (wireframe §1 — 자동 스크롤)
+  useEffect(() => {
+    if (submit.phase !== "idle") {
+      outcomeRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [submit.phase]);
 
   // ── 파생 검증값 ─────────────────────────────────────────────────────
   const bodyCount = charCount(normalizeBody(body)); // 정규화 후 기준 (gate·표시)
@@ -104,14 +134,89 @@ export default function ScoreForm() {
   }
 
   const bodyOk = bodyCount >= BODY_MIN && bodyCount <= BODY_MAX;
-  const canSubmit =
-    requiredOk && bodyOk && !targetInvalid && submit.phase !== "loading";
+  // 로딩·에러 중에는 폼을 잠근다 → 에러 화면에서 값을 못 바꾸므로 '다시 시도하기'(직전 payload 재전송)와
+  // 화면 내용이 항상 일치. 수정하려면 '글 고치고 다시 받기'로 idle 복귀(curea-review-ai 지적).
+  const locked = submit.phase === "loading" || submit.phase === "error";
+  const canSubmit = requiredOk && bodyOk && !targetInvalid && !locked;
 
-  // ── 제출 (P3.1: 직렬화 + 미리보기 / P3.2: /api/score 연동) ───────────
+  // ── 라이브 채점 호출 (contract §3~§5) ────────────────────────────────
+  async function runScore(payload: ScoreRequest) {
+    const token = sessionStorage.getItem(DEMO_TOKEN_KEY) ?? "";
+    // 토큰이 없으면(=401 후 폐기됨) 호출하지 않고 재입력만 유도 — stale 토큰 401 루프·낭비 방지(curea-review-ai 지적).
+    if (!token) {
+      onAuthExpired?.();
+      return;
+    }
+    setSubmit({ phase: "loading" });
+
+    let res: Response;
+    try {
+      res = await fetch("/api/score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-demo-token": token },
+        body: JSON.stringify(payload),
+        // 서버 maxDuration 60s 보다 약간 길게 — 서버의 E4(타임아웃) 응답이 먼저 도착하도록.
+        signal: AbortSignal.timeout(65_000),
+      });
+    } catch (e) {
+      // fetch 자체 실패. AbortSignal.timeout → TimeoutError(클라 타임아웃), 그 외 → 진짜 오프라인.
+      // 오프라인은 서버 계약 코드(E8 등)와 겹치지 않게 클라 전용 코드 E-NET로 구분(curea-review-ai 지적).
+      const isTimeout = e instanceof DOMException && e.name === "TimeoutError";
+      setSubmit({
+        phase: "error",
+        code: isTimeout ? "E4" : "E-NET",
+        message: isTimeout
+          ? "지금 첨삭이 지연되고 있어요. 다시 시도해 주세요"
+          : "인터넷 연결을 확인하고 다시 시도해 주세요", // 서버 503 E8 아닌 '진짜 오프라인' (EPO ①)
+        retryable: true,
+      });
+      return;
+    }
+
+    if (res.status === 401) {
+      // 로딩 해제(버튼 재활성) — 재인증 후 바로 다시 제출할 수 있게. TokenGate는 재입력 배너 노출.
+      setSubmit({ phase: "idle" });
+      onAuthExpired?.(); // E-AUTH: TokenGate가 재입력 배너 노출(토큰은 유지 → 글 보존)
+      return;
+    }
+
+    if (res.ok) {
+      // 200이라도 본문 JSON 파싱이 깨질 수 있다 — try/catch 없으면 loading에 영구 고정(curea-review-ai 지적).
+      try {
+        const output = (await res.json()) as F3Output;
+        setSubmit({ phase: "result", output, assignment: payload.assignment });
+      } catch {
+        setSubmit({
+          phase: "error",
+          code: "E5",
+          message: ERROR_MESSAGE.E5,
+          retryable: true,
+        });
+      }
+      return;
+    }
+
+    // 서버 에러 봉투 (계약 §5.1). code→카피 단일 소스 = grading.ts ERROR_MESSAGE.
+    let code: ErrorCode = "E5";
+    try {
+      const env = (await res.json()) as { error?: { code?: ErrorCode } };
+      if (env?.error?.code) code = env.error.code;
+    } catch {
+      /* 봉투 파싱 실패 → 기본 E5 */
+    }
+    setSubmit({
+      phase: "error",
+      code,
+      message: ERROR_MESSAGE[code] ?? "결과를 다시 만들어야 해요. 다시 시도해 주세요",
+      retryable: RETRYABLE.has(code),
+    });
+  }
+
+  // 새 제출 — 현재 화면 값으로 payload 조립, attempt_no +1, lastPayload에 보관 후 전송.
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSubmit) return;
-
+    submitCount.current += 1; // functional_spec E9 재제출 추적
     const payload: ScoreRequest = {
       assignment: {
         school_level: schoolLevel,
@@ -124,40 +229,34 @@ export default function ScoreForm() {
       meta: {
         client_version: "v0.1",
         submitted_at: new Date().toISOString(),
-        attempt_no: attemptNo.current,
+        attempt_no: submitCount.current,
       },
     };
+    lastPayload.current = payload;
+    void runScore(payload);
+  }
 
-    // ── P3.2 연동 자리 (05-29) ──────────────────────────────────────
-    // const token = sessionStorage.getItem(DEMO_TOKEN_KEY) ?? "";  // TokenGate가 보관 (§7.1)
-    // setSubmit({ phase: "loading" });
-    // try {
-    //   const res = await fetch("/api/score", {
-    //     method: "POST",
-    //     headers: { "Content-Type": "application/json", "x-demo-token": token },
-    //     body: JSON.stringify(payload),
-    //     signal: AbortSignal.timeout(60_000),
-    //   });
-    //   if (res.status === 401) return onAuthExpired?.();      // E-AUTH: TokenGate 재입력
-    //   if (res.ok) setSubmit({ phase: "result", data: await res.json() }); // 200 → /samples UI 재사용 (P3.3)
-    //   else {
-    //     const { error } = await res.json();                  // 서버 에러 봉투 (계약 §5.1)
-    //     setSubmit({ phase: "error", code: error.code, message: ERROR_MESSAGE[error.code] });
-    //     // code→카피 단일 소스 = grading.ts ERROR_MESSAGE (E4/E5·E6/E8/E10/E11 …). E8=503은 "일시적 오류…"(EPO ①)
-    //   }
-    // } catch {
-    //   // fetch 자체가 reject = 진짜 클라이언트 오프라인 (서버 503 E8 아님). 인터넷 안내는 여기서만.
-    //   setSubmit({ phase: "error", code: "E8", message: "인터넷 연결을 확인하고 다시 시도해 주세요." });
-    // }
-    // ─────────────────────────────────────────────────────────────────
-    setSubmit({ phase: "preview", payload }); // 골격: 직렬화 페이로드 검수용
+  // 다시 시도하기 — 일시 오류의 재호출. **직전 실패 payload를 그대로** 재전송(같은 요청·같은 attempt_no).
+  //   내용을 고쳐 다시 받으려면 '글 고치고 다시 받기'로 새 제출(attempt_no +1). 에러 중 폼은 잠겨 화면=전송 일치.
+  function retry() {
+    if (lastPayload.current) void runScore(lastPayload.current);
   }
 
   function handleResubmit() {
-    attemptNo.current += 1; // 재제출 시 +1 (functional_spec E9)
+    // 입력으로 복귀(폼 잠금 해제). 다음 새 제출(handleSubmit)에서 attempt_no가 증가한다.
     setSubmit({ phase: "idle" });
     formTopRef.current?.scrollIntoView({ behavior: "smooth" });
   }
+
+  const resubmitButton = (
+    <button
+      type="button"
+      onClick={handleResubmit}
+      className="border-border text-foreground hover:bg-muted inline-flex items-center justify-center rounded-lg border px-4 py-2.5 text-sm font-semibold"
+    >
+      글 고치고 다시 받기
+    </button>
+  );
 
   return (
     <div ref={formTopRef} className="space-y-6">
@@ -185,6 +284,7 @@ export default function ScoreForm() {
                 <button
                   key={p.label}
                   type="button"
+                  disabled={locked}
                   onClick={() => {
                     setSchoolLevel(p.school_level);
                     setSubject(p.subject);
@@ -194,7 +294,8 @@ export default function ScoreForm() {
                     "rounded-full border px-3 py-1 text-xs font-medium transition",
                     active
                       ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border text-foreground hover:bg-muted"
+                      : "border-border text-foreground hover:bg-muted",
+                    locked && "cursor-not-allowed opacity-50"
                   )}
                 >
                   {p.label}
@@ -211,6 +312,7 @@ export default function ScoreForm() {
             value={schoolLevel}
             options={SCHOOL_LEVELS}
             onChange={setSchoolLevel}
+            disabled={locked}
           />
           <SelectField
             id="subject"
@@ -218,6 +320,7 @@ export default function ScoreForm() {
             value={subject}
             options={SUBJECTS}
             onChange={setSubject}
+            disabled={locked}
           />
           <SelectField
             id="genre"
@@ -225,6 +328,7 @@ export default function ScoreForm() {
             value={genre}
             options={GENRES}
             onChange={setGenre}
+            disabled={locked}
           />
           <div>
             <label
@@ -240,10 +344,12 @@ export default function ScoreForm() {
               inputMode="numeric"
               value={targetRaw}
               onChange={(e) => setTargetRaw(e.target.value)}
+              disabled={locked}
               placeholder="예: 800 — 모르면 비워 두세요"
               className={cn(
                 "border-border bg-background text-foreground w-full rounded-lg border px-3 py-2 text-sm",
-                targetInvalid && "border-band-warn"
+                targetInvalid && "border-band-warn",
+                locked && "cursor-not-allowed opacity-60"
               )}
             />
             {targetInvalid && (
@@ -265,10 +371,14 @@ export default function ScoreForm() {
             id="prompt"
             value={promptText}
             onChange={(e) => setPromptText(e.target.value)}
+            disabled={locked}
             rows={3}
             maxLength={PROMPT_MAX}
             placeholder="선생님이 내준 과제를 그대로 적어 주세요. 예: 교복 자율화에 대한 자신의 주장을 근거 2개 이상으로 쓰시오."
-            className="border-border bg-background text-foreground w-full resize-y rounded-lg border px-3 py-2 text-sm leading-relaxed"
+            className={cn(
+              "border-border bg-background text-foreground w-full resize-y rounded-lg border px-3 py-2 text-sm leading-relaxed",
+              locked && "cursor-not-allowed opacity-60"
+            )}
           />
           <p className="text-subtle-foreground mt-1 text-right text-xs">
             {promptText.trim().length} / {PROMPT_MAX}자
@@ -288,16 +398,18 @@ export default function ScoreForm() {
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
+          disabled={locked}
           rows={12}
           placeholder="여기에 글 전체를 붙여넣어 주세요 (50자 이상)"
           className={cn(
             "border-border bg-background text-foreground w-full resize-y rounded-lg border px-3 py-2 text-sm leading-relaxed",
-            bodyError && "border-band-warn"
+            bodyError && "border-band-warn",
+            locked && "cursor-not-allowed opacity-60"
           )}
         />
         <div className="mt-1.5 flex items-center justify-between text-xs">
           <span className={cn(bodyError && "text-band-warn-foreground")}>
-            {bodyError?.message ?? " "}
+            {bodyError?.message ?? " "}
           </span>
           <span className="text-subtle-foreground tabular-nums">
             현재 {bodyCount}자{targetNum ? ` / 목표 ${targetNum}자` : ""}
@@ -321,48 +433,80 @@ export default function ScoreForm() {
               : "AI 첨삭 받기"}
           </button>
         </form>
-        {!canSubmit && submit.phase !== "loading" && (
+        {/* 입력 미완 안내는 idle에서만 — 에러 상태에선 locked로 canSubmit=false라 오해 유발(curea-review-ai 지적) */}
+        {submit.phase === "idle" && !canSubmit && (
           <p className="text-muted-foreground mt-2 text-center text-xs">
             과제 정보와 글(50자 이상)을 모두 입력하면 첨삭을 받을 수 있어요
           </p>
         )}
       </section>
 
-      {/* 블록 C — 결과 영역 (골격: 직렬화 페이로드 미리보기 / 실연동은 P3.2·P3.3) */}
-      {submit.phase === "preview" && (
-        <section className="border-accent-mid-surface bg-accent-mid-surface rounded-xl border p-5">
-          <div className="mb-2 flex items-center gap-2">
-            <span className="bg-accent-mid text-primary-foreground rounded-full px-2 py-0.5 text-xs font-semibold">
-              골격
-            </span>
-            <h2 className="text-foreground text-sm font-semibold">
-              /api/score 요청 페이로드 (검수용)
-            </h2>
+      {/* 블록 C — 로딩 / 결과 / 에러 */}
+      {submit.phase === "loading" && (
+        <section
+          ref={outcomeRef}
+          className="border-border bg-surface flex items-center gap-3 rounded-xl border p-6"
+        >
+          <span
+            className="border-primary inline-block h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-t-transparent"
+            aria-hidden
+          />
+          <div>
+            <p className="text-foreground text-sm font-medium">
+              AI가 5가지 기준으로 글을 읽고 있어요…
+            </p>
+            <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">
+              과제 이해 · 내용 충실도 · 구조·논리 · 표현·문장 · 성장 가능성
+              <br />
+              최대 1분 정도 걸릴 수 있어요.
+            </p>
           </div>
-          <p className="text-muted-foreground mb-3 text-xs leading-relaxed">
-            🔌 라이브 채점 연동은 <b>P3.2(05-29)</b> — route.ts(M1·05-28) 완성 후
-            붙입니다. 지금은 입력이 계약(12 §3.1)대로 직렬화되는지 보여 줍니다.
-            body 는 원본 그대로 전송하고, 정규화·char_count·meta 는 서버가 다시
-            산출합니다(계약 §3.2). 200 응답은 기존 <code>/samples</code> 결과
-            UI에 바인딩합니다(P3.3).
+        </section>
+      )}
+      {submit.phase === "result" && (
+        <div ref={outcomeRef}>
+          <ResultView
+            assignment={submit.assignment}
+            output={submit.output}
+            actions={resubmitButton}
+          />
+        </div>
+      )}
+
+      {submit.phase === "error" && (
+        <section
+          ref={outcomeRef}
+          className="border-band-warn-surface bg-band-warn-surface rounded-xl border p-5"
+        >
+          <h2 className="text-band-warn-foreground text-sm font-semibold">
+            채점을 마치지 못했어요
+          </h2>
+          <p className="text-foreground mt-1.5 text-sm">{submit.message}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {submit.retryable && (
+              <button
+                type="button"
+                onClick={retry}
+                className="bg-primary text-primary-foreground inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold transition hover:opacity-90"
+              >
+                다시 시도하기
+              </button>
+            )}
+            {resubmitButton}
+          </div>
+          <p className="text-subtle-foreground mt-2 text-[11px]">
+            오류 코드: {submit.code}
           </p>
-          <pre className="bg-surface border-border text-foreground overflow-x-auto rounded-lg border p-3 text-xs leading-relaxed">
-            {JSON.stringify(submit.payload, null, 2)}
-          </pre>
-          <button
-            type="button"
-            onClick={handleResubmit}
-            className="border-border text-foreground hover:bg-muted mt-3 inline-flex items-center justify-center rounded-lg border px-4 py-2 text-sm font-semibold"
-          >
-            글 고치고 다시 받기
-          </button>
         </section>
       )}
 
-      {/* C5 — 면책 (functional_spec §4.2 meta.disclaimer 와 동일 문자열) */}
-      <p className="bg-muted text-muted-foreground rounded-md px-3 py-2 text-xs">
-        ※ 이 채점은 AI 자동 채점입니다. 학교 교사의 실제 채점과 다를 수 있습니다.
-      </p>
+      {/* C5 — 면책 (결과 화면엔 ResultView가 동일 문구 포함하므로 그 외 상태에서만) */}
+      {submit.phase !== "result" && (
+        <p className="bg-muted text-muted-foreground rounded-md px-3 py-2 text-xs">
+          ※ 이 채점은 AI 자동 채점입니다. 학교 교사의 실제 채점과 다를 수
+          있습니다.
+        </p>
+      )}
     </div>
   );
 }
@@ -374,12 +518,14 @@ function SelectField({
   value,
   options,
   onChange,
+  disabled,
 }: {
   id: string;
   label: string;
   value: string;
   options: readonly string[];
   onChange: (v: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <div>
@@ -393,9 +539,11 @@ function SelectField({
         id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
         className={cn(
           "border-border bg-background w-full rounded-lg border px-3 py-2 text-sm",
-          value ? "text-foreground" : "text-subtle-foreground"
+          value ? "text-foreground" : "text-subtle-foreground",
+          disabled && "cursor-not-allowed opacity-60"
         )}
       >
         <option value="">선택해 주세요</option>

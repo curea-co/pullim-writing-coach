@@ -8,8 +8,8 @@
 //   보관(sessionStorage)하고, 채점 요청 시 `x-demo-token` 헤더로 보낸다. 비밀번호의 진위는
 //   **서버가 판정**한다(클라이언트는 모름) — 틀리면 /api/score가 401 `E-AUTH`로 응답한다.
 //
-// M1 골격 범위: 입력 화면 + 세션 보관 + "나가기"까지. **401 수신 시 토큰 폐기 + 재입력**은
-//   라이브 연동(P3.2)에서 ScoreForm 제출 핸들러가 onAuthExpired()를 호출하도록 연결한다(아래 주석).
+// 입력 화면 + 세션 보관 + "나가기" + 401 재노출(P3.2): 제출 시 서버가 401이면 ScoreForm이
+//   onAuthExpired()를 호출 → 토큰 폐기 + 입력 화면 재노출 + 사유 안내.
 
 import { useState, useSyncExternalStore } from "react";
 import { cn } from "@/app/lib/utils";
@@ -38,25 +38,30 @@ export default function TokenGate() {
   const token = useSyncExternalStore(subscribeToken, readToken, () => null);
   const [input, setInput] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
+  // 한 번 입장하면(또는 토큰 보유) ScoreForm을 계속 마운트해 작성 글을 보존한다.
+  // 401 때 stale 토큰을 폐기(아래)해도 이 플래그 덕분에 폼이 언마운트되지 않는다(curea-review-ai 지적).
+  const [entered, setEntered] = useState(false);
+  const showForm = token !== null || entered;
 
+  // 최초 입장 + 401 후 재입력 공용. 토큰을 갱신하고 입력/오류를 정리한다.
   function enter(e: React.FormEvent) {
     e.preventDefault();
     const t = input.trim();
     if (!t) return;
     writeToken(t);
+    setEntered(true);
     setAuthError(null);
+    setInput("");
   }
 
   function leave() {
     writeToken(null);
+    setEntered(false);
     setInput("");
+    setAuthError(null); // 로그아웃 = 인증 상태 초기화 → 다음 진입에 stale 오류 안 남김(curea-review-ai 지적)
   }
 
-  // P3.2 연동 자리: ScoreForm 제출이 401(E-AUTH)을 받으면 호출 →
-  //   세션 토큰 폐기 + 입력 화면 재노출 + 사유 안내.
-  //   <ScoreForm onAuthExpired={() => { writeToken(null); setAuthError("비밀번호가 올바르지 않아요. 다시 입력해 주세요."); }} />
-
-  if (!token) {
+  if (!showForm) {
     return (
       <section className="border-border bg-surface rounded-xl border p-6">
         <h2 className="text-foreground text-base font-semibold">🔒 데모 접근</h2>
@@ -110,7 +115,48 @@ export default function TokenGate() {
           나가기
         </button>
       </div>
-      <ScoreForm />
+      {/* 401 재인증 — ScoreForm을 언마운트하지 않고 인라인 배너로 비밀번호만 다시 받는다.
+          토큰을 비우면 ScoreForm이 사라져 작성한 글이 날아가므로 그대로 둔다(curea-review-ai 지적). */}
+      {authError && (
+        <section className="border-band-warn-surface bg-band-warn-surface rounded-xl border p-4">
+          <p className="text-band-warn-foreground text-sm font-medium">
+            {authError}
+          </p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            작성한 글은 그대로 있어요. 비밀번호만 다시 입력하면 채점을 이어갈 수
+            있어요.
+          </p>
+          <form onSubmit={enter} className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <input
+              type="password"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="데모 비밀번호"
+              autoComplete="off"
+              className="border-band-warn bg-background text-foreground flex-1 rounded-lg border px-3 py-2.5 text-sm"
+            />
+            <button
+              type="submit"
+              disabled={!input.trim()}
+              className={cn(
+                "bg-primary text-primary-foreground rounded-lg px-5 py-2.5 text-sm font-semibold transition hover:opacity-90",
+                !input.trim() && "cursor-not-allowed opacity-40"
+              )}
+            >
+              다시 들어가기
+            </button>
+          </form>
+        </section>
+      )}
+      <ScoreForm
+        onAuthExpired={() => {
+          // 제출 시 서버 401(E-AUTH): stale 토큰을 폐기(재사용 401 루프 방지)하되,
+          // entered 래치로 ScoreForm은 계속 마운트 → 작성 글 보존. 재입력 배너만 노출.
+          setEntered(true);
+          writeToken(null);
+          setAuthError("비밀번호가 올바르지 않아요. 다시 입력해 주세요.");
+        }}
+      />
     </div>
   );
 }
