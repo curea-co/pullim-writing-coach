@@ -433,7 +433,8 @@ export default function ScoreForm({
               : "AI 첨삭 받기"}
           </button>
         </form>
-        {!canSubmit && submit.phase !== "loading" && (
+        {/* 입력 미완 안내는 idle에서만 — 에러 상태에선 locked로 canSubmit=false라 오해 유발(curea-review-ai 지적) */}
+        {submit.phase === "idle" && !canSubmit && (
           <p className="text-muted-foreground mt-2 text-center text-xs">
             과제 정보와 글(50자 이상)을 모두 입력하면 첨삭을 받을 수 있어요
           </p>
