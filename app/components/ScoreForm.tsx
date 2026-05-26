@@ -86,9 +86,10 @@ export default function ScoreForm({
   const [promptText, setPromptText] = useState("");
   const [body, setBody] = useState(""); // 학생이 본 원본 — 정규화 전(화면 보존)
   const [submit, setSubmit] = useState<SubmitState>({ phase: "idle" });
-  // 제출 횟수(첫 제출=1, 새 제출마다 +1). 재시도(transient 재호출)는 같은 시도라 증가 안 함.
-  // 메인 CTA·"글 고치고 다시 받기" 어느 경로로 재제출해도 새 시도로 카운트되게 제출 시점에 증가(curea-review-ai 지적).
+  // 제출 횟수(첫 제출=1, 새 제출마다 +1). 새 제출(메인 CTA)만 증가, 재시도(transient 재호출)는 유지.
   const submitCount = useRef(0);
+  // 직전에 실제 전송한 payload — '다시 시도하기'는 이걸 그대로 재전송한다(같은 요청·같은 attempt_no).
+  const lastPayload = useRef<ScoreRequest | null>(null);
   const formTopRef = useRef<HTMLDivElement>(null);
   const outcomeRef = useRef<HTMLDivElement>(null);
 
@@ -133,8 +134,10 @@ export default function ScoreForm({
   }
 
   const bodyOk = bodyCount >= BODY_MIN && bodyCount <= BODY_MAX;
-  const canSubmit =
-    requiredOk && bodyOk && !targetInvalid && submit.phase !== "loading";
+  // 로딩·에러 중에는 폼을 잠근다 → 에러 화면에서 값을 못 바꾸므로 '다시 시도하기'(직전 payload 재전송)와
+  // 화면 내용이 항상 일치. 수정하려면 '글 고치고 다시 받기'로 idle 복귀(curea-review-ai 지적).
+  const locked = submit.phase === "loading" || submit.phase === "error";
+  const canSubmit = requiredOk && bodyOk && !targetInvalid && !locked;
 
   // ── 라이브 채점 호출 (contract §3~§5) ────────────────────────────────
   async function runScore(payload: ScoreRequest) {
@@ -178,8 +181,18 @@ export default function ScoreForm({
     }
 
     if (res.ok) {
-      const output = (await res.json()) as F3Output;
-      setSubmit({ phase: "result", output, assignment: payload.assignment });
+      // 200이라도 본문 JSON 파싱이 깨질 수 있다 — try/catch 없으면 loading에 영구 고정(curea-review-ai 지적).
+      try {
+        const output = (await res.json()) as F3Output;
+        setSubmit({ phase: "result", output, assignment: payload.assignment });
+      } catch {
+        setSubmit({
+          phase: "error",
+          code: "E5",
+          message: ERROR_MESSAGE.E5,
+          retryable: true,
+        });
+      }
       return;
     }
 
@@ -199,11 +212,12 @@ export default function ScoreForm({
     });
   }
 
-  // 항상 **현재 화면 값**으로 payload를 만든다 → 화면 내용과 전송 내용이 항상 일치(curea-review-ai 지적).
-  //   newAttempt=true(새 제출): attempt_no +1 / false(transient 재시도): attempt_no 유지 — 재시도와 재제출 구분.
-  function submitCurrent(newAttempt: boolean) {
-    if (newAttempt) submitCount.current += 1;
-    void runScore({
+  // 새 제출 — 현재 화면 값으로 payload 조립, attempt_no +1, lastPayload에 보관 후 전송.
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canSubmit) return;
+    submitCount.current += 1; // functional_spec E9 재제출 추적
+    const payload: ScoreRequest = {
       assignment: {
         school_level: schoolLevel,
         subject,
@@ -215,24 +229,21 @@ export default function ScoreForm({
       meta: {
         client_version: "v0.1",
         submitted_at: new Date().toISOString(),
-        attempt_no: submitCount.current, // functional_spec E9 재제출 추적
+        attempt_no: submitCount.current,
       },
-    });
+    };
+    lastPayload.current = payload;
+    void runScore(payload);
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!canSubmit) return;
-    submitCurrent(true); // 새 제출 → attempt_no +1
-  }
-
-  // 다시 시도하기 — 일시 오류 재시도. 현재 화면 값으로 보내되 attempt_no는 유지(같은 시도).
+  // 다시 시도하기 — 일시 오류의 재호출. **직전 실패 payload를 그대로** 재전송(같은 요청·같은 attempt_no).
+  //   내용을 고쳐 다시 받으려면 '글 고치고 다시 받기'로 새 제출(attempt_no +1). 에러 중 폼은 잠겨 화면=전송 일치.
   function retry() {
-    if (canSubmit) submitCurrent(false);
+    if (lastPayload.current) void runScore(lastPayload.current);
   }
 
   function handleResubmit() {
-    // 입력으로 복귀만. 다음 제출(submitCurrent)에서 attempt_no가 증가한다.
+    // 입력으로 복귀(폼 잠금 해제). 다음 새 제출(handleSubmit)에서 attempt_no가 증가한다.
     setSubmit({ phase: "idle" });
     formTopRef.current?.scrollIntoView({ behavior: "smooth" });
   }
@@ -273,6 +284,7 @@ export default function ScoreForm({
                 <button
                   key={p.label}
                   type="button"
+                  disabled={locked}
                   onClick={() => {
                     setSchoolLevel(p.school_level);
                     setSubject(p.subject);
@@ -282,7 +294,8 @@ export default function ScoreForm({
                     "rounded-full border px-3 py-1 text-xs font-medium transition",
                     active
                       ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border text-foreground hover:bg-muted"
+                      : "border-border text-foreground hover:bg-muted",
+                    locked && "cursor-not-allowed opacity-50"
                   )}
                 >
                   {p.label}
@@ -299,6 +312,7 @@ export default function ScoreForm({
             value={schoolLevel}
             options={SCHOOL_LEVELS}
             onChange={setSchoolLevel}
+            disabled={locked}
           />
           <SelectField
             id="subject"
@@ -306,6 +320,7 @@ export default function ScoreForm({
             value={subject}
             options={SUBJECTS}
             onChange={setSubject}
+            disabled={locked}
           />
           <SelectField
             id="genre"
@@ -313,6 +328,7 @@ export default function ScoreForm({
             value={genre}
             options={GENRES}
             onChange={setGenre}
+            disabled={locked}
           />
           <div>
             <label
@@ -328,10 +344,12 @@ export default function ScoreForm({
               inputMode="numeric"
               value={targetRaw}
               onChange={(e) => setTargetRaw(e.target.value)}
+              disabled={locked}
               placeholder="예: 800 — 모르면 비워 두세요"
               className={cn(
                 "border-border bg-background text-foreground w-full rounded-lg border px-3 py-2 text-sm",
-                targetInvalid && "border-band-warn"
+                targetInvalid && "border-band-warn",
+                locked && "cursor-not-allowed opacity-60"
               )}
             />
             {targetInvalid && (
@@ -353,10 +371,14 @@ export default function ScoreForm({
             id="prompt"
             value={promptText}
             onChange={(e) => setPromptText(e.target.value)}
+            disabled={locked}
             rows={3}
             maxLength={PROMPT_MAX}
             placeholder="선생님이 내준 과제를 그대로 적어 주세요. 예: 교복 자율화에 대한 자신의 주장을 근거 2개 이상으로 쓰시오."
-            className="border-border bg-background text-foreground w-full resize-y rounded-lg border px-3 py-2 text-sm leading-relaxed"
+            className={cn(
+              "border-border bg-background text-foreground w-full resize-y rounded-lg border px-3 py-2 text-sm leading-relaxed",
+              locked && "cursor-not-allowed opacity-60"
+            )}
           />
           <p className="text-subtle-foreground mt-1 text-right text-xs">
             {promptText.trim().length} / {PROMPT_MAX}자
@@ -376,11 +398,13 @@ export default function ScoreForm({
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
+          disabled={locked}
           rows={12}
           placeholder="여기에 글 전체를 붙여넣어 주세요 (50자 이상)"
           className={cn(
             "border-border bg-background text-foreground w-full resize-y rounded-lg border px-3 py-2 text-sm leading-relaxed",
-            bodyError && "border-band-warn"
+            bodyError && "border-band-warn",
+            locked && "cursor-not-allowed opacity-60"
           )}
         />
         <div className="mt-1.5 flex items-center justify-between text-xs">
@@ -493,12 +517,14 @@ function SelectField({
   value,
   options,
   onChange,
+  disabled,
 }: {
   id: string;
   label: string;
   value: string;
   options: readonly string[];
   onChange: (v: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <div>
@@ -512,9 +538,11 @@ function SelectField({
         id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
         className={cn(
           "border-border bg-background w-full rounded-lg border px-3 py-2 text-sm",
-          value ? "text-foreground" : "text-subtle-foreground"
+          value ? "text-foreground" : "text-subtle-foreground",
+          disabled && "cursor-not-allowed opacity-60"
         )}
       >
         <option value="">선택해 주세요</option>
