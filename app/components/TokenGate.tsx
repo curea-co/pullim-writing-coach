@@ -8,8 +8,8 @@
 //   보관(sessionStorage)하고, 채점 요청 시 `x-demo-token` 헤더로 보낸다. 비밀번호의 진위는
 //   **서버가 판정**한다(클라이언트는 모름) — 틀리면 /api/score가 401 `E-AUTH`로 응답한다.
 //
-// M1 골격 범위: 입력 화면 + 세션 보관 + "나가기"까지. **401 수신 시 토큰 폐기 + 재입력**은
-//   라이브 연동(P3.2)에서 ScoreForm 제출 핸들러가 onAuthExpired()를 호출하도록 연결한다(아래 주석).
+// 입력 화면 + 세션 보관 + "나가기" + 401 재노출(P3.2): 제출 시 서버가 401이면 ScoreForm이
+//   onAuthExpired()를 호출 → 토큰 폐기 + 입력 화면 재노출 + 사유 안내.
 
 import { useState, useSyncExternalStore } from "react";
 import { cn } from "@/app/lib/utils";
@@ -51,10 +51,6 @@ export default function TokenGate() {
     writeToken(null);
     setInput("");
   }
-
-  // P3.2 연동 자리: ScoreForm 제출이 401(E-AUTH)을 받으면 호출 →
-  //   세션 토큰 폐기 + 입력 화면 재노출 + 사유 안내.
-  //   <ScoreForm onAuthExpired={() => { writeToken(null); setAuthError("비밀번호가 올바르지 않아요. 다시 입력해 주세요."); }} />
 
   if (!token) {
     return (
@@ -110,7 +106,13 @@ export default function TokenGate() {
           나가기
         </button>
       </div>
-      <ScoreForm />
+      <ScoreForm
+        onAuthExpired={() => {
+          // 제출 시 서버가 401(E-AUTH) → 토큰 폐기 + 입력 화면 재노출 + 사유 안내.
+          writeToken(null);
+          setAuthError("비밀번호가 올바르지 않아요. 다시 입력해 주세요.");
+        }}
+      />
     </div>
   );
 }
