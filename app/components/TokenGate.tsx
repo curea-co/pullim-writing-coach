@@ -58,6 +58,7 @@ export default function TokenGate() {
     writeToken(null);
     setEntered(false);
     setInput("");
+    setAuthError(null); // 로그아웃 = 인증 상태 초기화 → 다음 진입에 stale 오류 안 남김(curea-review-ai 지적)
   }
 
   if (!showForm) {
