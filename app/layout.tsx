@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import Sidebar from "./components/Sidebar";
 
 export const metadata: Metadata = {
   title: "Pullim Writing Coach — 데모",
@@ -20,8 +21,12 @@ export default function RootLayout({
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css"
         />
       </head>
-      <body className="bg-background text-foreground flex min-h-full flex-col">
-        {children}
+      <body className="bg-background text-foreground min-h-full">
+        {/* 데스크톱: 좌측 사이드바 + 콘텐츠 / 모바일: 상단바(Sidebar 내부) 아래 콘텐츠 */}
+        <div className="md:flex md:min-h-screen">
+          <Sidebar />
+          <div className="min-w-0 flex-1">{children}</div>
+        </div>
       </body>
     </html>
   );
