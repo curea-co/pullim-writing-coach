@@ -138,8 +138,13 @@ export default function ScoreForm({
 
   // ── 라이브 채점 호출 (contract §3~§5) ────────────────────────────────
   async function runScore(payload: ScoreRequest) {
-    setSubmit({ phase: "loading" });
     const token = sessionStorage.getItem(DEMO_TOKEN_KEY) ?? "";
+    // 토큰이 없으면(=401 후 폐기됨) 호출하지 않고 재입력만 유도 — stale 토큰 401 루프·낭비 방지(curea-review-ai 지적).
+    if (!token) {
+      onAuthExpired?.();
+      return;
+    }
+    setSubmit({ phase: "loading" });
 
     let res: Response;
     try {
@@ -194,10 +199,10 @@ export default function ScoreForm({
     });
   }
 
-  // 항상 **현재 화면 값**으로 payload를 만든다 → 화면에 보이는 내용과 전송 내용이 항상 일치
-  // (curea-review-ai 지적: 에러 후 폼을 고치고 재시도하면 직전 payload가 가던 회귀 제거).
-  function submitCurrent() {
-    submitCount.current += 1; // 새 제출마다 +1 (첫 제출=1). 메인 CTA·다시 시도하기 모두 카운트.
+  // 항상 **현재 화면 값**으로 payload를 만든다 → 화면 내용과 전송 내용이 항상 일치(curea-review-ai 지적).
+  //   newAttempt=true(새 제출): attempt_no +1 / false(transient 재시도): attempt_no 유지 — 재시도와 재제출 구분.
+  function submitCurrent(newAttempt: boolean) {
+    if (newAttempt) submitCount.current += 1;
     void runScore({
       assignment: {
         school_level: schoolLevel,
@@ -218,12 +223,12 @@ export default function ScoreForm({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSubmit) return;
-    submitCurrent();
+    submitCurrent(true); // 새 제출 → attempt_no +1
   }
 
-  // 다시 시도하기 — 현재 화면 값으로 다시 제출(잠금 대신 재구성, curea-review-ai 지적).
+  // 다시 시도하기 — 일시 오류 재시도. 현재 화면 값으로 보내되 attempt_no는 유지(같은 시도).
   function retry() {
-    if (canSubmit) submitCurrent();
+    if (canSubmit) submitCurrent(false);
   }
 
   function handleResubmit() {

@@ -38,6 +38,10 @@ export default function TokenGate() {
   const token = useSyncExternalStore(subscribeToken, readToken, () => null);
   const [input, setInput] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
+  // 한 번 입장하면(또는 토큰 보유) ScoreForm을 계속 마운트해 작성 글을 보존한다.
+  // 401 때 stale 토큰을 폐기(아래)해도 이 플래그 덕분에 폼이 언마운트되지 않는다(curea-review-ai 지적).
+  const [entered, setEntered] = useState(false);
+  const showForm = token !== null || entered;
 
   // 최초 입장 + 401 후 재입력 공용. 토큰을 갱신하고 입력/오류를 정리한다.
   function enter(e: React.FormEvent) {
@@ -45,16 +49,18 @@ export default function TokenGate() {
     const t = input.trim();
     if (!t) return;
     writeToken(t);
+    setEntered(true);
     setAuthError(null);
     setInput("");
   }
 
   function leave() {
     writeToken(null);
+    setEntered(false);
     setInput("");
   }
 
-  if (!token) {
+  if (!showForm) {
     return (
       <section className="border-border bg-surface rounded-xl border p-6">
         <h2 className="text-foreground text-base font-semibold">🔒 데모 접근</h2>
@@ -142,10 +148,13 @@ export default function TokenGate() {
         </section>
       )}
       <ScoreForm
-        onAuthExpired={() =>
-          // 제출 시 서버 401(E-AUTH) → 토큰은 유지(글 보존) + 재입력 배너만 노출.
-          setAuthError("비밀번호가 올바르지 않아요. 다시 입력해 주세요.")
-        }
+        onAuthExpired={() => {
+          // 제출 시 서버 401(E-AUTH): stale 토큰을 폐기(재사용 401 루프 방지)하되,
+          // entered 래치로 ScoreForm은 계속 마운트 → 작성 글 보존. 재입력 배너만 노출.
+          setEntered(true);
+          writeToken(null);
+          setAuthError("비밀번호가 올바르지 않아요. 다시 입력해 주세요.");
+        }}
       />
     </div>
   );
