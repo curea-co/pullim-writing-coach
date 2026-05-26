@@ -8,9 +8,11 @@
 
 import type { Assignment, Submission } from "../data/samples";
 import { SAMPLES } from "../data/samples";
+import { MODEL_VERSION } from "./model-version";
 
-// meta.model_version 단일 상수 (12 §4.2). 프롬프트 버전이 바뀌면 여기만 갱신.
-export const MODEL_VERSION = "writing-coach-prompt-v0.2";
+// MODEL_VERSION은 ./model-version(leaf 상수 모듈)에 정의 — grading.ts가 prompt.ts(→SAMPLES)를
+// 끌어오지 않게 분리(issue #4). 하위 호환을 위해 여기서 재노출.
+export { MODEL_VERSION };
 
 const SYSTEM_PROMPT_BASE = `You are "Pullim Writing Coach", an AI essay reviewer for Korean middle/high school
 students. You score student writing on FIVE areas (each 0~20, total 0~100) and
