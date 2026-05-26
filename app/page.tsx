@@ -49,6 +49,15 @@ export default function Home() {
           ※ 이 채점은 AI 자동 채점입니다. 학교 교사의 실제 채점과 다를 수
           있습니다.
         </p>
+        <Link
+          href="/try"
+          className="border-border text-foreground hover:bg-muted mt-3 inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium"
+        >
+          글 입력 화면 보기
+          <span className="bg-accent-mid-surface text-accent-mid rounded-full px-1.5 py-0.5 text-[10px] font-semibold">
+            P3.1 골격
+          </span>
+        </Link>
       </section>
 
       <section>

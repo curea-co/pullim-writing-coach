@@ -1,23 +1,38 @@
-// 08 프롬프트 v0.1 재현 검증 — 5종 샘플 × 5회 = 25건 호출.
-// 실행: node --env-file=.env.local scripts/verify.mjs
+// 프롬프트 재현 검증 — 5종 샘플 × 5회 = 25건.
+// 실행(기본 = MOCK, 토큰 무료): node scripts/verify.mjs
+// 실호출(기록용 1회, 유료): VERIFY_LIVE=1 node --env-file=.env.local scripts/verify.mjs
 // 정답: app/data/samples.ts (06 v.4) / 허용: 총점 ±3, 영역 ±2
 // 강제 룰: FIX_COUNT(mechanical) / DUPLICATION·POSITION(heuristic 경고)
+//
+// ⚠️ 게이트 의미 (EPO 결정 2026-05-26): 5종 전부 anchor라 실호출 25건은 회로적이고(09 v.2 §5.2),
+//    유료 토큰을 매번 태울 이유가 없다. **기본을 MOCK으로 전환** — anchor 정답을 그대로 재생해
+//    파싱·스키마·FIX/DUP·점수합 등 **하네스 회귀**를 결정적·무료로 검증한다.
+//    이 게이트는 더 이상 '모델 품질/일반화'를 측정하지 않는다 — 그 신호는 P2.4(임의 글)·P5(실학생)로
+//    이관(09 v.2 §4·§5.1). 실모델 1회 기록이 필요하면 VERIFY_LIVE=1.
 
 import { writeFileSync } from "node:fs";
 import { SAMPLES } from "../app/data/samples.ts";
 import { SYSTEM_PROMPT, buildUserPrompt } from "./prompts.mjs";
 
+const LIVE = process.env.VERIFY_LIVE === "1"; // 기본 false = MOCK(무료)
 const KEY = process.env.ANTHROPIC_API_KEY;
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
+const MODEL = LIVE ? process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6" : "mock";
 const RUNS = 5;
 const AREAS = ["과제 이해", "내용 충실도", "구조·논리", "표현·문장", "성장 가능성"];
 
-if (!KEY) {
-  console.error("FAIL: ANTHROPIC_API_KEY 미설정");
+if (LIVE && !KEY) {
+  console.error("FAIL: VERIFY_LIVE=1 인데 ANTHROPIC_API_KEY 미설정");
   process.exit(1);
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// MOCK: anchor 정답(sample.output)을 모델 응답으로 재생. 유료 호출·env 불필요.
+//   하네스(파싱·checkSchema·checkFixCount 등)를 결정적으로 통과시켜 회귀를 잡는다.
+//   일반화/모델 품질은 측정하지 않는다(이관됨). SYSTEM_PROMPT 미사용(주석 import 유지).
+function callMock(sample) {
+  return { text: JSON.stringify(sample.output), ms: 0, usage: { mock: true } };
+}
 
 async function callApi(userPrompt, attempt = 0) {
   const t0 = Date.now();
@@ -123,7 +138,11 @@ function checkPosition(o, body) {
 const median = (a) => { const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
 
 async function main() {
-  console.log(`모델 ${MODEL} · 샘플 ${SAMPLES.length}종 × ${RUNS}회 = ${SAMPLES.length * RUNS}건\n`);
+  console.log(
+    `${LIVE ? "LIVE(유료)" : "MOCK(무료·회귀)"} · 모델 ${MODEL} · 샘플 ${SAMPLES.length}종 × ${RUNS}회 = ${SAMPLES.length * RUNS}건\n`
+  );
+  if (!LIVE)
+    console.log("※ MOCK = anchor 정답 재생. 하네스 회귀만 검증. 일반화는 P2.4·P5 (09 v.2 §5.1).\n");
   const report = [];
 
   for (const sample of SAMPLES) {
@@ -134,9 +153,11 @@ async function main() {
     process.stdout.write(`[${sample.label}] ${sample.title} (정답 ${expectedTotal})  `);
 
     for (let r = 0; r < RUNS; r++) {
-      await sleep(1200); // 호출 간격 — RPM 여유 확보
+      if (LIVE) await sleep(1200); // 호출 간격 — RPM 여유 확보 (MOCK은 불필요)
       try {
-        const { text, ms, usage } = await callApi(userPrompt);
+        const { text, ms, usage } = LIVE
+          ? await callApi(userPrompt)
+          : callMock(sample);
         const o = parseJson(text);
         const schemaErr = checkSchema(o);
         const areas = (o.scores || []).map((s) => s.score);
