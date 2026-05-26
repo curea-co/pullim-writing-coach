@@ -89,7 +89,6 @@ export default function ScoreForm({
   // 제출 횟수(첫 제출=1, 새 제출마다 +1). 재시도(transient 재호출)는 같은 시도라 증가 안 함.
   // 메인 CTA·"글 고치고 다시 받기" 어느 경로로 재제출해도 새 시도로 카운트되게 제출 시점에 증가(curea-review-ai 지적).
   const submitCount = useRef(0);
-  const lastPayload = useRef<ScoreRequest | null>(null); // 재시도용
   const formTopRef = useRef<HTMLDivElement>(null);
   const outcomeRef = useRef<HTMLDivElement>(null);
 
@@ -167,7 +166,9 @@ export default function ScoreForm({
     }
 
     if (res.status === 401) {
-      onAuthExpired?.(); // E-AUTH: TokenGate가 토큰 폐기 + 재입력
+      // 로딩 해제(버튼 재활성) — 재인증 후 바로 다시 제출할 수 있게. TokenGate는 재입력 배너 노출.
+      setSubmit({ phase: "idle" });
+      onAuthExpired?.(); // E-AUTH: TokenGate가 재입력 배너 노출(토큰은 유지 → 글 보존)
       return;
     }
 
@@ -193,11 +194,11 @@ export default function ScoreForm({
     });
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!canSubmit) return;
-    submitCount.current += 1; // 새 제출마다 +1 (첫 제출=1). 경로 무관 — 메인 CTA로 재제출해도 카운트.
-    const payload: ScoreRequest = {
+  // 항상 **현재 화면 값**으로 payload를 만든다 → 화면에 보이는 내용과 전송 내용이 항상 일치
+  // (curea-review-ai 지적: 에러 후 폼을 고치고 재시도하면 직전 payload가 가던 회귀 제거).
+  function submitCurrent() {
+    submitCount.current += 1; // 새 제출마다 +1 (첫 제출=1). 메인 CTA·다시 시도하기 모두 카운트.
+    void runScore({
       assignment: {
         school_level: schoolLevel,
         subject,
@@ -211,18 +212,22 @@ export default function ScoreForm({
         submitted_at: new Date().toISOString(),
         attempt_no: submitCount.current, // functional_spec E9 재제출 추적
       },
-    };
-    lastPayload.current = payload;
-    void runScore(payload);
+    });
   }
 
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canSubmit) return;
+    submitCurrent();
+  }
+
+  // 다시 시도하기 — 현재 화면 값으로 다시 제출(잠금 대신 재구성, curea-review-ai 지적).
   function retry() {
-    // transient 오류 재호출 = 같은 시도 → attempt_no 증가 없이 동일 payload 재전송.
-    if (lastPayload.current) void runScore(lastPayload.current);
+    if (canSubmit) submitCurrent();
   }
 
   function handleResubmit() {
-    // 입력으로 복귀만. 다음 실제 제출(handleSubmit)에서 attempt_no가 증가한다.
+    // 입력으로 복귀만. 다음 제출(submitCurrent)에서 attempt_no가 증가한다.
     setSubmit({ phase: "idle" });
     formTopRef.current?.scrollIntoView({ behavior: "smooth" });
   }

@@ -39,12 +39,14 @@ export default function TokenGate() {
   const [input, setInput] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
 
+  // 최초 입장 + 401 후 재입력 공용. 토큰을 갱신하고 입력/오류를 정리한다.
   function enter(e: React.FormEvent) {
     e.preventDefault();
     const t = input.trim();
     if (!t) return;
     writeToken(t);
     setAuthError(null);
+    setInput("");
   }
 
   function leave() {
@@ -106,12 +108,44 @@ export default function TokenGate() {
           나가기
         </button>
       </div>
+      {/* 401 재인증 — ScoreForm을 언마운트하지 않고 인라인 배너로 비밀번호만 다시 받는다.
+          토큰을 비우면 ScoreForm이 사라져 작성한 글이 날아가므로 그대로 둔다(curea-review-ai 지적). */}
+      {authError && (
+        <section className="border-band-warn-surface bg-band-warn-surface rounded-xl border p-4">
+          <p className="text-band-warn-foreground text-sm font-medium">
+            {authError}
+          </p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            작성한 글은 그대로 있어요. 비밀번호만 다시 입력하면 채점을 이어갈 수
+            있어요.
+          </p>
+          <form onSubmit={enter} className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <input
+              type="password"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="데모 비밀번호"
+              autoComplete="off"
+              className="border-band-warn bg-background text-foreground flex-1 rounded-lg border px-3 py-2.5 text-sm"
+            />
+            <button
+              type="submit"
+              disabled={!input.trim()}
+              className={cn(
+                "bg-primary text-primary-foreground rounded-lg px-5 py-2.5 text-sm font-semibold transition hover:opacity-90",
+                !input.trim() && "cursor-not-allowed opacity-40"
+              )}
+            >
+              다시 들어가기
+            </button>
+          </form>
+        </section>
+      )}
       <ScoreForm
-        onAuthExpired={() => {
-          // 제출 시 서버가 401(E-AUTH) → 토큰 폐기 + 입력 화면 재노출 + 사유 안내.
-          writeToken(null);
-          setAuthError("비밀번호가 올바르지 않아요. 다시 입력해 주세요.");
-        }}
+        onAuthExpired={() =>
+          // 제출 시 서버 401(E-AUTH) → 토큰은 유지(글 보존) + 재입력 배너만 노출.
+          setAuthError("비밀번호가 올바르지 않아요. 다시 입력해 주세요.")
+        }
       />
     </div>
   );
