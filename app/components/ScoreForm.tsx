@@ -89,9 +89,9 @@ export default function ScoreForm({
   const formTopRef = useRef<HTMLDivElement>(null);
   const outcomeRef = useRef<HTMLDivElement>(null);
 
-  // 결과·에러가 나오면 그 위치로 스크롤 (wireframe §1 — 블록 C 자동 스크롤)
+  // 블록 C(로딩·결과·에러)가 나오면 그 위치로 스크롤 (wireframe §1 — 자동 스크롤)
   useEffect(() => {
-    if (submit.phase === "result" || submit.phase === "error") {
+    if (submit.phase !== "idle") {
       outcomeRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [submit.phase]);
@@ -392,20 +392,35 @@ export default function ScoreForm({
               : "AI 첨삭 받기"}
           </button>
         </form>
-        {submit.phase === "loading" ? (
+        {!canSubmit && submit.phase !== "loading" && (
           <p className="text-muted-foreground mt-2 text-center text-xs">
-            AI가 5가지 기준으로 읽고 있어요 · 최대 1분 정도 걸릴 수 있어요
+            과제 정보와 글(50자 이상)을 모두 입력하면 첨삭을 받을 수 있어요
           </p>
-        ) : (
-          !canSubmit && (
-            <p className="text-muted-foreground mt-2 text-center text-xs">
-              과제 정보와 글(50자 이상)을 모두 입력하면 첨삭을 받을 수 있어요
-            </p>
-          )
         )}
       </section>
 
-      {/* 블록 C — 결과 / 에러 */}
+      {/* 블록 C — 로딩 / 결과 / 에러 */}
+      {submit.phase === "loading" && (
+        <section
+          ref={outcomeRef}
+          className="border-border bg-surface flex items-center gap-3 rounded-xl border p-6"
+        >
+          <span
+            className="border-primary inline-block h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-t-transparent"
+            aria-hidden
+          />
+          <div>
+            <p className="text-foreground text-sm font-medium">
+              AI가 5가지 기준으로 글을 읽고 있어요…
+            </p>
+            <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">
+              과제 이해 · 내용 충실도 · 구조·논리 · 표현·문장 · 성장 가능성
+              <br />
+              최대 1분 정도 걸릴 수 있어요.
+            </p>
+          </div>
+        </section>
+      )}
       {submit.phase === "result" && (
         <div ref={outcomeRef}>
           <ResultView
