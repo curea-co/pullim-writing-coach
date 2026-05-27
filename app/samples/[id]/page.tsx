@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SAMPLES, getSample } from "../../data/samples";
 import ResultView from "../../components/ResultView";
+import AnnotatedBody from "../../components/AnnotatedBody";
 import Breadcrumb from "../../components/Breadcrumb";
 import CtaBand from "../../components/CtaBand";
 
@@ -103,9 +104,7 @@ export default async function SampleDetailPage({
                   : ""}
               </span>
             </div>
-            <p className="text-foreground text-sm leading-relaxed whitespace-pre-wrap">
-              {submission.body}
-            </p>
+            <AnnotatedBody body={submission.body} scores={output.scores} />
             <p className="border-border text-subtle-foreground mt-3 border-t pt-3 text-[11px] leading-relaxed">
               {isCited
                 ? "출처: 본 학생 글은 김은태·정혜린(2024, 국어교육학연구 59(3)) 및 김경환(2021, 한국어문교육 37)에 수록된 중·고등학생 정보 전달 글(설명문)을 인용·발췌한 것입니다. 학년·과목·과제 맥락은 채점 시연용 메타데이터입니다."
