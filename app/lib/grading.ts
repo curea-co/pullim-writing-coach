@@ -6,7 +6,7 @@
 //     번들 없이 직접 import한다. 모델 호출(부수효과)은 app/api/score/route.ts가 전담한다.
 
 import type { AreaName, F3Output, RevisionGuide, Score } from "../data/samples";
-import { MODEL_VERSION } from "./prompt";
+import { MODEL_VERSION } from "./model-version";
 
 // 5영역 고정 순서 (12 §4.3 / verify.mjs). 스키마 검증의 권위 기준.
 export const AREAS: readonly AreaName[] = [
