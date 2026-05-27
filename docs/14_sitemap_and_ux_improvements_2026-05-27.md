@@ -34,14 +34,14 @@ Pullim Writing Coach (데모)
 │   ├─ [게이트] TokenGate         데모 접근 토큰 (E-AUTH)
 │   ├─ 입력 폼 ScoreForm          과제 정보(F1) + 학생 글(F2)
 │   └─ 결과 ResultView            ← 공유 결과 뷰 (아래 /samples 와 동일 UI)
-│        ├─ #score      01 점수
-│        ├─ #feedback   02 영역별 피드백
-│        └─ #guide      03 수정 가이드
+│        ├─ #result-score      01 점수
+│        ├─ #result-feedback   02 영역별 피드백
+│        └─ #result-guide      03 수정 가이드
 │
 └─ /samples/[id]          샘플 채점 결과 (정적 5종: d·c·a·e·b)
     ├─ Breadcrumb                 홈 / 샘플 / {label} {category}   ← 신규(depth)
     ├─ 좌: 과제 정보 + 학생 글(출처 표기)
-    └─ 우: ResultView (#score / #feedback / #guide + sticky SectionNav)
+    └─ 우: ResultView (#result-score / #result-feedback / #result-guide + sticky SectionNav)
                                   + CTA 밴드 → /try               ← 신규
 
 좌측 글로벌 내비(Sidebar, 반응형 — 데스크톱 고정 / 모바일 드로어)
