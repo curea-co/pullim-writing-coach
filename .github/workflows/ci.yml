@@ -30,7 +30,10 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        # npm ci 대신 npm install — 커밋된 package-lock.json이 크로스플랫폼 네이티브 optional 의존
+        # (@emnapi/*·@next/swc-linux 등)을 완전히 담지 못해(Windows에서 생성) Linux 러너의 엄격한
+        # npm ci가 EUSAGE로 실패. install은 현재 플랫폼 기준으로 reconcile해 통과한다.
+        run: npm install --no-audit --no-fund
 
       - name: Typecheck
         run: npm run typecheck
