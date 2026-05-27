@@ -46,15 +46,16 @@ export default function SectionNav({ items }: { items: SectionNavItem[] }) {
     };
   }, [items]);
 
-  const handleJump = (id: string) => {
+  const handleJump = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
     const el = document.getElementById(id);
-    if (el) {
-      // prefers-reduced-motion 사용자는 애니메이션 없이 즉시 이동(curea-review-ai 지적, a11y).
-      const reduce = window.matchMedia(
-        "(prefers-reduced-motion: reduce)"
-      ).matches;
-      el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
-    }
+    if (!el) return; // el 없으면 앵커 기본 동작에 맡김
+    e.preventDefault();
+    // prefers-reduced-motion 사용자는 애니메이션 없이 즉시 이동(curea-review-ai 지적, a11y).
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+    // URL 해시 갱신 — 직접 링크·새로고침 복원·뒤로/앞으로 가능(curea-review-ai 지적).
+    // 부드러운 스크롤을 유지하려 기본 점프는 막고 pushState로 해시만 반영.
+    history.pushState(null, "", `#${id}`);
     setActive(id);
   };
 
@@ -68,10 +69,10 @@ export default function SectionNav({ items }: { items: SectionNavItem[] }) {
       {items.map((it) => {
         const isActive = active === it.id;
         return (
-          <button
+          <a
             key={it.id}
-            type="button"
-            onClick={() => handleJump(it.id)}
+            href={`#${it.id}`}
+            onClick={(e) => handleJump(e, it.id)}
             aria-current={isActive ? "true" : undefined}
             className={cn(
               "flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition",
@@ -89,7 +90,7 @@ export default function SectionNav({ items }: { items: SectionNavItem[] }) {
               {it.num}
             </span>
             {it.label}
-          </button>
+          </a>
         );
       })}
     </nav>

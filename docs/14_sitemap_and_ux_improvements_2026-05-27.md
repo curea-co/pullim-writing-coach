@@ -68,7 +68,11 @@ Pullim Writing Coach (데모)
 - **상단 메가 메뉴**: WC는 3페이지 데모 — 좌측 사이드바가 이미 충분. 메가 메뉴는 과설계.
 - **데이터 테이블/코드 블록/모델 라우팅**: 레퍼런스는 플랫폼 마케팅 사이트. WC 학생용 데모엔 부적합.
 - **색상·폰트**: 지시대로 현 토큰 유지 — 신규 색 토큰 0개.
-- **(후속) 섹션 내비 URL 해시/히스토리 라우팅**: 현재 버튼+scrollIntoView라 직접 링크·뒤로가기 불가(curea-review-ai #7 지적). 3섹션 데모엔 영향 작아 후속 과제로 둠. prefers-reduced-motion 배려는 반영 완료.
+
+### 2.2 접근성 보강 (curea-review-ai #7 반영 완료)
+- **섹션 내비 URL 해시/히스토리**: `<a href="#result-*">` + `history.pushState`로 전환 — 직접 링크·새로고침 복원·뒤로/앞으로 동작(기존 버튼+scrollIntoView 한계 해소).
+- **prefers-reduced-motion**: 모션 축소 선호 사용자는 `scrollIntoView`를 `auto`로(부드러운 스크롤 미적용).
+- **모바일 sticky**: 전역 상단바(z-30) 아래로 `top-14` 배치해 가림 해소.
 
 ---
 
