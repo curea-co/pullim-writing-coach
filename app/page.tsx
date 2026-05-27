@@ -1,6 +1,23 @@
 import Link from "next/link";
 import { cn } from "@/app/lib/utils";
 import { SAMPLES, getTotalScoreBand, hasLargeAreaGap } from "./data/samples";
+import CtaBand from "./components/CtaBand";
+
+// 홈 3-up 피처 카드 (레퍼런스 3-up 패턴). 색·폰트는 기존 토큰 유지.
+const FEATURES = [
+  {
+    title: "5영역 채점",
+    body: "과제 이해 · 내용 충실도 · 구조·논리 · 표현·문장 · 성장 가능성을 각 20점으로.",
+  },
+  {
+    title: "코칭 톤 피드백",
+    body: "잘한 점 · 고칠 점 · 수정 가이드를 학생 눈높이의 코칭 말투로.",
+  },
+  {
+    title: "점수대 5케이스",
+    body: "저점(40) · 편차(61) · 중점(74) · 중상(85) · 고점(86) — 구간별 시연.",
+  },
+];
 
 // 카테고리 칩 — 시맨틱 밴드/액센트 토큰 사용(fe-styling)
 const CATEGORY_CHIP: Record<string, string> = {
@@ -30,21 +47,28 @@ export default function Home() {
         </p>
       </header>
 
-      <section className="border-border bg-surface mb-8 rounded-xl border p-5">
-        <h2 className="text-foreground mb-2 text-sm font-semibold">
+      <section className="mb-8">
+        <h2 className="text-foreground mb-3 text-sm font-semibold">
           이 데모가 보여 주는 것
         </h2>
-        <ul className="text-muted-foreground space-y-1 text-sm">
-          <li>
-            · 5영역(과제 이해 · 내용 충실도 · 구조·논리 · 표현·문장 · 성장
-            가능성) 채점
-          </li>
-          <li>· 잘한 점·고칠 점·수정 가이드 학생용 코칭 톤 표시</li>
-          <li>
-            · 점수대별 5케이스: 저점(40) · 편차(61) · 중점(74) · 중상(85) ·
-            고점(86)
-          </li>
-        </ul>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {FEATURES.map((f, i) => (
+            <div
+              key={f.title}
+              className="border-border bg-surface rounded-xl border p-4"
+            >
+              <div className="text-subtle-foreground mb-2 text-xs font-semibold tabular-nums">
+                {String(i + 1).padStart(2, "0")}
+              </div>
+              <h3 className="text-foreground text-sm font-semibold">
+                {f.title}
+              </h3>
+              <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                {f.body}
+              </p>
+            </div>
+          ))}
+        </div>
         <p className="bg-muted text-muted-foreground mt-3 rounded-md px-3 py-2 text-xs">
           ※ 이 채점은 AI 자동 채점입니다. 학교 교사의 실제 채점과 다를 수
           있습니다.
@@ -123,6 +147,8 @@ export default function Home() {
           })}
         </div>
       </section>
+
+      <CtaBand />
 
       <footer className="border-border text-subtle-foreground mt-12 space-y-1 border-t pt-6 text-xs">
         <p>

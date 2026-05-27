@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SAMPLES, getSample } from "../../data/samples";
 import ResultView from "../../components/ResultView";
+import Breadcrumb from "../../components/Breadcrumb";
+import CtaBand from "../../components/CtaBand";
 
 export function generateStaticParams() {
   return SAMPLES.map((s) => ({ id: s.id }));
@@ -36,14 +38,13 @@ export default async function SampleDetailPage({
 
   return (
     <main className="mx-auto w-full max-w-4xl px-5 py-8 md:py-12">
-      <nav className="mb-6">
-        <Link
-          href="/"
-          className="text-muted-foreground hover:text-foreground text-sm"
-        >
-          ← 샘플 목록으로
-        </Link>
-      </nav>
+      <Breadcrumb
+        items={[
+          { label: "홈", href: "/" },
+          { label: "샘플 채점 결과", href: "/" },
+          { label: `${sample.label} · ${sample.category}` },
+        ]}
+      />
 
       <header className="mb-8">
         <div className="mb-2 flex items-center gap-2 text-xs">
@@ -128,6 +129,11 @@ export default async function SampleDetailPage({
           }
         />
       </div>
+
+      <CtaBand
+        title="다른 글도 직접 넣어 보세요"
+        description="이 샘플처럼, 직접 쓴 수행평가 글을 라이브로 채점받을 수 있어요."
+      />
     </main>
   );
 }

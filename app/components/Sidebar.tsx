@@ -46,6 +46,9 @@ function NavLinks({
 
   return (
     <nav className="flex flex-col gap-0.5">
+      <div className="text-subtle-foreground mt-1 mb-1 px-3 text-[11px] font-semibold">
+        둘러보기
+      </div>
       <Link href="/" onClick={onNavigate} className={itemCls(pathname === "/")}>
         홈
       </Link>
