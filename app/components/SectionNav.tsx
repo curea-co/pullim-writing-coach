@@ -48,7 +48,13 @@ export default function SectionNav({ items }: { items: SectionNavItem[] }) {
 
   const handleJump = (id: string) => {
     const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (el) {
+      // prefers-reduced-motion 사용자는 애니메이션 없이 즉시 이동(curea-review-ai 지적, a11y).
+      const reduce = window.matchMedia(
+        "(prefers-reduced-motion: reduce)"
+      ).matches;
+      el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+    }
     setActive(id);
   };
 
