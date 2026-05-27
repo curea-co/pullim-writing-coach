@@ -19,13 +19,17 @@ export default function SectionNav({ items }: { items: SectionNavItem[] }) {
       .filter((el): el is HTMLElement => el !== null);
     if (els.length === 0) return;
 
-    // 화면 상단 1/3 지점을 지나는 섹션을 활성으로 — 위에서부터 가장 마지막으로 진입한 것.
+    // 관찰 중인 모든 섹션의 가시성을 누적 관리한다. 콜백 entries엔 "이번에 바뀐" 섹션만 오므로
+    // 그것만 보면 위로 다시 스크롤할 때 활성이 실제 보이는 섹션과 어긋난다(curea-review-ai 지적).
+    // 전체 상태에서 문서 순서상 화면 밴드에 든 '첫' 섹션을 활성으로 잡는다.
+    const visible = new Map<string, boolean>();
     const observer = new IntersectionObserver(
       (entries) => {
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        if (visible[0]?.target.id) setActive(visible[0].target.id);
+        for (const e of entries) {
+          visible.set((e.target as HTMLElement).id, e.isIntersecting);
+        }
+        const firstVisible = items.find((it) => visible.get(it.id));
+        if (firstVisible) setActive(firstVisible.id);
       },
       { rootMargin: "-12% 0px -70% 0px", threshold: 0 }
     );
