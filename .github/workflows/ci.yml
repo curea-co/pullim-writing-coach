@@ -1,0 +1,42 @@
+name: CI
+
+# 단위 테스트 + 타입체크. GitHub-hosted ubuntu-latest에서 Node 24를 깔아 실행한다.
+# 이유: codex-review.yml은 self-hosted 러너(Node 20)라 scripts/normalize.test.mjs가
+#   app/lib/grading.ts를 네이티브 TS strip으로 직접 import하지 못해(register-ts.mjs 훅 + Node ≥22.6 필요)
+#   테스트를 재실행하지 못한다. 그 공백을 본 워크플로가 메운다. (EPO 2026-05-27)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Typecheck & Unit tests (Node 24)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        # npm ci 대신 npm install — 커밋된 package-lock.json이 크로스플랫폼 네이티브 optional 의존
+        # (@emnapi/*·@next/swc-linux 등)을 완전히 담지 못해(Windows에서 생성) Linux 러너의 엄격한
+        # npm ci가 EUSAGE로 실패. install은 현재 플랫폼 기준으로 reconcile해 통과한다.
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests (normalizeBody·validate·guards)
+        run: npm run test:unit
