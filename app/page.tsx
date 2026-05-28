@@ -2,6 +2,7 @@ import Link from "next/link";
 import { cn } from "@/app/lib/utils";
 import { SAMPLES, getTotalScoreBand, hasLargeAreaGap } from "./data/samples";
 import CtaBand from "./components/CtaBand";
+import HomeWelcomeBanner from "./components/HomeWelcomeBanner";
 
 // 홈 3-up 피처 카드 (레퍼런스 3-up 패턴). 색·폰트는 기존 토큰 유지.
 const FEATURES = [
@@ -47,7 +48,10 @@ export default function Home() {
         </p>
       </header>
 
-      {/* 닫는 CTA 밴드 — 타이틀·안내 텍스트 바로 아래로 이동 (UI 요청) */}
+      {/* 헤더 직후 = 개인화 우선(HomeWelcomeBanner). 그 다음에 main #8 결정 위치의 CtaBand. */}
+      <HomeWelcomeBanner />
+
+      {/* 닫는 CTA 밴드 — 타이틀·안내 텍스트 아래로 이동 (UI 요청, PR #8) */}
       <CtaBand />
 
       <section className="mt-10 mb-8">

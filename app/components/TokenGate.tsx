@@ -33,7 +33,12 @@ function writeToken(v: string | null) {
   window.dispatchEvent(new Event(TOKEN_EVENT));
 }
 
-export default function TokenGate() {
+export default function TokenGate({
+  defaults,
+}: {
+  // ScoreForm 폼 필드 프리필 — TryClient가 프로필에서 주입.
+  defaults?: { school_level?: string; subject?: string; genre?: string };
+} = {}) {
   // 서버/하이드레이션 스냅샷은 null(미인증) → 입력 화면. 하이드레이션 후 실제 토큰으로 전환.
   const token = useSyncExternalStore(subscribeToken, readToken, () => null);
   const [input, setInput] = useState("");
@@ -149,6 +154,7 @@ export default function TokenGate() {
         </section>
       )}
       <ScoreForm
+        defaults={defaults}
         onAuthExpired={() => {
           // 제출 시 서버 401(E-AUTH): stale 토큰을 폐기(재사용 401 루프 방지)하되,
           // entered 래치로 ScoreForm은 계속 마운트 → 작성 글 보존. 재입력 배너만 노출.

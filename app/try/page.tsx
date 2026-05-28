@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import TokenGate from "../components/TokenGate";
+import TryClient from "../components/TryClient";
 
 export const metadata: Metadata = {
   title: "글 입력 — Pullim Writing Coach",
@@ -36,8 +36,8 @@ export default function TryPage() {
         </p>
       </header>
 
-      {/* 데모 접근 게이트(E-AUTH) → 통과 시 입력 폼 */}
-      <TokenGate />
+      {/* 프로필 인사/인라인 폼(클라) + 데모 접근 게이트(E-AUTH) → ScoreForm */}
+      <TryClient />
     </main>
   );
 }
