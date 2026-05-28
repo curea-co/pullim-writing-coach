@@ -47,7 +47,10 @@ export default function Home() {
         </p>
       </header>
 
-      <section className="mb-8">
+      {/* 닫는 CTA 밴드 — 타이틀·안내 텍스트 바로 아래로 이동 (UI 요청) */}
+      <CtaBand />
+
+      <section className="mt-10 mb-8">
         <h2 className="text-foreground mb-3 text-sm font-semibold">
           이 데모가 보여 주는 것
         </h2>
@@ -147,8 +150,6 @@ export default function Home() {
           })}
         </div>
       </section>
-
-      <CtaBand />
 
       <footer className="border-border text-subtle-foreground mt-12 space-y-1 border-t pt-6 text-xs">
         <p>
