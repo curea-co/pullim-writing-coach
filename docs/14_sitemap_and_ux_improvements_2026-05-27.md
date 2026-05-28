@@ -28,7 +28,7 @@
 ```text
 Pullim Writing Coach (데모)
 │
-├─ /                      홈 — 히어로 + 3-up 피처 카드 + 샘플 5종 그리드 + CTA 밴드 + 푸터
+├─ /                      홈 — 히어로 + CTA 밴드(상단·PR #8) + 3-up 피처 카드 + 샘플 5종 그리드 + 푸터
 │
 ├─ /try                   직접 채점받기 (라이브)
 │   ├─ [게이트] TokenGate         데모 접근 토큰 (E-AUTH)
@@ -60,7 +60,7 @@ Pullim Writing Coach (데모)
 | 1 | sticky **번호 섹션 내비**(scroll-spy) | 결과 뷰에 `01 점수 · 02 피드백 · 03 가이드` sticky 핀 + 스크롤 활성 표시 | `SectionNav.tsx` (신규, client) · `ResultView.tsx` |
 | 2 | `LAYER 0N` 섹션 라벨 | 결과 카드 헤더에 `01·02·03` 번호 부여 | `ResultView.tsx` |
 | 3 | 명확한 계층(2-depth) | 샘플 상세 상단 **브레드크럼**(홈/샘플/라벨) — 기존 "← 목록" 텍스트 링크 대체 | `Breadcrumb.tsx` (신규) |
-| 4 | 닫는 **CTA 밴드** | 홈·샘플 하단에 "직접 글을 넣어 채점받기 →/try" 밴드 | `CtaBand.tsx` (신규) |
+| 4 | **CTA 밴드** (페이지별 위치 다름) | **/samples 하단** — 닫는 CTA(맥락을 본 뒤 행동 유도). **홈 상단**(히어로 직후, PR #8) — 첫 화면 primary CTA로 행동 유도. 같은 `CtaBand.tsx` 컴포넌트 재사용(공유), 위치만 페이지별. | `CtaBand.tsx` (신규) |
 | 5 | **3-up 피처 카드** | 홈 "이 데모가 보여주는 것" 불릿 → 3장 카드(5영역 채점 / 코칭 톤 / 점수대 5케이스) | `page.tsx` |
 | 6 | 그룹화된 메뉴 depth | 사이드바 상단에 `둘러보기` 그룹 라벨 추가(기존 `샘플 채점 결과`와 대칭) | `Sidebar.tsx` |
 
