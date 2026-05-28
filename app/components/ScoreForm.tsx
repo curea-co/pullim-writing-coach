@@ -76,12 +76,19 @@ type SubmitState =
 
 export default function ScoreForm({
   onAuthExpired,
+  defaults,
 }: {
   onAuthExpired?: () => void; // 401(E-AUTH) 시 TokenGate가 토큰 폐기 + 재입력 노출
+  defaults?: {
+    // 프로필 기반 프리필 (A2). mount 시점 1회 적용 — 이후 사용자가 자유 편집.
+    school_level?: string;
+    subject?: string;
+    genre?: string;
+  };
 }) {
-  const [schoolLevel, setSchoolLevel] = useState("");
-  const [subject, setSubject] = useState("");
-  const [genre, setGenre] = useState("");
+  const [schoolLevel, setSchoolLevel] = useState(() => defaults?.school_level ?? "");
+  const [subject, setSubject] = useState(() => defaults?.subject ?? "");
+  const [genre, setGenre] = useState(() => defaults?.genre ?? "");
   const [targetRaw, setTargetRaw] = useState(""); // 빈 문자열 = 제한 없음
   const [promptText, setPromptText] = useState("");
   const [body, setBody] = useState(""); // 학생이 본 원본 — 정규화 전(화면 보존)

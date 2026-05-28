@@ -2,6 +2,7 @@ import Link from "next/link";
 import { cn } from "@/app/lib/utils";
 import { SAMPLES, getTotalScoreBand, hasLargeAreaGap } from "./data/samples";
 import CtaBand from "./components/CtaBand";
+import HomeWelcomeBanner from "./components/HomeWelcomeBanner";
 
 // 홈 3-up 피처 카드 (레퍼런스 3-up 패턴). 색·폰트는 기존 토큰 유지.
 const FEATURES = [
@@ -46,6 +47,8 @@ export default function Home() {
           적용
         </p>
       </header>
+
+      <HomeWelcomeBanner />
 
       <section className="mb-8">
         <h2 className="text-foreground mb-3 text-sm font-semibold">
