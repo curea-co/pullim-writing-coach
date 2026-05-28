@@ -2,6 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SAMPLES, getSample } from "../../data/samples";
 import ResultView from "../../components/ResultView";
+import AnnotatedBody from "../../components/AnnotatedBody";
+import Breadcrumb from "../../components/Breadcrumb";
+import CtaBand from "../../components/CtaBand";
 
 export function generateStaticParams() {
   return SAMPLES.map((s) => ({ id: s.id }));
@@ -36,14 +39,13 @@ export default async function SampleDetailPage({
 
   return (
     <main className="mx-auto w-full max-w-4xl px-5 py-8 md:py-12">
-      <nav className="mb-6">
-        <Link
-          href="/"
-          className="text-muted-foreground hover:text-foreground text-sm"
-        >
-          ← 샘플 목록으로
-        </Link>
-      </nav>
+      <Breadcrumb
+        items={[
+          { label: "홈", href: "/" },
+          { label: "샘플 채점 결과", href: "/" },
+          { label: `${sample.label} · ${sample.category}` },
+        ]}
+      />
 
       <header className="mb-8">
         <div className="mb-2 flex items-center gap-2 text-xs">
@@ -102,9 +104,7 @@ export default async function SampleDetailPage({
                   : ""}
               </span>
             </div>
-            <p className="text-foreground text-sm leading-relaxed whitespace-pre-wrap">
-              {submission.body}
-            </p>
+            <AnnotatedBody body={submission.body} scores={output.scores} />
             <p className="border-border text-subtle-foreground mt-3 border-t pt-3 text-[11px] leading-relaxed">
               {isCited
                 ? "출처: 본 학생 글은 김은태·정혜린(2024, 국어교육학연구 59(3)) 및 김경환(2021, 한국어문교육 37)에 수록된 중·고등학생 정보 전달 글(설명문)을 인용·발췌한 것입니다. 학년·과목·과제 맥락은 채점 시연용 메타데이터입니다."
@@ -128,6 +128,11 @@ export default async function SampleDetailPage({
           }
         />
       </div>
+
+      <CtaBand
+        title="다른 글도 직접 넣어 보세요"
+        description="이 샘플처럼, 직접 쓴 수행평가 글을 라이브로 채점받을 수 있어요."
+      />
     </main>
   );
 }

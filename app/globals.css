@@ -52,3 +52,10 @@ body {
 .score-bar {
   animation: growBar 600ms ease-out;
 }
+
+/* 전정 장애·멀미 민감 사용자 — 모션 제거 (a11y, plan-design-review 2026-05-27 must-fix) */
+@media (prefers-reduced-motion: reduce) {
+  .score-bar {
+    animation: none;
+  }
+}

@@ -16,6 +16,14 @@ import {
   hasLargeAreaGap,
 } from "../data/scoring";
 import CopyButton from "./CopyButton";
+import SectionNav from "./SectionNav";
+
+// 결과 섹션 — sticky 번호 내비(SectionNav)와 카드 헤더가 공유하는 단일 소스.
+const RESULT_SECTIONS = [
+  { id: "result-score", num: "01", label: "점수" },
+  { id: "result-feedback", num: "02", label: "영역별 피드백" },
+  { id: "result-guide", num: "03", label: "수정 가이드" },
+];
 
 // 결과 복사 텍스트 (functional_spec §5 포맷). 화면·복사 동일 disclaimer.
 export function buildCopyText(assignment: Assignment, output: F3Output): string {
@@ -68,9 +76,17 @@ export default function ResultView({
 
   return (
     <div className={cn("space-y-5", className)}>
+      <SectionNav items={RESULT_SECTIONS} />
+
       {/* C1. 점수 (F4) */}
-      <div className="border-border bg-surface rounded-xl border p-5">
-        <h2 className="text-foreground mb-4 text-sm font-semibold">점수</h2>
+      <div
+        id="result-score"
+        className="border-border bg-surface scroll-mt-20 rounded-xl border p-5"
+      >
+        <h2 className="text-foreground mb-4 flex items-center gap-2 text-sm font-semibold">
+          <span className="text-subtle-foreground tabular-nums">01</span>
+          점수
+        </h2>
         <div className="mb-2 flex items-baseline gap-3">
           <div className="text-foreground text-5xl font-bold tracking-tight">
             {output.total_score}
@@ -141,8 +157,12 @@ export default function ResultView({
       </div>
 
       {/* C2. 영역별 피드백 (F5) */}
-      <div className="border-border bg-surface rounded-xl border p-5">
-        <h2 className="text-foreground mb-4 text-sm font-semibold">
+      <div
+        id="result-feedback"
+        className="border-border bg-surface scroll-mt-20 rounded-xl border p-5"
+      >
+        <h2 className="text-foreground mb-4 flex items-center gap-2 text-sm font-semibold">
+          <span className="text-subtle-foreground tabular-nums">02</span>
           영역별 피드백
         </h2>
         <div className="space-y-4">
@@ -184,8 +204,12 @@ export default function ResultView({
       </div>
 
       {/* C3. 수정 가이드 (F6) */}
-      <div className="border-border bg-surface rounded-xl border p-5">
-        <h2 className="text-foreground mb-4 text-sm font-semibold">
+      <div
+        id="result-guide"
+        className="border-border bg-surface scroll-mt-20 rounded-xl border p-5"
+      >
+        <h2 className="text-foreground mb-4 flex items-center gap-2 text-sm font-semibold">
+          <span className="text-subtle-foreground tabular-nums">03</span>
           이렇게 고쳐 보세요
         </h2>
         <ol className="space-y-3">
