@@ -45,7 +45,7 @@ export default function WhyScoreToggle({
       </summary>
 
       <div className="border-border border-t px-3 py-2.5">
-        {/* (1) 영역 의미 — 학생/평가관이 "무엇을 보는지" frame */}
+        {/* (1) 영역 의미 — 학생/교사가 "무엇을 보는지" frame */}
         <p className="text-foreground break-keep leading-relaxed">
           <span className="text-subtle-foreground mr-1">[{criteria.sectionRef}]</span>
           {criteria.meaning}

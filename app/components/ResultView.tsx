@@ -1,6 +1,6 @@
 "use client";
 // Pullim Writing Coach — 첨삭 결과 뷰 (C1~C5). 정적 샘플(/samples/[id])과
-// 라이브 채점 결과(ScoreForm) 양쪽이 공유하는 단일 UI (WBS P3.3 "결과 화면 재사용").
+// 실시간 채점 결과(ScoreForm) 양쪽이 공유하는 단일 UI (WBS P3.3 "결과 화면 재사용").
 //
 // "use client" — captureRef + ExportButtons(#16 PDF/스크린샷) 통합. SSR HTML은 동일 생성.
 // useState/useEffect 없음 → SSG/prerender 영향 0 (P1 mark·anchor id 모두 그대로 prerender).

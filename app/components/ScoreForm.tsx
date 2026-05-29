@@ -1,6 +1,6 @@
 "use client";
 
-// Pullim Writing Coach — 학생 글 입력 폼 + 라이브 채점 (WBS P3.1 + P3.2)
+// Pullim Writing Coach — 학생 글 입력 폼 + 실시간 채점 (WBS P3.1 + P3.2)
 //
 // 근거: 03_wireframe_first_screen_v.3 (블록 A·B·마이크로카피) ·
 //       02_functional_spec_v.3 §3 F1·F2·§6 에러 · 12_api_contract §3(요청)·§4(응답)·§5(에러)
@@ -46,7 +46,7 @@ import ResultView from "./ResultView";
 import { DEMO_TOKEN_KEY } from "./TokenGate";
 
 // #9 본문 자동 저장 — saved_at(ISO) → "M/D HH:MM" 짧은 카피.
-//   학생/평가관이 한눈에 "최근에 저장됐다" 인식하면 충분 — 초 단위·날짜년도 생략.
+//   학생/교사가 한눈에 "최근에 저장됐다" 인식하면 충분 — 초 단위·날짜년도 생략.
 function formatSavedAt(iso: string): string {
   try {
     const d = new Date(iso);
@@ -236,7 +236,7 @@ export default function ScoreForm({
   const locked = submit.phase === "loading" || submit.phase === "error";
   const canSubmit = requiredOk && bodyOk && !targetInvalid && !locked;
 
-  // ── 라이브 채점 호출 (contract §3~§5) ────────────────────────────────
+  // ── 실시간 채점 호출 (contract §3~§5) ────────────────────────────────
   async function runScore(payload: ScoreRequest) {
     const token = sessionStorage.getItem(DEMO_TOKEN_KEY) ?? "";
     // 토큰이 없으면(=401 후 폐기됨) 호출하지 않고 재입력만 유도 — stale 토큰 401 루프·낭비 방지(curea-review-ai 지적).

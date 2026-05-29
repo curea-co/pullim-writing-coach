@@ -59,7 +59,7 @@ function NavLinks({
       >
         직접 채점받기
         <span className="bg-accent-mid-surface text-accent-mid ml-auto rounded-full px-1.5 py-0.5 text-[10px] font-semibold">
-          라이브
+          실시간
         </span>
       </Link>
       {/* 2026-05-29 LNB 확장 — 내 정보·서비스 소개 (둘러보기 섹션 끝에 추가) */}

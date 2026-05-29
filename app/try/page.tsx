@@ -5,7 +5,7 @@ import TryClient from "../components/TryClient";
 export const metadata: Metadata = {
   title: "글 입력 — Pullim Writing Coach",
   description:
-    "학생 글을 입력하면 AI가 5가지 기준으로 라이브 채점해 드려요 (WBS P3.1·P3.2).",
+    "학생 글을 입력하면 AI가 5가지 기준으로 첨삭해 드려요 (WBS P3.1·P3.2).",
 };
 
 // 블록 A(헤더) = 서버 컴포넌트, 입력/검증/상태는 ScoreForm(클라이언트)에 위임.
@@ -28,7 +28,7 @@ export default function TryPage() {
             Pullim Writing Coach
           </h1>
           <span className="bg-accent-mid-surface text-accent-mid rounded-full px-2 py-0.5 text-xs font-semibold">
-            라이브 채점
+            실시간 채점
           </span>
         </div>
         <p className="text-muted-foreground mt-3 text-base">
