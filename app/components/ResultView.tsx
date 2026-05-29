@@ -25,6 +25,7 @@ import GrowthCard from "./GrowthCard";
 import RevisionBodyView from "./RevisionBodyView";
 import SectionNav from "./SectionNav";
 import TrustLabel from "./TrustLabel";
+import WhyScoreToggle from "./WhyScoreToggle";
 
 // 결과 섹션 — sticky 번호 내비(SectionNav)와 카드 헤더가 공유하는 단일 소스.
 const RESULT_SECTIONS = [
@@ -256,6 +257,8 @@ export default function ResultView({
                     </span>
                     {sc.feedback_fix}
                   </p>
+                  {/* #4 왜 이 점수 토글 — native <details>, JS 0바이트, a11y 무료 */}
+                  <WhyScoreToggle area={sc.area} score={sc.score} className="mt-2" />
                 </div>
               </div>
             );
