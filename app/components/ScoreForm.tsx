@@ -37,6 +37,11 @@ import {
   type RevisionEntry,
   saveDraft,
 } from "@/app/lib/storage";
+import {
+  computeProgress,
+  getProgressBarClass,
+  getProgressTextClass,
+} from "@/app/lib/progress";
 import ResultView from "./ResultView";
 import { DEMO_TOKEN_KEY } from "./TokenGate";
 
@@ -224,6 +229,8 @@ export default function ScoreForm({
   }
 
   const bodyOk = bodyCount >= BODY_MIN && bodyCount <= BODY_MAX;
+  // #10 글자수 진척 — 목표 입력 시만 노출. 5밴드(warmup/approaching/bullseye/over/way-over).
+  const progressState = computeProgress(bodyCount, targetNum, BODY_MAX);
   // 로딩·에러 중에는 폼을 잠근다 → 에러 화면에서 값을 못 바꾸므로 '다시 시도하기'(직전 payload 재전송)와
   // 화면 내용이 항상 일치. 수정하려면 '글 고치고 다시 받기'로 idle 복귀(curea-review-ai 지적).
   const locked = submit.phase === "loading" || submit.phase === "error";
@@ -525,6 +532,39 @@ export default function ScoreForm({
             현재 {bodyCount}자{targetNum ? ` / 목표 ${targetNum}자` : ""}
           </span>
         </div>
+        {/* #10 글자수 진척 인디케이터 — 목표 입력 시만 노출. role=progressbar로 a11y. */}
+        {progressState && (
+          <div
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(progressState.rawPct)}
+            aria-label="목표 글자수 대비 진척"
+            className="mt-1.5"
+          >
+            <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full">
+              {/* 인라인 style 정당 — 동적 width는 Tailwind 정적 클래스로 표현 불가(score-bar와 동일 예외) */}
+              <div
+                className={cn(
+                  "h-full transition-all duration-300 motion-reduce:transition-none",
+                  getProgressBarClass(progressState.band),
+                )}
+                style={{ width: `${progressState.pct}%` }}
+              />
+            </div>
+            <p
+              className={cn(
+                "mt-1 break-keep text-[11px]",
+                getProgressTextClass(progressState.band),
+              )}
+            >
+              {progressState.label}
+              <span className="text-subtle-foreground ml-1 tabular-nums">
+                ({progressState.rawPct}%)
+              </span>
+            </p>
+          </div>
+        )}
         {/* #9 자동 저장 표시 — 한 번이라도 저장된 적이 있으면 노출 */}
         {lastSavedAt && (
           <p
