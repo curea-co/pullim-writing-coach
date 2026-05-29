@@ -24,6 +24,7 @@ import FeedbackDiff from "./FeedbackDiff";
 import GrowthCard from "./GrowthCard";
 import RevisionBodyView from "./RevisionBodyView";
 import SectionNav from "./SectionNav";
+import TrustLabel from "./TrustLabel";
 
 // 결과 섹션 — sticky 번호 내비(SectionNav)와 카드 헤더가 공유하는 단일 소스.
 const RESULT_SECTIONS = [
@@ -98,6 +99,9 @@ export default function ResultView({
   return (
     <div className={cn("space-y-5", className)}>
       <div ref={captureRef} className="space-y-5">
+      {/* #19 신뢰 라벨 — 결과 보기 전 mental model 정착(AI 채점·교사 검토 권장) */}
+      <TrustLabel />
+
       {revisionMode && (
         <GrowthCard v1={revisionMode.v1.output} v2={revisionMode.v2.output} />
       )}
