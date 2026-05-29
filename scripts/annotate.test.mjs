@@ -4,7 +4,11 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { computeSegments, extractQuotedPhrases } from "../app/lib/annotate.ts";
+import {
+  computeSegments,
+  extractQuotedPhrases,
+  extractQuotedPhrasesWithSource,
+} from "../app/lib/annotate.ts";
 
 const join = (segs) => segs.map((s) => s.text).join("");
 const highlights = (segs) => segs.filter((s) => s.highlight).map((s) => s.text);
@@ -70,4 +74,42 @@ test("같은 인용구 중복 입력 — 첫 매치 1곳만", () => {
 test("빈 본문 → 빈 세그먼트", () => {
   assert.deepEqual(computeSegments("", ["x"]), []);
   assert.deepEqual(computeSegments(null, ["x"]), []);
+});
+
+// ── #2 인라인 첨삭 클릭 — phrase별 source area 추적 ─────────────────
+test("extractQuotedPhrasesWithSource: 각 phrase에 가장 첫 areaIndex 부여", () => {
+  const scores = [
+    { feedback_good: "'좋은 표현'이 보여요", feedback_fix: "x" },
+    { feedback_good: "y", feedback_fix: "'다음 문장'을 다시 보세요" },
+    { feedback_good: "'좋은 표현' 또 등장", feedback_fix: "z" },
+  ];
+  const result = extractQuotedPhrasesWithSource(scores);
+  assert.equal(result.length, 2);
+  // 첫 등장한 area가 source — '좋은 표현'은 area 0, '다음 문장'은 area 1
+  const map = new Map(result.map((r) => [r.phrase, r.areaIndex]));
+  assert.equal(map.get("좋은 표현"), 0);
+  assert.equal(map.get("다음 문장"), 1);
+});
+
+test("computeSegments: PhraseSource[] 입력 시 segment에 areaIndex 동행", () => {
+  const body = "이 글의 좋은 표현은 다음 문장에서 잘 드러난다";
+  const segs = computeSegments(body, [
+    { phrase: "좋은 표현", areaIndex: 0 },
+    { phrase: "다음 문장", areaIndex: 1 },
+  ]);
+  const highlighted = segs.filter((s) => s.highlight);
+  assert.equal(highlighted.length, 2);
+  // 본문 순서대로
+  assert.equal(highlighted[0].text, "좋은 표현");
+  assert.equal(highlighted[0].areaIndex, 0);
+  assert.equal(highlighted[1].text, "다음 문장");
+  assert.equal(highlighted[1].areaIndex, 1);
+});
+
+test("computeSegments: string[] (기존) 입력은 areaIndex 없이 동작 — 하위호환", () => {
+  const body = "가나다라마바사";
+  const segs = computeSegments(body, ["가나다"]);
+  const h = segs.find((s) => s.highlight);
+  assert.equal(h.text, "가나다");
+  assert.equal(h.areaIndex, undefined);
 });
