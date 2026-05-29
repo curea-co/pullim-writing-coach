@@ -244,10 +244,14 @@ const DRAFT_KEY = "pwc_draft_v1";
 
 export type DraftSnapshot = {
   body: string;                    // 학생 글 원본 (정규화 전)
+  // 타입은 string으로 두되 isDraftSnapshot이 enum 멤버십을 검증 — Codex 리뷰 2026-05-29.
+  //   타입 narrow를 안 하는 이유: ScoreForm의 schoolLevel은 useState<string>("")로
+  //   select onChange에서 enum 값이 들어오는 구조라, 호출자 캐스팅 부담을 안 만들기 위함.
+  //   안전성은 loadDraft가 invalid draft를 null로 반환해 보장.
   school_level?: string;
   subject?: string;
   genre?: string;
-  target_raw?: string;             // 빈 문자열 = 제한 없음
+  target_raw?: string;             // 빈 문자열 = 제한 없음 (자유 입력이라 enum 아님)
   prompt_text?: string;
   saved_at: string;                // ISO 8601 +09:00
 };
@@ -257,8 +261,22 @@ export function isDraftSnapshot(v: unknown): v is DraftSnapshot {
   const o = v as Record<string, unknown>;
   if (typeof o.body !== "string") return false;
   if (typeof o.saved_at !== "string" || o.saved_at.length === 0) return false;
-  // 선택 필드는 string 또는 undefined만 허용 — 타 타입 들어오면 손상으로 본다.
-  for (const k of ["school_level", "subject", "genre", "target_raw", "prompt_text"] as const) {
+  // enum 필드 — 손상된 LS가 select에 없는 값을 통과시키면 ScoreForm의 requiredOk가
+  // 가짜 truthy가 되어 잘못된 payload 전송 위험(Codex 리뷰 2026-05-29). isProfile과 동일 패턴.
+  if (
+    o.school_level !== undefined &&
+    (typeof o.school_level !== "string" || !(SCHOOL_LEVELS as readonly string[]).includes(o.school_level))
+  ) return false;
+  if (
+    o.subject !== undefined &&
+    (typeof o.subject !== "string" || !(SUBJECTS as readonly string[]).includes(o.subject))
+  ) return false;
+  if (
+    o.genre !== undefined &&
+    (typeof o.genre !== "string" || !(GENRES as readonly string[]).includes(o.genre))
+  ) return false;
+  // 자유 입력 필드 — string 또는 undefined만.
+  for (const k of ["target_raw", "prompt_text"] as const) {
     if (o[k] !== undefined && typeof o[k] !== "string") return false;
   }
   return true;
