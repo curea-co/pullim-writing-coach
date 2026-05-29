@@ -15,7 +15,11 @@ import {
   getTotalScoreBand,
   hasLargeAreaGap,
 } from "../data/scoring";
+import type { RevisionEntry } from "../lib/storage";
 import CopyButton from "./CopyButton";
+import FeedbackDiff from "./FeedbackDiff";
+import GrowthCard from "./GrowthCard";
+import RevisionBodyView from "./RevisionBodyView";
 import SectionNav from "./SectionNav";
 
 // 결과 섹션 — sticky 번호 내비(SectionNav)와 카드 헤더가 공유하는 단일 소스.
@@ -59,11 +63,15 @@ export default function ResultView({
   output,
   actions,
   className,
+  revisionMode,
 }: {
   assignment: Assignment | Sample["assignment"];
   output: F3Output;
   actions?: ReactNode; // C4의 부가 버튼 (페이지별: "다른 샘플 보기" / "글 고치고 다시 받기")
   className?: string;
+  // #1 수정 전/후 비교 — 활성화되면 GrowthCard·본문 토글·FeedbackDiff 사용.
+  //   v2는 보통 output과 같지만 명시적 전달(구현자가 v2 따로 합성 가능).
+  revisionMode?: { v1: RevisionEntry; v2: RevisionEntry };
 }) {
   const band = getTotalScoreBand(output.total_score);
   const gap = hasLargeAreaGap(output.scores);
@@ -74,9 +82,22 @@ export default function ResultView({
   const maxIdx = scoreVals.indexOf(Math.max(...scoreVals));
   const minIdx = scoreVals.indexOf(Math.min(...scoreVals));
 
+  // 수정 전/후 모드 — v1 width(%)를 keyframe from으로 주입해 v1→v2 애니메이션.
+  const v1ScoresByArea = revisionMode
+    ? new Map(revisionMode.v1.output.scores.map((s) => [s.area, s.score]))
+    : null;
+
   return (
     <div className={cn("space-y-5", className)}>
+      {revisionMode && (
+        <GrowthCard v1={revisionMode.v1.output} v2={revisionMode.v2.output} />
+      )}
+
       <SectionNav items={RESULT_SECTIONS} />
+
+      {revisionMode && (
+        <RevisionBodyView v1={revisionMode.v1} v2={revisionMode.v2} />
+      )}
 
       {/* C1. 점수 (F4) */}
       <div
@@ -136,10 +157,29 @@ export default function ResultView({
                 <div className="flex-1">
                   <div className="bg-muted h-2.5 w-full overflow-hidden rounded-full">
                     {/* 동적 width는 데이터 기반이라 Tailwind 정적 클래스로 표현 불가 — 인라인 style 정당 예외 (audit D3) */}
-                    <div
-                      className={cn("score-bar h-full", sty.bar)}
-                      style={{ width: `${widthPct}%` }}
-                    />
+                    {(() => {
+                      // 수정 전/후 모드면 .score-bar--from + --from-width 주입(v1 위치에서 v2로 자라남).
+                      const fromScore = v1ScoresByArea?.get(sc.area);
+                      const isRevision = revisionMode && typeof fromScore === "number";
+                      const fromPct = isRevision ? (fromScore / sc.max) * 100 : 0;
+                      const style = isRevision
+                        ? ({
+                            width: `${widthPct}%`,
+                            // CSS custom property — keyframe from { width: var(--from-width) }
+                            ["--from-width" as string]: `${fromPct}%`,
+                          } as React.CSSProperties)
+                        : { width: `${widthPct}%` };
+                      return (
+                        <div
+                          className={cn(
+                            isRevision ? "score-bar--from" : "score-bar",
+                            "h-full",
+                            sty.bar,
+                          )}
+                          style={style}
+                        />
+                      );
+                    })()}
                   </div>
                 </div>
                 <div
@@ -156,7 +196,7 @@ export default function ResultView({
         </ul>
       </div>
 
-      {/* C2. 영역별 피드백 (F5) */}
+      {/* C2. 영역별 피드백 (F5) — revisionMode면 FeedbackDiff(v1/v2 비교) 사용 */}
       <div
         id="result-feedback"
         className="border-border bg-surface scroll-mt-20 rounded-xl border p-5"
@@ -165,6 +205,9 @@ export default function ResultView({
           <span className="text-subtle-foreground tabular-nums">02</span>
           영역별 피드백
         </h2>
+        {revisionMode ? (
+          <FeedbackDiff v1={revisionMode.v1.output} v2={revisionMode.v2.output} />
+        ) : (
         <div className="space-y-4">
           {output.scores.map((sc) => {
             const sty = getScoreColor(sc.score);
@@ -201,6 +244,7 @@ export default function ResultView({
             );
           })}
         </div>
+        )}
       </div>
 
       {/* C3. 수정 가이드 (F6) */}

@@ -53,9 +53,21 @@ body {
   animation: growBar 600ms ease-out;
 }
 
+/* 수정 전/후 비교 모드 — 0이 아니라 v1 위치에서 v2로 자라남(#1 design doc 2026-05-28).
+   인라인 style로 --from-width 주입. width 자체는 v2 target. */
+@keyframes growBarFromV1 {
+  from {
+    width: var(--from-width, 0);
+  }
+}
+.score-bar--from {
+  animation: growBarFromV1 800ms ease-out;
+}
+
 /* 전정 장애·멀미 민감 사용자 — 모션 제거 (a11y, plan-design-review 2026-05-27 must-fix) */
 @media (prefers-reduced-motion: reduce) {
-  .score-bar {
+  .score-bar,
+  .score-bar--from {
     animation: none;
   }
 }
