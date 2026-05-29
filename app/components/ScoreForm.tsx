@@ -28,9 +28,33 @@ import {
   TARGET_MIN,
 } from "@/app/lib/grading";
 import type { F3Output } from "@/app/data/scoring";
-import { addRevision, getThread, type RevisionEntry } from "@/app/lib/storage";
+import {
+  addRevision,
+  clearDraft,
+  type DraftSnapshot,
+  getThread,
+  loadDraft,
+  type RevisionEntry,
+  saveDraft,
+} from "@/app/lib/storage";
 import ResultView from "./ResultView";
 import { DEMO_TOKEN_KEY } from "./TokenGate";
+
+// #9 본문 자동 저장 — saved_at(ISO) → "M/D HH:MM" 짧은 카피.
+//   학생/평가관이 한눈에 "최근에 저장됐다" 인식하면 충분 — 초 단위·날짜년도 생략.
+function formatSavedAt(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "방금 전";
+    const m = d.getMonth() + 1;
+    const day = d.getDate();
+    const h = String(d.getHours()).padStart(2, "0");
+    const min = String(d.getMinutes()).padStart(2, "0");
+    return `${m}/${day} ${h}:${min}`;
+  } catch {
+    return "방금 전";
+  }
+}
 
 // 학년·과목·장르 프리필은 A2 프로필 기반(TokenGate→ScoreForm defaults prop)으로 일원화.
 // "자주 쓰는 조합" chip은 프로필 도입 후 중복이라 제거(사용자 피드백 2026-05-29).
@@ -94,6 +118,11 @@ export default function ScoreForm({
   const [revisionPair, setRevisionPair] = useState<{ v1: RevisionEntry; v2: RevisionEntry } | null>(
     null,
   );
+  // #9 본문 자동 저장 — 마운트 시 draft 발견하면 명시적 "이어 쓰기/새로 시작" 배너.
+  //   공용 기기에서 타인 글 자동 노출 방지 → 자동 복원 X.
+  const [restoredDraft, setRestoredDraft] = useState<DraftSnapshot | null>(null);
+  // 마지막 자동 저장 시각(표시용). null = 아직 저장 안 됨.
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const formTopRef = useRef<HTMLDivElement>(null);
   const outcomeRef = useRef<HTMLDivElement>(null);
 
@@ -103,6 +132,63 @@ export default function ScoreForm({
       outcomeRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [submit.phase]);
+
+  // #9 마운트 시 1회 — 저장된 draft가 있으면 배너로 사용자에게 선택권 부여.
+  //   body 비어 있는 draft는 가치 없으니 무시(저장 자체를 안 했어야 함, 방어).
+  useEffect(() => {
+    const draft = loadDraft();
+    if (draft && draft.body.trim().length > 0) {
+      setRestoredDraft(draft);
+    }
+  }, []);
+
+  // #9 자동 저장 — debounce 800ms. idle phase + restore 배너 결정 전이면 보류.
+  //   비어 있는 폼은 저장 X(LS 공간·오해 방지). 변경 후 800ms 침묵 → write.
+  useEffect(() => {
+    if (submit.phase !== "idle") return;
+    if (restoredDraft !== null) return; // 사용자가 "이어 쓰기/새로 시작" 결정할 때까지 대기
+    const meaningful = body.trim().length > 0 || promptText.trim().length > 0;
+    if (!meaningful) return;
+    const t = setTimeout(() => {
+      const res = saveDraft({
+        body,
+        school_level: schoolLevel || undefined,
+        subject: subject || undefined,
+        genre: genre || undefined,
+        target_raw: targetRaw || undefined,
+        prompt_text: promptText || undefined,
+      });
+      if (res.ok) setLastSavedAt(res.saved_at);
+      // 실패해도 사용자에게 알리지 않음 — 입력 흐름 끊지 않기 위함(quota는 거의 없음).
+    }, 800);
+    return () => clearTimeout(t);
+  }, [body, schoolLevel, subject, genre, targetRaw, promptText, submit.phase, restoredDraft]);
+
+  // #9 제출 성공 시 draft 폐기 — 결과를 받은 시점에 draft는 더는 가치 없음.
+  useEffect(() => {
+    if (submit.phase === "result") {
+      clearDraft();
+      setLastSavedAt(null);
+    }
+  }, [submit.phase]);
+
+  function applyRestore() {
+    if (!restoredDraft) return;
+    setBody(restoredDraft.body);
+    if (restoredDraft.school_level) setSchoolLevel(restoredDraft.school_level);
+    if (restoredDraft.subject) setSubject(restoredDraft.subject);
+    if (restoredDraft.genre) setGenre(restoredDraft.genre);
+    if (restoredDraft.target_raw) setTargetRaw(restoredDraft.target_raw);
+    if (restoredDraft.prompt_text) setPromptText(restoredDraft.prompt_text);
+    setLastSavedAt(restoredDraft.saved_at);
+    setRestoredDraft(null);
+  }
+
+  function dismissRestore() {
+    setRestoredDraft(null);
+    clearDraft();
+    setLastSavedAt(null);
+  }
 
   // ── 파생 검증값 ─────────────────────────────────────────────────────
   const bodyCount = charCount(normalizeBody(body)); // 정규화 후 기준 (gate·표시)
@@ -284,6 +370,42 @@ export default function ScoreForm({
 
   return (
     <div ref={formTopRef} className="space-y-6">
+      {/* #9 본문 자동 저장 복원 배너 — 마운트 시 draft 있을 때만 */}
+      {restoredDraft && (
+        <section
+          role="region"
+          aria-label="이전 작성 글 불러오기"
+          className="border-accent-mid-surface bg-accent-mid-surface flex flex-wrap items-start gap-3 rounded-xl border p-4"
+        >
+          <div className="min-w-0 flex-1">
+            <p className="text-foreground break-keep text-sm font-semibold">
+              📝 이전에 쓰던 글이 있어요
+            </p>
+            <p className="text-muted-foreground break-keep mt-1 text-xs leading-relaxed">
+              마지막 저장 {formatSavedAt(restoredDraft.saved_at)} · 본문{" "}
+              {restoredDraft.body.trim().length}자. 이어서 쓸까요?{" "}
+              <span className="text-subtle-foreground">'새로 시작'하면 저장된 글은 지워져요.</span>
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              onClick={applyRestore}
+              className="rounded-lg bg-[#24D39E] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1FBE8C]"
+            >
+              이어 쓰기
+            </button>
+            <button
+              type="button"
+              onClick={dismissRestore}
+              className="border-border bg-surface text-foreground hover:bg-muted rounded-lg border px-3 py-1.5 text-xs font-medium"
+            >
+              새로 시작
+            </button>
+          </div>
+        </section>
+      )}
+
       {/* 블록 B1 — 과제 정보 (F1) */}
       <section className="border-border bg-surface rounded-xl border p-5">
         <h2 className="text-foreground mb-1 text-base font-semibold">
@@ -403,6 +525,15 @@ export default function ScoreForm({
             현재 {bodyCount}자{targetNum ? ` / 목표 ${targetNum}자` : ""}
           </span>
         </div>
+        {/* #9 자동 저장 표시 — 한 번이라도 저장된 적이 있으면 노출 */}
+        {lastSavedAt && (
+          <p
+            className="text-subtle-foreground mt-1 text-right text-[11px]"
+            aria-live="polite"
+          >
+            자동 저장됨 · {formatSavedAt(lastSavedAt)}
+          </p>
+        )}
       </section>
 
       {/* 블록 B3 — 실행 버튼 (F3) */}

@@ -230,3 +230,73 @@ export function clearAllRevisions(): void {
     /* swallow */
   }
 }
+
+// ── Draft (#9 본문 자동 저장) ─────────────────────────────────────────
+// localStorage["pwc_draft_v1"] = DraftSnapshot.
+//   /try 입력 화면에서 body·과제정보를 debounce(800ms)로 자동 저장.
+//   복원은 명시적 "이어 쓰기/새로 시작" 배너로 — 공용 기기에서 타인 글 노출 방지.
+//   제출 성공 시 clearDraft 호출(데이터 보존이 끝남).
+//
+//   단일 draft 정책: 한 번에 하나만 보관(샘플 폼은 본문 1개 입력 슬롯이라).
+//   thread별 다중 draft가 필요해지면 키를 v2로 마이그레이션해 분리.
+
+const DRAFT_KEY = "pwc_draft_v1";
+
+export type DraftSnapshot = {
+  body: string;                    // 학생 글 원본 (정규화 전)
+  school_level?: string;
+  subject?: string;
+  genre?: string;
+  target_raw?: string;             // 빈 문자열 = 제한 없음
+  prompt_text?: string;
+  saved_at: string;                // ISO 8601 +09:00
+};
+
+export function isDraftSnapshot(v: unknown): v is DraftSnapshot {
+  if (typeof v !== "object" || v === null) return false;
+  const o = v as Record<string, unknown>;
+  if (typeof o.body !== "string") return false;
+  if (typeof o.saved_at !== "string" || o.saved_at.length === 0) return false;
+  // 선택 필드는 string 또는 undefined만 허용 — 타 타입 들어오면 손상으로 본다.
+  for (const k of ["school_level", "subject", "genre", "target_raw", "prompt_text"] as const) {
+    if (o[k] !== undefined && typeof o[k] !== "string") return false;
+  }
+  return true;
+}
+
+export function loadDraft(): DraftSnapshot | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return isDraftSnapshot(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveDraft(
+  snapshot: Omit<DraftSnapshot, "saved_at">,
+): { ok: true; saved_at: string } | { ok: false; reason: "quota" | "denied" | "invalid" } {
+  if (typeof window === "undefined") return { ok: false, reason: "denied" };
+  const saved_at = consentNow();
+  const full: DraftSnapshot = { ...snapshot, saved_at };
+  if (!isDraftSnapshot(full)) return { ok: false, reason: "invalid" };
+  try {
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify(full));
+    return { ok: true, saved_at };
+  } catch (e) {
+    const reason = e instanceof DOMException && e.name === "QuotaExceededError" ? "quota" : "denied";
+    return { ok: false, reason };
+  }
+}
+
+export function clearDraft(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    /* swallow */
+  }
+}
