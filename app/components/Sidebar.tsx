@@ -62,6 +62,17 @@ function NavLinks({
           라이브
         </span>
       </Link>
+      {/* 2026-05-29 LNB 확장 — 내 정보·서비스 소개 (둘러보기 섹션 끝에 추가) */}
+      <Link href="/me" onClick={onNavigate} className={itemCls(pathname === "/me")}>
+        내 정보
+      </Link>
+      <Link
+        href="/about"
+        onClick={onNavigate}
+        className={itemCls(pathname === "/about")}
+      >
+        서비스 소개
+      </Link>
 
       <div className="text-subtle-foreground mt-4 mb-1 px-3 text-[11px] font-semibold">
         샘플 채점 결과
