@@ -56,6 +56,40 @@ test("isDraftSnapshot: 선택 필드는 string|undefined만 — number 들어오
   );
 });
 
+// Codex 리뷰 2026-05-29: enum 멤버십까지 검증 — select에 없는 값이 통과해
+// requiredOk가 가짜 truthy가 되는 사고 방지(isProfile과 동일 패턴).
+test("isDraftSnapshot: school_level/subject/genre 비-enum 값 거부", () => {
+  // school_level: SCHOOL_LEVELS에 없는 임의 string
+  assert.equal(
+    isDraftSnapshot({ body: "x", saved_at: "x", school_level: "invalid-level" }),
+    false,
+  );
+  // subject: SUBJECTS에 없는 임의 string
+  assert.equal(
+    isDraftSnapshot({ body: "x", saved_at: "x", subject: "invalid-subject" }),
+    false,
+  );
+  // genre: GENRES에 없는 임의 string
+  assert.equal(
+    isDraftSnapshot({ body: "x", saved_at: "x", genre: "invalid-genre" }),
+    false,
+  );
+});
+
+test("isDraftSnapshot: 유효 enum 멤버는 정상 통과", () => {
+  // 기존 grading.ts enum의 실제 멤버로 양성 케이스 확인
+  assert.equal(
+    isDraftSnapshot({
+      body: "x",
+      saved_at: "x",
+      school_level: "중2",
+      subject: "국어",
+      genre: "설명문",
+    }),
+    true,
+  );
+});
+
 test("save/load roundtrip — 모든 필드 보존 + saved_at 자동 주입", () => {
   const result = saveDraft({
     body: "안녕 친구야",
