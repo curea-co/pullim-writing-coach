@@ -15,6 +15,7 @@ import {
   getTotalScoreBand,
   hasLargeAreaGap,
 } from "../data/scoring";
+import { feedbackAreaId } from "../lib/feedback-anchors";
 import type { RevisionEntry } from "../lib/storage";
 import CopyButton from "./CopyButton";
 import FeedbackDiff from "./FeedbackDiff";
@@ -209,10 +210,14 @@ export default function ResultView({
           <FeedbackDiff v1={revisionMode.v1.output} v2={revisionMode.v2.output} />
         ) : (
         <div className="space-y-4">
-          {output.scores.map((sc) => {
+          {output.scores.map((sc, i) => {
             const sty = getScoreColor(sc.score);
             return (
-              <div key={sc.area} className="border-border border-l-2 pl-3">
+              <div
+                key={sc.area}
+                id={feedbackAreaId(i)}
+                className="border-border scroll-mt-20 rounded border-l-2 pl-3"
+              >
                 <div className="mb-1 flex items-center gap-2">
                   <span className="text-foreground text-sm font-semibold">
                     ▸ {sc.area}

@@ -64,10 +64,28 @@ body {
   animation: growBarFromV1 800ms ease-out;
 }
 
+/* #2 인라인 첨삭 클릭 → 영역 피드백 카드로 스크롤 시 일시적 강조(flash).
+   AnnotatedBody가 클릭 시 .feedback-flash 클래스를 1.6s 동안 부여. band-good 톤(긍정·찾음).
+   reduced-motion 가드는 아래 통합. */
+@keyframes feedbackFlash {
+  0% {
+    background-color: var(--color-band-good-surface);
+    box-shadow: 0 0 0 2px var(--color-band-good);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+.feedback-flash {
+  animation: feedbackFlash 1.5s ease-out;
+}
+
 /* 전정 장애·멀미 민감 사용자 — 모션 제거 (a11y, plan-design-review 2026-05-27 must-fix) */
 @media (prefers-reduced-motion: reduce) {
   .score-bar,
-  .score-bar--from {
+  .score-bar--from,
+  .feedback-flash {
     animation: none;
   }
 }

@@ -4,6 +4,7 @@
 //   서버 호환(상태 없음).
 
 import type { F3Output } from "../data/scoring";
+import { feedbackAreaId } from "../lib/feedback-anchors";
 import { areaCopy, areaTone, areaToneColorHint, computeDelta } from "../lib/revision";
 import { cn } from "../lib/utils";
 
@@ -34,8 +35,9 @@ export default function FeedbackDiff({
         return (
           <article
             key={row.area}
+            id={feedbackAreaId(i)}
             className={cn(
-              "border-l-2 pl-3",
+              "scroll-mt-20 rounded border-l-2 pl-3",
               colorHint === "warn" ? "border-band-warn" : "border-border",
             )}
           >
