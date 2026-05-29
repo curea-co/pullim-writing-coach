@@ -140,7 +140,7 @@ export default function ProfileForm({
 
         <TextField
           label="학교명"
-          placeholder="PDF·스크린샷 헤더에 표시돼요"
+          placeholder="(예) 대한중학교"
           value={draft.school_name ?? ""}
           onChange={(v) => setField("school_name", v)}
           max={30}

@@ -81,3 +81,152 @@ export function consentNow(): string {
   const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
   return kst.toISOString().replace(/\.\d{3}Z$/, "+09:00").replace(/Z$/, "+09:00");
 }
+
+// ── Revisions (#1 수정 전/후 비교) ─────────────────────────────────────
+// localStorage["pwc_revisions_v1"] = RevisionThread[].
+//   한 thread = "같은 글의 고쳐쓰기 묶음". revisions[0]이 v1(초안), 끝이 최신.
+//   LRU 정책(CEO 리뷰 2026-05-28):
+//   · thread당 4번째 추가 시 가장 오래된 1건 drop ("오래된 이력 1건 정리했어요")
+//   · 전체 storage quota 초과 시 가장 오래된 thread 통째 drop, 재시도 1회.
+
+import type { Assignment, F3Output } from "../data/scoring";
+
+const REVISIONS_KEY = "pwc_revisions_v1";
+export const MAX_REVISIONS_PER_THREAD = 3;
+
+export type RevisionEntry = {
+  id: string;                                        // crypto.randomUUID()
+  version: number;                                   // 1, 2, 3 (thread 내 순번)
+  created_at: string;                                // ISO 8601 +09:00
+  assignment: Assignment;
+  submission: { body: string; char_count: number };
+  output: F3Output;
+};
+
+export type RevisionThread = {
+  thread_id: string;                                 // crypto.randomUUID()
+  revisions: RevisionEntry[];                        // [oldest, ..., newest], length ≤ MAX_REVISIONS_PER_THREAD
+};
+
+function isRevisionEntry(v: unknown): v is RevisionEntry {
+  if (typeof v !== "object" || v === null) return false;
+  const o = v as Record<string, unknown>;
+  if (typeof o.id !== "string" || typeof o.version !== "number") return false;
+  if (typeof o.created_at !== "string") return false;
+  if (typeof o.assignment !== "object" || typeof o.submission !== "object") return false;
+  if (typeof o.output !== "object") return false;
+  return true;
+}
+
+function isRevisionThread(v: unknown): v is RevisionThread {
+  if (typeof v !== "object" || v === null) return false;
+  const o = v as Record<string, unknown>;
+  if (typeof o.thread_id !== "string") return false;
+  if (!Array.isArray(o.revisions) || o.revisions.some((r) => !isRevisionEntry(r))) return false;
+  return true;
+}
+
+export function loadRevisions(): RevisionThread[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(REVISIONS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isRevisionThread);
+  } catch {
+    return [];
+  }
+}
+
+function writeRevisions(threads: RevisionThread[]): { ok: true } | { ok: false; reason: "quota" | "denied" } {
+  if (typeof window === "undefined") return { ok: false, reason: "denied" };
+  try {
+    window.localStorage.setItem(REVISIONS_KEY, JSON.stringify(threads));
+    return { ok: true };
+  } catch (e) {
+    const reason = e instanceof DOMException && e.name === "QuotaExceededError" ? "quota" : "denied";
+    return { ok: false, reason };
+  }
+}
+
+export type AddRevisionResult =
+  | { ok: true; thread_id: string; dropped_oldest_in_thread: boolean; dropped_oldest_thread: boolean }
+  | { ok: false; reason: "denied" };
+
+// thread_id 있으면 해당 thread에 append, 없으면 새 thread 생성.
+// 새 entry의 version은 thread 안에서 자동(직전 max+1, 첫 추가는 1).
+// quota 초과 시 가장 오래된 thread 통째 drop + 재시도 1회. 또 실패하면 denied.
+export function addRevision(
+  threadId: string | null,
+  partial: Omit<RevisionEntry, "id" | "version" | "created_at">,
+): AddRevisionResult {
+  const threads = loadRevisions();
+  let droppedInThread = false;
+  let targetIdx = threadId ? threads.findIndex((t) => t.thread_id === threadId) : -1;
+
+  // 새 thread 생성
+  if (targetIdx === -1) {
+    const newThread: RevisionThread = {
+      thread_id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `thr_${Date.now()}`,
+      revisions: [],
+    };
+    threads.push(newThread);
+    targetIdx = threads.length - 1;
+  }
+
+  const thread = threads[targetIdx];
+  const nextVersion = thread.revisions.length > 0
+    ? Math.max(...thread.revisions.map((r) => r.version)) + 1
+    : 1;
+  const newEntry: RevisionEntry = {
+    id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `rev_${Date.now()}_${nextVersion}`,
+    version: nextVersion,
+    created_at: consentNow(),
+    ...partial,
+  };
+  thread.revisions.push(newEntry);
+
+  // thread 내 LRU
+  if (thread.revisions.length > MAX_REVISIONS_PER_THREAD) {
+    thread.revisions.shift();
+    droppedInThread = true;
+  }
+
+  // 1차 write
+  let result = writeRevisions(threads);
+  let droppedThread = false;
+
+  // quota 초과 → 가장 오래된 thread(현재 target 아닌 것 중) drop 후 재시도
+  if (!result.ok && result.reason === "quota") {
+    const candidate = threads.findIndex((_, i) => i !== targetIdx);
+    if (candidate !== -1) {
+      threads.splice(candidate, 1);
+      droppedThread = true;
+      // targetIdx가 candidate 뒤에 있었으면 인덱스 보정 — 여기선 thread_id로 다시 찾음
+      result = writeRevisions(threads);
+    }
+  }
+
+  if (!result.ok) return { ok: false, reason: "denied" };
+  return {
+    ok: true,
+    thread_id: thread.thread_id,
+    dropped_oldest_in_thread: droppedInThread,
+    dropped_oldest_thread: droppedThread,
+  };
+}
+
+export function getThread(threadId: string): RevisionThread | null {
+  const threads = loadRevisions();
+  return threads.find((t) => t.thread_id === threadId) ?? null;
+}
+
+export function clearAllRevisions(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(REVISIONS_KEY);
+  } catch {
+    /* swallow */
+  }
+}

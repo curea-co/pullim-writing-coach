@@ -28,20 +28,12 @@ import {
   TARGET_MIN,
 } from "@/app/lib/grading";
 import type { F3Output } from "@/app/data/scoring";
+import { addRevision, getThread, type RevisionEntry } from "@/app/lib/storage";
 import ResultView from "./ResultView";
 import { DEMO_TOKEN_KEY } from "./TokenGate";
 
-// 자주 쓰는 조합 프리셋 (F09, wireframe B1). FE 전용 — 장르는 기본값, 학생이 바꿀 수 있다.
-const PRESETS = [
-  { label: "중2 국어", school_level: "중2", subject: "국어", genre: "설명문" },
-  { label: "중3 사회", school_level: "중3", subject: "사회", genre: "설명문" },
-  {
-    label: "고1 국어",
-    school_level: "고1",
-    subject: "국어",
-    genre: "감상문·독후감",
-  },
-] as const;
+// 학년·과목·장르 프리필은 A2 프로필 기반(TokenGate→ScoreForm defaults prop)으로 일원화.
+// "자주 쓰는 조합" chip은 프로필 도입 후 중복이라 제거(사용자 피드백 2026-05-29).
 
 // 요청 계약 (contract §3.1). body 는 **원본** — 정규화·char_count 는 서버 권위.
 type ScoreRequest = {
@@ -97,6 +89,11 @@ export default function ScoreForm({
   const submitCount = useRef(0);
   // 직전에 실제 전송한 payload — '다시 시도하기'는 이걸 그대로 재전송한다(같은 요청·같은 attempt_no).
   const lastPayload = useRef<ScoreRequest | null>(null);
+  // #1 수정 전/후 비교 — 이번 폼 라이프타임 동안의 thread id + 직전 두 revision pair.
+  const [revisionThreadId, setRevisionThreadId] = useState<string | null>(null);
+  const [revisionPair, setRevisionPair] = useState<{ v1: RevisionEntry; v2: RevisionEntry } | null>(
+    null,
+  );
   const formTopRef = useRef<HTMLDivElement>(null);
   const outcomeRef = useRef<HTMLDivElement>(null);
 
@@ -191,6 +188,26 @@ export default function ScoreForm({
       // 200이라도 본문 JSON 파싱이 깨질 수 있다 — try/catch 없으면 loading에 영구 고정(curea-review-ai 지적).
       try {
         const output = (await res.json()) as F3Output;
+        // #1 수정 전/후 — thread에 이번 제출 추가. 같은 thread면 비교 모드 활성.
+        const revRes = addRevision(revisionThreadId, {
+          assignment: payload.assignment,
+          submission: {
+            body: payload.submission.body,
+            char_count: Array.from(payload.submission.body).length,
+          },
+          output,
+        });
+        if (revRes.ok) {
+          setRevisionThreadId(revRes.thread_id);
+          const thread = getThread(revRes.thread_id);
+          if (thread && thread.revisions.length >= 2) {
+            const rs = thread.revisions;
+            setRevisionPair({ v1: rs[rs.length - 2], v2: rs[rs.length - 1] });
+          } else {
+            setRevisionPair(null); // 1차 제출 — 비교 모드 없음
+          }
+        }
+        // 저장 실패해도 결과 화면은 항상 보여줌(데이터 보존만 못한 것).
         setSubmit({ phase: "result", output, assignment: payload.assignment });
       } catch {
         setSubmit({
@@ -259,9 +276,9 @@ export default function ScoreForm({
     <button
       type="button"
       onClick={handleResubmit}
-      className="border-border text-foreground hover:bg-muted inline-flex items-center justify-center rounded-lg border px-4 py-2.5 text-sm font-semibold"
+      className="inline-flex items-center justify-center rounded-lg bg-[#24D39E] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1FBE8C]"
     >
-      글 고치고 다시 받기
+      {revisionPair ? "한 번 더 고쳐쓰기" : "고쳐쓰기 시작"}
     </button>
   );
 
@@ -275,42 +292,6 @@ export default function ScoreForm({
         <p className="text-muted-foreground mb-4 text-xs">
           선생님이 내준 과제 조건을 입력하면, AI가 그 기준으로 채점해요.
         </p>
-
-        {/* 프리셋 칩 (F09) */}
-        <div className="mb-4">
-          <span className="text-muted-foreground mb-1.5 block text-xs font-medium">
-            자주 쓰는 조합
-          </span>
-          <div className="flex flex-wrap gap-2">
-            {PRESETS.map((p) => {
-              const active =
-                schoolLevel === p.school_level &&
-                subject === p.subject &&
-                genre === p.genre;
-              return (
-                <button
-                  key={p.label}
-                  type="button"
-                  disabled={locked}
-                  onClick={() => {
-                    setSchoolLevel(p.school_level);
-                    setSubject(p.subject);
-                    setGenre(p.genre);
-                  }}
-                  className={cn(
-                    "rounded-full border px-3 py-1 text-xs font-medium transition",
-                    active
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border text-foreground hover:bg-muted",
-                    locked && "cursor-not-allowed opacity-50"
-                  )}
-                >
-                  {p.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <SelectField
@@ -476,6 +457,7 @@ export default function ScoreForm({
             assignment={submit.assignment}
             output={submit.output}
             actions={resubmitButton}
+            revisionMode={revisionPair ?? undefined}
           />
         </div>
       )}
