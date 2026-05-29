@@ -302,7 +302,7 @@ export const SAMPLES: Sample[] = [
     label: "E",
     category: "중상",
     title: "고1 국어 감상문 — 이육사 시 '광야'",
-    intent: "§2.1 감상문 해석 · 양호 중앙 · 약점(완화 표현·짧은 마지막 단락) 3가지 짚을 수 있음",
+    // intent 의도적으로 비움 — § 루브릭 인용 학생용 노출 부적절(2026-05-29). type 옵셔널.
     assignment: {
       school_level: "고1",
       subject: "국어",

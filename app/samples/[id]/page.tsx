@@ -20,7 +20,8 @@ export async function generateMetadata({
   if (!sample) return { title: "샘플 없음" };
   return {
     title: `${sample.label}. ${sample.title} — Pullim Writing Coach`,
-    description: sample.intent,
+    // intent 미설정 시 카테고리 폴백 — § 메모 학생/검색 노출 금지(2026-05-29).
+    description: sample.intent ?? `샘플 ${sample.label} · ${sample.category}`,
   };
 }
 
@@ -56,7 +57,9 @@ export default async function SampleDetailPage({
         <h1 className="text-foreground text-2xl font-bold md:text-3xl">
           {sample.title}
         </h1>
-        <p className="text-muted-foreground mt-1 text-sm">{sample.intent}</p>
+        {sample.intent && (
+          <p className="text-muted-foreground mt-1 text-sm">{sample.intent}</p>
+        )}
       </header>
 
       <div className="grid gap-6 lg:grid-cols-5">

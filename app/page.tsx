@@ -146,9 +146,11 @@ export default function Home() {
                     </span>
                   )}
                 </div>
-                <p className="text-muted-foreground mt-3 text-xs leading-relaxed">
-                  {s.intent}
-                </p>
+                {s.intent && (
+                  <p className="text-muted-foreground mt-3 text-xs leading-relaxed">
+                    {s.intent}
+                  </p>
+                )}
               </Link>
             );
           })}
