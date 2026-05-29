@@ -86,7 +86,7 @@ export default function Home() {
         >
           직접 글 입력해 채점받기
           <span className="bg-accent-mid-surface text-accent-mid rounded-full px-1.5 py-0.5 text-[10px] font-semibold">
-            라이브
+            실시간
           </span>
         </Link>
       </section>

@@ -116,7 +116,7 @@ export default async function SampleDetailPage({
           </div>
         </section>
 
-        {/* 오른쪽: 첨삭 결과 — 공유 ResultView (라이브 폼과 동일 UI, P3.3) */}
+        {/* 오른쪽: 첨삭 결과 — 공유 ResultView (실시간 폼과 동일 UI, P3.3) */}
         <ResultView
           assignment={assignment}
           output={output}
@@ -134,7 +134,7 @@ export default async function SampleDetailPage({
 
       <CtaBand
         title="다른 글도 직접 넣어 보세요"
-        description="이 샘플처럼, 직접 쓴 수행평가 글을 라이브로 채점받을 수 있어요."
+        description="이 샘플처럼, 직접 쓴 수행평가 글을 첨삭받을 수 있어요."
       />
     </main>
   );

@@ -57,7 +57,7 @@ export type Sample = {
   label: string; // A, B, C, D, E
   category: Category;
   title: string;
-  // 내부 PM/루브릭 메모(§ 표기 등) — 학생/평가관 화면에는 노출하지 않음.
+  // 내부 PM/루브릭 메모(§ 표기 등) — 학생/교사 화면에는 노출하지 않음.
   //   2026-05-29 학생용 카피에서 § 인용을 제거(샘플 E 시작) → 옵셔널로 격하.
   intent?: string;
   assignment: Assignment;

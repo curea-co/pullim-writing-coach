@@ -1,5 +1,5 @@
 // /about — 서비스 소개 (정적 페이지, LNB 진입).
-//   "무엇·어떻게·누구·데이터·한계" 5섹션. 학생/평가관/교사가 한 화면에서 mental model 정착.
+//   "무엇·어떻게·누구·데이터·한계" 5섹션. 학생/교사가 한 화면에서 mental model 정착.
 //   서버 컴포넌트 — 상태 없음, SSG/prerender. #19 TrustLabel과 톤 일치(중립·격려).
 //   2026-05-29 LNB 추가 시 신규.
 
@@ -10,7 +10,7 @@ import Breadcrumb from "../components/Breadcrumb";
 export const metadata: Metadata = {
   title: "서비스 소개 — Pullim Writing Coach",
   description:
-    "Pullim Writing Coach는 학생 글을 AI가 5가지 기준(과제 이해·내용 충실도·구조·논리·표현·문장·성장 가능성)으로 첨삭해 주는 라이브 채점 도구예요.",
+    "Pullim Writing Coach는 학생 글을 AI가 5가지 기준(과제 이해·내용 충실도·구조·논리·표현·문장·성장 가능성)으로 첨삭해 주는 글쓰기 도구예요.",
 };
 
 export default function AboutPage() {
@@ -23,12 +23,11 @@ export default function AboutPage() {
           Pullim Writing Coach
         </h1>
         <p className="text-muted-foreground break-keep mt-3 text-base leading-relaxed">
-          수행평가 글을 AI가 5가지 기준으로 첨삭해 주는 라이브 채점 도구예요.
-          학생은 글을 다듬는 방향을, 평가관·교사는 학생이 어디쯤 있는지 frame을 함께 봐요.
+          수행평가 글을 AI가 5가지 기준으로 첨삭해 주는 글쓰기 도구예요.
         </p>
       </header>
 
-      <Section title="무엇을 해 주는가요?">
+      <Section title="무엇을 해 주나요?">
         <p>
           학생이 쓴 글을 붙여넣으면 1분 안에 5영역 루브릭 기준으로 채점하고,
           영역별 잘한 점·고칠 점과 우선순위 가이드를 보여줘요. 결과는 PDF·스크린샷으로
@@ -41,7 +40,7 @@ export default function AboutPage() {
           <li>학교·학년, 과목, 장르, 과제 내용을 입력해요.</li>
           <li>학생이 쓴 글 전체를 그대로 붙여넣어요.</li>
           <li>AI가 5영역 루브릭으로 채점해 영역 점수·피드백·수정 가이드를 만들어요.</li>
-          <li>결과 화면에서 인라인 첨삭·왜 이 점수 토글·수정 전/후 비교를 확인해요.</li>
+          <li>결과 화면에서 첨삭·점수 설명 토글·수정 전/후 비교를 확인해요.</li>
         </ol>
         <p className="text-subtle-foreground mt-3 text-sm">
           5영역: <strong className="text-foreground">과제 이해 · 내용 충실도 · 구조·논리 · 표현·문장 · 성장 가능성</strong>.
@@ -56,8 +55,8 @@ export default function AboutPage() {
             방향을 잡고 싶을 때.
           </li>
           <li>
-            <strong className="text-foreground">평가관·교사</strong> — 다수 학생 글을 검토하기 전 1차
-            스크리닝과 fix 방향 정리.
+            <strong className="text-foreground">교사</strong> — 다수 학생 글을 검토하기 전 1차
+            검토와 고칠 방향 정리.
           </li>
         </ul>
       </Section>
@@ -65,8 +64,8 @@ export default function AboutPage() {
       <Section title="데이터는 어떻게 다뤄지나요?">
         <ul className="ml-1 list-disc space-y-2 pl-5">
           <li>
-            프로필(닉네임·학년·과목·학교명)과 본문 자동 저장 draft는 <strong className="text-foreground">사용자 브라우저</strong>에만
-            저장돼요(localStorage). 서버에 전송·저장하지 않아요.
+            프로필(닉네임·학년·과목·학교명)과 본문 임시 저장본은 <strong className="text-foreground">학생 기기의 브라우저 저장소</strong>에만
+            남아요. 서버에 전송·저장하지 않아요.
           </li>
           <li>
             채점 요청 시 본문은 AI 모델 호출을 위해 일시 전송되며 저장하지 않아요.
