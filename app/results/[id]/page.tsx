@@ -135,7 +135,7 @@ export default function ResultDetailPage({
 
       <CtaBand
         title="또 한 편 써 보세요"
-        description="새 글을 라이브로 채점받을 수 있어요."
+        description="새 글을 실시간으로 채점받을 수 있어요."
       />
     </main>
   );
