@@ -1,6 +1,6 @@
 "use client";
 // 미성년자 대상 데모 동의 — 잠금된 PM 초안(CEO 리뷰 2026-05-28).
-//   EPO 최종 승인 대기 항목. 구현 중 EPO가 수정 시 이 파일만 갱신.
+//   ✅ EPO 최종 승인 완료 (2026-05-31). 본문 변경 시 EPO 재승인 필요.
 
 export default function ConsentNotice({
   checked,
