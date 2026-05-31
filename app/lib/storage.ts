@@ -318,3 +318,105 @@ export function clearDraft(): void {
     /* swallow */
   }
 }
+
+// ── Results (채점 결과 조회) ──────────────────────────────────────────
+// localStorage["pwc_results_v1"] = ResultEntry[].
+//   /try 채점 성공 시 자동 저장 → /results 페이지에서 목록·상세 조회.
+//   LRU 정책: 최대 20건 보관, 초과 시 가장 오래된 1건 drop. quota 초과 시 추가 1건 drop 후 재시도.
+//   Revisions와 별개 — Revisions는 "같은 글의 고쳐쓰기 묶음", Results는 "독립된 채점 이력".
+
+const RESULTS_KEY = "pwc_results_v1";
+export const MAX_RESULTS = 20;
+
+export type ResultEntry = {
+  id: string;                                          // crypto.randomUUID()
+  created_at: string;                                  // ISO 8601 +09:00
+  assignment: Assignment;
+  submission: { body: string; char_count: number };
+  output: F3Output;
+};
+
+function isResultEntry(v: unknown): v is ResultEntry {
+  if (typeof v !== "object" || v === null) return false;
+  const o = v as Record<string, unknown>;
+  if (typeof o.id !== "string" || o.id.length === 0) return false;
+  if (typeof o.created_at !== "string" || o.created_at.length === 0) return false;
+  if (typeof o.assignment !== "object" || o.assignment === null) return false;
+  if (typeof o.submission !== "object" || o.submission === null) return false;
+  if (typeof o.output !== "object" || o.output === null) return false;
+  return true;
+}
+
+export function loadResults(): ResultEntry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(RESULTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isResultEntry);
+  } catch {
+    return [];
+  }
+}
+
+export function getResult(id: string): ResultEntry | null {
+  const all = loadResults();
+  return all.find((r) => r.id === id) ?? null;
+}
+
+function writeResults(results: ResultEntry[]): { ok: true } | { ok: false; reason: "quota" | "denied" } {
+  if (typeof window === "undefined") return { ok: false, reason: "denied" };
+  try {
+    window.localStorage.setItem(RESULTS_KEY, JSON.stringify(results));
+    return { ok: true };
+  } catch (e) {
+    const reason = e instanceof DOMException && e.name === "QuotaExceededError" ? "quota" : "denied";
+    return { ok: false, reason };
+  }
+}
+
+export type AddResultResult =
+  | { ok: true; id: string; dropped_oldest: boolean }
+  | { ok: false; reason: "denied" };
+
+// 신규 채점 결과 저장. 목록 끝에 추가(시간순 append) — 조회 시 역순 정렬.
+//   MAX_RESULTS 초과 시 가장 오래된 1건 shift. quota 시 1건 더 drop 후 재시도.
+export function addResult(
+  partial: Omit<ResultEntry, "id" | "created_at">,
+): AddResultResult {
+  const results = loadResults();
+  let droppedOldest = false;
+  const newEntry: ResultEntry = {
+    id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `res_${Date.now()}`,
+    created_at: consentNow(),
+    ...partial,
+  };
+  results.push(newEntry);
+
+  // 전역 LRU
+  if (results.length > MAX_RESULTS) {
+    results.shift();
+    droppedOldest = true;
+  }
+
+  let r = writeResults(results);
+  // quota → 추가 1건 drop 후 재시도
+  if (!r.ok && r.reason === "quota" && results.length > 1) {
+    results.shift();
+    droppedOldest = true;
+    r = writeResults(results);
+  }
+
+  if (!r.ok) return { ok: false, reason: "denied" };
+  return { ok: true, id: newEntry.id, dropped_oldest: droppedOldest };
+}
+
+export function clearAllResults(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(RESULTS_KEY);
+  } catch {
+    /* swallow */
+  }
+}
