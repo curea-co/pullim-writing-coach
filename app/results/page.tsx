@@ -106,7 +106,7 @@ export default function ResultsListPage() {
 
       <CtaBand
         title="다시 한 편 채점받아 볼래요?"
-        description="라이브 채점으로 또 다른 글을 평가받을 수 있어요."
+        description="실시간 채점으로 또 다른 글을 평가받을 수 있어요."
       />
     </main>
   );
