@@ -1,0 +1,148 @@
+"use client";
+// /results/[id] — 채점 결과 상세 (#11 신규, 2026-05-31).
+//   localStorage에서 단건 조회 → 좌 학생 글 / 우 ResultView (공유 컴포넌트).
+//   /samples/[id]와 동일 2단 레이아웃, 단 데이터 소스만 LS.
+//   id 미발견 시 안내 + /results로 복귀 CTA.
+
+import Link from "next/link";
+import { use, useEffect, useState } from "react";
+import { getResult, type ResultEntry } from "../../lib/storage";
+import Breadcrumb from "../../components/Breadcrumb";
+import ResultView from "../../components/ResultView";
+import CtaBand from "../../components/CtaBand";
+
+type LoadState = "loading" | "missing" | "loaded";
+
+export default function ResultDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  // Next.js 16 — params는 Promise. use()로 client 컴포넌트에서 unwrap.
+  const { id } = use(params);
+  const [state, setState] = useState<LoadState>("loading");
+  const [entry, setEntry] = useState<ResultEntry | null>(null);
+
+  useEffect(() => {
+    const r = getResult(id);
+    if (r) {
+      setEntry(r);
+      setState("loaded");
+    } else {
+      setState("missing");
+    }
+  }, [id]);
+
+  if (state === "loading") {
+    return (
+      <main className="mx-auto w-full max-w-4xl px-5 py-8 md:py-12">
+        <p className="text-muted-foreground text-sm">불러오는 중…</p>
+      </main>
+    );
+  }
+
+  if (state === "missing" || !entry) {
+    return (
+      <main className="mx-auto w-full max-w-4xl px-5 py-8 md:py-12">
+        <Breadcrumb
+          items={[
+            { label: "홈", href: "/" },
+            { label: "채점 결과 조회", href: "/results" },
+            { label: "찾을 수 없음" },
+          ]}
+        />
+        <section className="border-border bg-surface rounded-xl border p-6 text-center">
+          <p className="text-foreground text-base font-semibold">
+            이 채점 결과를 찾을 수 없어요.
+          </p>
+          <p className="text-muted-foreground mt-2 text-sm">
+            데이터가 삭제됐거나 보관 한도(20건)를 넘어 정리됐을 수 있어요.
+          </p>
+          <Link
+            href="/results"
+            className="bg-primary text-primary-foreground mt-4 inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold"
+          >
+            목록으로
+            <span aria-hidden>→</span>
+          </Link>
+        </section>
+      </main>
+    );
+  }
+
+  const { assignment, submission, output } = entry;
+  const dateLabel = formatKstDate(entry.created_at);
+
+  return (
+    <main className="mx-auto w-full max-w-4xl px-5 py-8 md:py-12">
+      <Breadcrumb
+        items={[
+          { label: "홈", href: "/" },
+          { label: "채점 결과 조회", href: "/results" },
+          { label: dateLabel },
+        ]}
+      />
+
+      <header className="mb-8">
+        <div className="mb-2 flex items-center gap-2 text-xs">
+          <span className="bg-primary text-primary-foreground rounded-full px-2 py-0.5 font-semibold">
+            내 채점 결과
+          </span>
+          <span className="text-subtle-foreground">{dateLabel}</span>
+        </div>
+        <h1 className="text-foreground text-2xl font-bold md:text-3xl">
+          {assignment.school_level} · {assignment.subject} · {assignment.genre}
+        </h1>
+        <p className="text-muted-foreground mt-1 text-sm line-clamp-2">
+          {assignment.prompt_text}
+        </p>
+      </header>
+
+      <div className="grid gap-6 lg:grid-cols-5">
+        {/* 좌: 학생 글 */}
+        <section className="space-y-5 lg:col-span-2">
+          <div className="border-border bg-surface rounded-xl border p-5">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-foreground text-sm font-semibold">내 글</h2>
+              <span className="text-muted-foreground text-xs">
+                {submission.char_count}자
+                {assignment.target_char_count
+                  ? ` / 목표 ${assignment.target_char_count}자`
+                  : ""}
+              </span>
+            </div>
+            <p className="text-foreground text-sm leading-relaxed whitespace-pre-wrap">
+              {submission.body}
+            </p>
+          </div>
+        </section>
+
+        {/* 우: 결과 (공유 ResultView) */}
+        <ResultView
+          assignment={assignment}
+          output={output}
+          className="lg:col-span-3"
+          actions={
+            <Link
+              href="/results"
+              className="border-border text-foreground hover:bg-muted inline-flex items-center justify-center rounded-lg border px-4 py-2.5 text-sm font-semibold"
+            >
+              목록으로
+            </Link>
+          }
+        />
+      </div>
+
+      <CtaBand
+        title="또 한 편 써 보세요"
+        description="새 글을 라이브로 채점받을 수 있어요."
+      />
+    </main>
+  );
+}
+
+function formatKstDate(iso: string): string {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m) return iso;
+  return `${m[1]}-${m[2]}-${m[3]} ${m[4]}:${m[5]}`;
+}

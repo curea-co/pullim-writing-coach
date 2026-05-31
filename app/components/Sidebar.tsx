@@ -62,6 +62,14 @@ function NavLinks({
           실시간
         </span>
       </Link>
+      {/* 2026-05-31 #11 채점 결과 조회 — 직접 채점받기 바로 아래(짝지어 노출) */}
+      <Link
+        href="/results"
+        onClick={onNavigate}
+        className={itemCls(pathname === "/results" || pathname.startsWith("/results/"))}
+      >
+        채점 결과 조회
+      </Link>
       {/* 2026-05-29 LNB 확장 — 내 정보·서비스 소개 (둘러보기 섹션 끝에 추가) */}
       <Link href="/me" onClick={onNavigate} className={itemCls(pathname === "/me")}>
         내 정보

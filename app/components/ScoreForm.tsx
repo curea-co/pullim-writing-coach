@@ -29,6 +29,7 @@ import {
 } from "@/app/lib/grading";
 import type { F3Output } from "@/app/data/scoring";
 import {
+  addResult,
   addRevision,
   clearDraft,
   type DraftSnapshot,
@@ -281,6 +282,17 @@ export default function ScoreForm({
       // 200이라도 본문 JSON 파싱이 깨질 수 있다 — try/catch 없으면 loading에 영구 고정(curea-review-ai 지적).
       try {
         const output = (await res.json()) as F3Output;
+        // #11 채점 결과 조회 — /results 목록에 자동 저장 (LRU 20건).
+        //   저장 실패해도 결과 화면은 정상 표시(데이터 보존만 못한 것).
+        addResult({
+          assignment: payload.assignment,
+          submission: {
+            body: payload.submission.body,
+            char_count: Array.from(payload.submission.body).length,
+          },
+          output,
+        });
+
         // #1 수정 전/후 — thread에 이번 제출 추가. 같은 thread면 비교 모드 활성.
         const revRes = addRevision(revisionThreadId, {
           assignment: payload.assignment,
