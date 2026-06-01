@@ -129,6 +129,9 @@ export default function ScoreForm({
   const [restoredDraft, setRestoredDraft] = useState<DraftSnapshot | null>(null);
   // 마지막 자동 저장 시각(표시용). null = 아직 저장 안 됨.
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  // #B 클립보드 자동 감지 — 마운트 시 1회 조용히 read. 권한 거절·미지원 → null 유지(폴백).
+  //   noise 차단: 30자 미만이면 무시. body·draft 있으면 표시 X(중복 방지).
+  const [clipboardPreview, setClipboardPreview] = useState<string | null>(null);
   const formTopRef = useRef<HTMLDivElement>(null);
   const outcomeRef = useRef<HTMLDivElement>(null);
 
@@ -146,6 +149,29 @@ export default function ScoreForm({
     if (draft && draft.body.trim().length > 0) {
       setRestoredDraft(draft);
     }
+  }, []);
+
+  // #B 마운트 시 1회 — 클립보드에 의미 있는 텍스트가 있으면 배너로 1클릭 붙여넣기 제공.
+  //   조건: clipboard API 지원 + 권한 허용 + 30자 이상. 권한 거절·미지원 → 조용히 폴백.
+  //   draft 또는 body 있으면 표시 X — UI 경합 방지(draft 우선).
+  useEffect(() => {
+    // SSR/구버전 가드
+    if (typeof navigator === "undefined" || !navigator.clipboard?.readText) return;
+    let cancelled = false;
+    navigator.clipboard
+      .readText()
+      .then((text) => {
+        if (cancelled) return;
+        const trimmed = text?.trim() ?? "";
+        // 30자 미만 = URL/짧은 메모 추정, noise. 글 본문 가능성 낮음.
+        if (trimmed.length >= 30) setClipboardPreview(text);
+      })
+      .catch(() => {
+        // 권한 거절 / 미지원 — 조용히 폴백, 사용자에게 알리지 않음(설계 default).
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // #9 자동 저장 — debounce 800ms. idle phase + restore 배너 결정 전이면 보류.
@@ -194,6 +220,18 @@ export default function ScoreForm({
     setRestoredDraft(null);
     clearDraft();
     setLastSavedAt(null);
+  }
+
+  // #B 클립보드 텍스트 적용 — body에 채우고 미리보기 클리어. autosave가 800ms 후 LS 저장.
+  function applyClipboard() {
+    if (!clipboardPreview) return;
+    setBody(clipboardPreview);
+    setClipboardPreview(null);
+  }
+
+  // #B 미리보기 무시 — state만 클리어, 시스템 클립보드는 건드리지 않음.
+  function dismissClipboard() {
+    setClipboardPreview(null);
   }
 
   // ── 파생 검증값 ─────────────────────────────────────────────────────
@@ -420,6 +458,44 @@ export default function ScoreForm({
               className="border-border bg-surface text-foreground hover:bg-muted rounded-lg border px-3 py-1.5 text-xs font-medium"
             >
               새로 시작
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* #B 클립보드 자동 감지 배너 — draft 없을 때 + body 비었을 때만 노출.
+          draft 배너와 동시 노출 X(restoredDraft가 null이어야 함). 사용자가 타이핑 시작하면 자연 소멸. */}
+      {clipboardPreview && !restoredDraft && body.length === 0 && (
+        <section
+          role="region"
+          aria-label="클립보드 글 붙여넣기"
+          className="border-accent-mid-surface bg-accent-mid-surface flex flex-wrap items-start gap-3 rounded-xl border p-4"
+        >
+          <div className="min-w-0 flex-1">
+            <p className="text-foreground break-keep text-sm font-semibold">
+              📋 클립보드에 글이 있어요 ({clipboardPreview.trim().length}자)
+            </p>
+            <p className="text-muted-foreground break-keep mt-1 line-clamp-1 text-xs leading-relaxed">
+              "{clipboardPreview.trim().slice(0, 40)}…"
+            </p>
+            <p className="text-subtle-foreground mt-1 text-[11px]">
+              본문에 1클릭으로 채워 넣을 수 있어요.
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              onClick={applyClipboard}
+              className="rounded-lg bg-[#24D39E] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1FBE8C]"
+            >
+              붙여넣기
+            </button>
+            <button
+              type="button"
+              onClick={dismissClipboard}
+              className="border-border bg-surface text-foreground hover:bg-muted rounded-lg border px-3 py-1.5 text-xs font-medium"
+            >
+              무시
             </button>
           </div>
         </section>
