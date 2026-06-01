@@ -27,9 +27,15 @@
 └──────────────────────────────────────────────┘
 ```
 
-- **출력**: 학생 글 텍스트 1건 (정규화 전)
-- **시각 신호**: 글자수·진척 인디케이터 (#10/PR #23 재사용, Step 1 안에 배치)
-- **다음 단계 활성 조건**: `char ≥ 50` (BODY_MIN)
+- **출력**: 학생 글 텍스트 1건 (정규화 전 — UI 표시용으로 보존)
+- **시각 신호** (Codex PR #33 정합화):
+  - **목표 분량은 Step 2 입력**이라 Step 1에는 `target` 없음 — target-driven 진척바는 Step 1에 미노출.
+  - 대신 **"to-50자" 미니바**(under-50 보조 UI)와 글자수 카운터로 진척 시그널.
+  - 50자↑이면서 Step 2에 진입해 목표 분량 입력하면, Step 2 메타 폼 아래 target-driven 진척바 노출(#34 후속).
+- **다음 단계 활성 조건**: `bodyCount ≥ BODY_MIN(=50)` — **정규화 후(`normalizeBody`) 기준**.
+  - 원본은 충분해도 발췌 표기(`〈중략〉` 등)뿐이면 E11로 막힘(서버 정합 유지).
+- **under-50 진척 인디케이터 design intent**: bodyCount<50일 때 mini bar만, target-driven 바는 50자↑부터.
+  - 50자 미만 구간에서는 "to-50자"가 1차 목표 — target 대비 진척은 50자 채운 후 보이는 게 인지 부담 ↓.
 
 ### Step 2 — "내용 확인 + 과제 정보"
 ```
@@ -43,7 +49,7 @@
 │   과목     [국어 ▾]   ← /me 프로필 prefill   │
 │   장르     [감상문·독후감 ▾] ← prefill      │
 │   목표 분량 [800] 자                         │
-│   과제문   [textarea 50~1000자]              │
+│   과제문   [textarea 10~1000자]              │
 │                                              │
 │ [채점받기]  (~12초 안내)                     │
 └──────────────────────────────────────────────┘
@@ -131,7 +137,7 @@
 
 ## 10. 참고
 
-- 기존 ScoreForm: [app/components/ScoreForm.tsx](../app/components/ScoreForm.tsx) (현재 line 285~~480 의 JSX 순서가 변경 대상)
+- 기존 ScoreForm: [app/components/ScoreForm.tsx](../app/components/ScoreForm.tsx) — `Step 1`/`Step 2` 섹션이 변경 대상 (줄번호 대신 구조 기준; Codex PR #33 후속 리팩터로 줄 위치 자주 이동).
 - 진척 인디케이터: [app/lib/progress.ts](../app/lib/progress.ts) + PR #23
 - 자동 저장 draft: PR #20 패턴 그대로 (#A 이후도 호환)
 - 결과 자동 저장: PR #29 패턴 그대로 (#A 이후도 호환)
