@@ -879,6 +879,46 @@ export default function ScoreForm({
           onChangeTargetRaw={setTargetRaw}
           onChangePromptText={setPromptText}
         />
+        {/* Codex PR #34: Step 2에서 목표 분량 변경 시 진척 즉시 확인. 모바일에서 위로 스크롤 안 해도 됨.
+            본문은 Step 1에서 확정돼 fixed — 목표 분량만 사용자가 조정. progressState 동일 계산. */}
+        {progressState && bodyCount >= BODY_MIN && (
+          <div
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(progressState.pct)}
+            aria-valuetext={`${progressState.rawPct}% (${progressState.label})`}
+            aria-label="현재 본문 vs 목표 글자 수 진척"
+            className="border-border bg-muted/30 mt-4 rounded-lg border p-3"
+          >
+            <div className="text-foreground mb-2 flex items-center justify-between text-xs">
+              <span className="font-medium">현재 글자수 진척</span>
+              <span className="text-subtle-foreground tabular-nums">
+                {bodyCount}자{targetNum ? ` / 목표 ${targetNum}자` : ""}
+              </span>
+            </div>
+            <div className="bg-muted h-2 w-full overflow-hidden rounded-full">
+              <div
+                className={cn(
+                  "h-full transition-all duration-300 motion-reduce:transition-none",
+                  getProgressBarClass(progressState.band),
+                )}
+                style={{ width: `${progressState.pct}%` }}
+              />
+            </div>
+            <p
+              className={cn(
+                "mt-1 break-keep text-xs",
+                getProgressTextClass(progressState.band),
+              )}
+            >
+              {progressState.label}
+              <span className="text-subtle-foreground ml-1 tabular-nums">
+                ({progressState.rawPct}%)
+              </span>
+            </p>
+          </div>
+        )}
       </section>
 
       {/* 채점 버튼 + disabled 사유 안내 — 기존 #38 카피 유지(글 길이는 이미 Step 1에서 보장) */}
