@@ -675,9 +675,15 @@ export default function ScoreForm({
           </span>
         </div>
         {fileError && (
-          <p role="alert" className="text-band-warn-foreground break-keep mt-2 text-xs">
-            {fileError}
-          </p>
+          <div role="alert" className="border-band-warn-surface bg-band-warn-surface mt-2 rounded-md border p-2.5">
+            <p className="text-band-warn-foreground break-keep text-xs leading-relaxed">
+              {fileError}
+            </p>
+            {/* #M3 ⑤ 채널 폴백 안내 — 어떤 파일 에러여도 직접 붙여넣기로 우회 가능. */}
+            <p className="text-muted-foreground break-keep mt-1.5 text-[11px] leading-relaxed">
+              💡 본문을 위 영역에 직접 붙여넣어도 채점받을 수 있어요.
+            </p>
+          </div>
         )}
         <div className="mt-1.5 flex items-center justify-between text-xs">
           <span className={cn(bodyError && "text-band-warn-foreground")}>
