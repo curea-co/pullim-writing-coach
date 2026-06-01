@@ -341,9 +341,27 @@ function isResultEntry(v: unknown): v is ResultEntry {
   const o = v as Record<string, unknown>;
   if (typeof o.id !== "string" || o.id.length === 0) return false;
   if (typeof o.created_at !== "string" || o.created_at.length === 0) return false;
+  // Codex PR #29: 깊은 검증 — 손상된 LS 엔트리가 /results UI에서 런타임 예외 트리거 방지.
+  // /results 목록(map 도는 r.output.total_score)·상세(scores.map) 양쪽 필수 필드 가드.
   if (typeof o.assignment !== "object" || o.assignment === null) return false;
+  const a = o.assignment as Record<string, unknown>;
+  if (typeof a.school_level !== "string" || typeof a.subject !== "string") return false;
+  if (typeof a.genre !== "string" || typeof a.prompt_text !== "string") return false;
   if (typeof o.submission !== "object" || o.submission === null) return false;
+  const s = o.submission as Record<string, unknown>;
+  if (typeof s.body !== "string" || typeof s.char_count !== "number") return false;
   if (typeof o.output !== "object" || o.output === null) return false;
+  const out = o.output as Record<string, unknown>;
+  if (typeof out.total_score !== "number") return false;
+  if (!Array.isArray(out.scores)) return false;
+  // 영역 점수 항목별 검증 — ResultView.scores.map 안전 보장.
+  for (const score of out.scores) {
+    if (typeof score !== "object" || score === null) return false;
+    const sc = score as Record<string, unknown>;
+    if (typeof sc.area !== "string" || typeof sc.score !== "number") return false;
+  }
+  if (!Array.isArray(out.revision_guides)) return false;
+  if (typeof out.meta !== "object" || out.meta === null) return false;
   return true;
 }
 
@@ -519,9 +537,28 @@ export function recordMetaUsage(field: MetaField, value: string): void {
   }
 }
 
+// 필드별 허용값 검증 — 손상된 LS가 enum 외 값을 반환해 ScoreForm requiredOk를
+// 가짜 truthy로 만드는 사고 방지(Codex PR #41, isDraftSnapshot과 동일 패턴).
+function isValidMetaValue(field: MetaField, value: string): boolean {
+  switch (field) {
+    case "school_level":
+      return (SCHOOL_LEVELS as readonly string[]).includes(value);
+    case "subject":
+      return (SUBJECTS as readonly string[]).includes(value);
+    case "genre":
+      return (GENRES as readonly string[]).includes(value);
+    case "target_raw": {
+      // 빈 문자열 = 제한 없음(저장 안 함 가정). 숫자 문자열만 허용.
+      const n = Number(value);
+      return Number.isInteger(n) && n >= 50 && n <= 2000;
+    }
+  }
+}
+
 // 최빈값 — count 우선, 동률은 last_used_at(최신 우선). 없으면 null.
+// Codex PR #41: enum 외 손상값은 폴백 무시(다음 유효 항목 시도, 없으면 null).
 export function getMostUsedMeta(field: MetaField): string | null {
-  const list = loadMetaUsage()[field];
+  const list = loadMetaUsage()[field].filter((e) => isValidMetaValue(field, e.value));
   if (list.length === 0) return null;
   // count desc, last_used_at desc
   const sorted = [...list].sort((a, b) => {

@@ -149,12 +149,33 @@ test("loadResults — Array가 아닌 값 → []", () => {
   assert.deepEqual(loadResults(), []);
 });
 
-test("loadResults — 필수 필드 누락 entry는 필터링", () => {
+test("loadResults — 필수 필드 누락 entry는 필터링 (Codex PR #29 deep validation)", () => {
+  // Codex PR #29: isResultEntry가 깊은 필드(assignment.school_level/subject/genre/prompt_text,
+  // submission.body/char_count, output.total_score/scores/revision_guides/meta) 모두 검증.
+  const validEntry = {
+    id: "valid",
+    created_at: "2026-05-31T12:00:00+09:00",
+    assignment: {
+      school_level: "중2",
+      subject: "국어",
+      genre: "설명문",
+      target_char_count: null,
+      prompt_text: "test prompt",
+    },
+    submission: { body: "test body", char_count: 9 },
+    output: {
+      total_score: 70,
+      scores: [{ area: "과제 이해", score: 15, max: 20, feedback_good: "g", feedback_fix: "f" }],
+      revision_guides: [],
+      meta: { model_version: "v1", generated_at: "x", is_verified: false, disclaimer: "x" },
+    },
+  };
   storageMock.setItem(
     "pwc_results_v1",
     JSON.stringify([
-      { id: "valid", created_at: "2026-05-31T12:00:00+09:00", assignment: {}, submission: {}, output: {} },
+      validEntry,
       { id: "no-output-field" }, // 필수 누락 → 필터링
+      { ...validEntry, id: "shallow-but-invalid", assignment: {} }, // assignment 빈 객체 → 필터링
     ]),
   );
   const list = loadResults();

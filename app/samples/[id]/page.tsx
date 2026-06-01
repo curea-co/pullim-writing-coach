@@ -20,8 +20,8 @@ export async function generateMetadata({
   if (!sample) return { title: "샘플 없음" };
   return {
     title: `${sample.label}. ${sample.title} — Pullim Writing Coach`,
-    // intent 미설정 시 카테고리 폴백 — § 메모 학생/검색 노출 금지(2026-05-29).
-    description: sample.intent ?? `샘플 ${sample.label} · ${sample.category}`,
+    // intent는 내부 PM/루브릭 메모(§ 표기 포함) — 메타데이터·검색 노출 금지(Codex PR #15).
+    description: `샘플 ${sample.label} · ${sample.category} · ${sample.assignment.school_level} ${sample.assignment.subject} ${sample.assignment.genre}`,
   };
 }
 
@@ -57,9 +57,7 @@ export default async function SampleDetailPage({
         <h1 className="text-foreground text-2xl font-bold md:text-3xl">
           {sample.title}
         </h1>
-        {sample.intent && (
-          <p className="text-muted-foreground mt-1 text-sm">{sample.intent}</p>
-        )}
+        {/* sample.intent는 내부 PM/루브릭 메모로 학생 화면 미노출 (Codex PR #15). */}
       </header>
 
       <div className="grid gap-6 lg:grid-cols-5">

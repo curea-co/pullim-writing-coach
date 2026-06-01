@@ -59,7 +59,9 @@ export default function ExportButtons({
           document.body.appendChild(a);
           a.click();
           a.remove();
-          URL.revokeObjectURL(url);
+          // Codex PR #13: 즉시 revoke 시 Safari/Firefox에서 간헐적으로 다운로드 실패.
+          // setTimeout으로 next tick 이후 revoke — 다운로드 시작 후 안전한 정리.
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
           resolve();
         }, "image/png");
       });

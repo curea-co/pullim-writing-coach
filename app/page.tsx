@@ -146,11 +146,8 @@ export default function Home() {
                     </span>
                   )}
                 </div>
-                {s.intent && (
-                  <p className="text-muted-foreground mt-3 text-xs leading-relaxed">
-                    {s.intent}
-                  </p>
-                )}
+                {/* sample.intent는 내부 PM/루브릭 메모(§ 표기 포함) — 학생 화면 노출 금지.
+                    Codex PR #15 지적: E만 비우고 A-D는 그대로 노출되어 컨벤션 위반. 전부 비표시. */}
               </Link>
             );
           })}

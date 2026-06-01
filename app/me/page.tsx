@@ -8,6 +8,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import ProfileForm, { type ProfileDraft } from "../components/ProfileForm";
 import {
+  clearAllResults,
+  clearAllRevisions,
+  clearDraft,
+  clearMetaUsage,
   clearProfile,
   loadProfile,
   saveProfile,
@@ -96,7 +100,13 @@ export default function MePage() {
   };
 
   const handleDelete = () => {
+    // Codex PR #25/#29: 삭제 범위가 profile만이라 "프로필·이력 삭제" 카피와 실제 동작 불일치였음.
+    // 5개 LS 키 모두 clear — 학생/공용 기기에서 "모두 지웠다"는 약속을 실제 보장.
     clearProfile();
+    clearDraft();
+    clearAllRevisions();
+    clearAllResults();
+    clearMetaUsage();
     router.push("/");
   };
 
@@ -145,8 +155,9 @@ export default function MePage() {
       <section className="border-band-warn-surface bg-band-warn-surface/30 mt-10 rounded-xl border p-5">
         <h2 className="text-band-warn-foreground text-sm font-semibold">데이터 삭제</h2>
         <p className="text-muted-foreground break-keep mt-2 text-justify text-xs leading-relaxed">
-          저장된 프로필·동의 기록을 모두 지웁니다. 채점 결과는 따로 저장돼 있지 않으면 사라질
-          수 있어요. 이 작업은 되돌릴 수 없습니다.
+          이 브라우저에 저장된 <strong className="text-foreground">모든 데이터</strong>를 지웁니다:
+          프로필·동의 기록, 본문 임시 저장본, 수정 이력, 채점 결과(최대 20건), 자주 쓰는 메타.
+          이 작업은 되돌릴 수 없습니다.
         </p>
 
         {!confirmDelete ? (

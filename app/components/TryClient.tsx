@@ -69,11 +69,10 @@ export default function TryClient() {
         <TokenGate
           defaults={{
             school_level: profile.school_level,
-            // "기타"면 자유 입력값(있을 때), 그 외엔 enum 그대로
-            subject:
-              profile.primary_subject === "기타"
-                ? profile.primary_subject_other || profile.primary_subject
-                : profile.primary_subject,
+            // ScoreForm subject는 SUBJECTS enum만 받음 — 자유 입력값을 그대로 넘기면
+            // saveDraft가 invalid 반환해 autosave 실패(Codex PR #22). 항상 enum 값 유지.
+            // 자유 입력값(primary_subject_other)은 PDF 헤더·결과 표시용 — 폼 prefill엔 미반영.
+            subject: profile.primary_subject,
             genre: profile.frequent_genre,
           }}
         />

@@ -63,12 +63,21 @@ test("way-over (>130%) — 줄여 보세요", () => {
   assert.match(r.label, /줄여/);
 });
 
-test("BODY_MAX 하드 캡 — target 비율 무관하게 way-over로 강제", () => {
-  // target 5000(과도) + current 2000 = 40%지만 BODY_MAX 도달이라 way-over
-  const r = computeProgress(2000, 5000, BODY_MAX);
+test("BODY_MAX 초과 — target 비율 무관하게 way-over로 강제 (Codex PR #23: > 비교)", () => {
+  // target 5000(과도) + current 2001 = BODY_MAX 초과라 way-over
+  const r = computeProgress(2001, 5000, BODY_MAX);
   assert.ok(r);
   assert.equal(r.band, "way-over");
   assert.match(r.label, /2000자까지만/);
+});
+
+test("BODY_MAX 정확히 2000자 — bodyOk이므로 way-over 카피 아님", () => {
+  // bodyOk = bodyCount <= BODY_MAX이라 정확히 2000은 정상.
+  // target 5000 + current 2000 = 40%이라 warmup 밴드.
+  const r = computeProgress(2000, 5000, BODY_MAX);
+  assert.ok(r);
+  // 카피가 "2000자까지만"가 아니어야 함(정상 입력 범위 내)
+  assert.equal(/2000자까지만/.test(r.label), false);
 });
 
 test("BODY_MAX 직전(1999/2000) — way-over 아님(BODY_MAX 미도달)", () => {
