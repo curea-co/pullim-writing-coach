@@ -420,3 +420,106 @@ export function clearAllResults(): void {
     /* swallow */
   }
 }
+
+// ── #M3 ③ Meta usage LRU — 자주 쓴 장르·목표 분량 학습 ────────────────
+// localStorage["pwc_meta_usage_v1"] = MetaUsage.
+//   채점 성공 시 recordMetaUsage 호출 → 필드별 LRU 5건 유지(count + last_used_at).
+//   Step 2 prefill 우선순위: profile(주어진 defaults) > LRU 최빈값 > 빈 문자열.
+//   target_raw는 프로필에 없으니 LRU만 사용 — 학생 자주 쓰는 분량 자연 학습.
+
+const META_USAGE_KEY = "pwc_meta_usage_v1";
+export const MAX_META_USAGE_PER_FIELD = 5;
+
+export type MetaField = "school_level" | "subject" | "genre" | "target_raw";
+
+export type MetaUsageEntry = {
+  value: string;
+  count: number;        // 누적 사용 횟수
+  last_used_at: string; // ISO 8601 +09:00
+};
+
+export type MetaUsage = Record<MetaField, MetaUsageEntry[]>;
+
+function emptyMetaUsage(): MetaUsage {
+  return { school_level: [], subject: [], genre: [], target_raw: [] };
+}
+
+function isMetaUsageEntry(v: unknown): v is MetaUsageEntry {
+  if (typeof v !== "object" || v === null) return false;
+  const o = v as Record<string, unknown>;
+  return (
+    typeof o.value === "string" &&
+    typeof o.count === "number" &&
+    typeof o.last_used_at === "string"
+  );
+}
+
+function isMetaUsage(v: unknown): v is MetaUsage {
+  if (typeof v !== "object" || v === null) return false;
+  const o = v as Record<string, unknown>;
+  const fields: MetaField[] = ["school_level", "subject", "genre", "target_raw"];
+  return fields.every(
+    (f) => Array.isArray(o[f]) && (o[f] as unknown[]).every(isMetaUsageEntry),
+  );
+}
+
+export function loadMetaUsage(): MetaUsage {
+  if (typeof window === "undefined") return emptyMetaUsage();
+  try {
+    const raw = window.localStorage.getItem(META_USAGE_KEY);
+    if (!raw) return emptyMetaUsage();
+    const parsed = JSON.parse(raw);
+    return isMetaUsage(parsed) ? parsed : emptyMetaUsage();
+  } catch {
+    return emptyMetaUsage();
+  }
+}
+
+// 단일 필드 사용 기록. 같은 value 있으면 count + 1 + last_used_at 갱신, 없으면 신규 추가.
+// 필드별 LRU 5건 — 6번째 신규 추가 시 last_used_at 가장 오래된 항목 drop.
+export function recordMetaUsage(field: MetaField, value: string): void {
+  if (typeof window === "undefined") return;
+  const trimmed = value.trim();
+  if (!trimmed) return; // 빈 값은 기록 안 함
+  const usage = loadMetaUsage();
+  const list = usage[field];
+  const now = consentNow();
+  const existing = list.find((e) => e.value === trimmed);
+  if (existing) {
+    existing.count += 1;
+    existing.last_used_at = now;
+  } else {
+    list.push({ value: trimmed, count: 1, last_used_at: now });
+    // 6번째 신규 추가 시 가장 오래된 항목 drop(last_used_at 기준).
+    if (list.length > MAX_META_USAGE_PER_FIELD) {
+      list.sort((a, b) => a.last_used_at.localeCompare(b.last_used_at));
+      list.shift(); // 가장 오래된 1건 drop
+    }
+  }
+  try {
+    window.localStorage.setItem(META_USAGE_KEY, JSON.stringify(usage));
+  } catch {
+    /* swallow — quota는 거의 안 터짐(JSON 작음) */
+  }
+}
+
+// 최빈값 — count 우선, 동률은 last_used_at(최신 우선). 없으면 null.
+export function getMostUsedMeta(field: MetaField): string | null {
+  const list = loadMetaUsage()[field];
+  if (list.length === 0) return null;
+  // count desc, last_used_at desc
+  const sorted = [...list].sort((a, b) => {
+    if (b.count !== a.count) return b.count - a.count;
+    return b.last_used_at.localeCompare(a.last_used_at);
+  });
+  return sorted[0].value;
+}
+
+export function clearMetaUsage(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(META_USAGE_KEY);
+  } catch {
+    /* swallow */
+  }
+}
