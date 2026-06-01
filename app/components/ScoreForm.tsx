@@ -570,6 +570,9 @@ export default function ScoreForm({
           두세요 — 그 부분도 채점 대상이에요.
         </p>
         <textarea
+          id="body"
+          name="body"
+          aria-label="학생 글 본문"
           value={body}
           onChange={(e) => setBody(e.target.value)}
           onDrop={handleDrop}
@@ -589,11 +592,13 @@ export default function ScoreForm({
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <input
             ref={fileInputRef}
+            id="body-file-upload"
+            name="body-file-upload"
             type="file"
             accept=".txt,.md,.markdown,text/plain,text/markdown"
             onChange={handleFileInput}
             className="hidden"
-            aria-hidden
+            aria-label="텍스트 파일 업로드"
           />
           <button
             type="button"
@@ -805,12 +810,24 @@ export default function ScoreForm({
               : "AI 첨삭 받기"}
           </button>
         </form>
-        {/* 입력 미완 안내는 idle에서만 — 에러 상태에선 locked로 canSubmit=false라 오해 유발(curea-review-ai 지적) */}
-        {submit.phase === "idle" && !canSubmit && (
-          <p className="text-muted-foreground mt-2 text-center text-xs">
-            과제 정보와 글(50자 이상)을 모두 입력하면 첨삭을 받을 수 있어요
-          </p>
-        )}
+        {/* 입력 미완 안내는 idle에서만 — 에러 상태에선 locked로 canSubmit=false라 오해 유발(curea-review-ai 지적)
+            구체화: 어느 필드가 비어 있는지 명시(prod 보고: "버튼 눌러도 실행 안 됨" → disabled 사유 모호). */}
+        {submit.phase === "idle" && !canSubmit && (() => {
+          const missing: string[] = [];
+          if (!schoolLevel) missing.push("학교·학년");
+          if (!subject) missing.push("과목");
+          if (!genre) missing.push("장르");
+          if (!promptOk) missing.push(`과제 내용(${PROMPT_MIN}자 이상)`);
+          if (!bodyOk) missing.push(`글(${BODY_MIN}자 이상)`);
+          if (targetInvalid) missing.push("목표 글자 수");
+          return (
+            <p className="text-muted-foreground break-keep mt-2 text-center text-xs">
+              {missing.length > 0
+                ? `다음을 채우면 채점을 받을 수 있어요: ${missing.join(" · ")}`
+                : "잠시 후 다시 시도해 주세요"}
+            </p>
+          );
+        })()}
       </section>
 
       {/* 블록 C — 로딩 / 결과 / 에러 */}
