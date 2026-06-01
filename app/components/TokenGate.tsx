@@ -104,6 +104,10 @@ export default function TokenGate({
           비밀번호는 이 브라우저 세션에만 저장되고, 채점 요청 시 서버가
           확인해요. (계약 §7.1)
         </p>
+        {/* #M3 ⑤ 환경 가이드 — 비밀번호 모를 때 안내 */}
+        <p className="text-subtle-foreground mt-1 break-keep text-xs leading-relaxed">
+          비밀번호를 모르겠다면 데모를 안내한 운영자에게 요청해 주세요.
+        </p>
       </section>
     );
   }
@@ -127,9 +131,9 @@ export default function TokenGate({
           <p className="text-band-warn-foreground text-sm font-medium">
             {authError}
           </p>
-          <p className="text-muted-foreground mt-1 text-xs">
+          <p className="text-muted-foreground break-keep mt-1 text-xs leading-relaxed">
             작성한 글은 그대로 있어요. 비밀번호만 다시 입력하면 채점을 이어갈 수
-            있어요.
+            있어요. 비밀번호를 모르겠다면 데모 운영자에게 다시 요청해 주세요.
           </p>
           <form onSubmit={enter} className="mt-3 flex flex-col gap-2 sm:flex-row">
             <input
