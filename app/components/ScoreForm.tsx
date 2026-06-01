@@ -425,10 +425,83 @@ export default function ScoreForm({
         </section>
       )}
 
-      {/* 블록 B1 — 과제 정보 (F1) */}
+      {/* 블록 B1 — 학생 글 (paradigm v1 #A: 글 먼저, 메타 나중. docs/18_try_paradigm_v1.md) */}
       <section className="border-border bg-surface rounded-xl border p-5">
         <h2 className="text-foreground mb-1 text-base font-semibold">
-          1. 과제 정보를 알려 주세요
+          1. 글을 넣어 주세요
+        </h2>
+        <p className="text-muted-foreground mb-3 text-xs">
+          어디서 가져온 글이든 받아드릴게요. 맞춤법·띄어쓰기는 고치지 말고 쓴 그대로
+          두세요 — 그 부분도 채점 대상이에요.
+        </p>
+        <textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          disabled={locked}
+          rows={12}
+          placeholder="여기에 글 전체를 붙여넣어 주세요 (50자 이상)"
+          className={cn(
+            "border-border bg-background text-foreground w-full resize-y rounded-lg border px-3 py-2 text-sm leading-relaxed",
+            bodyError && "border-band-warn",
+            locked && "cursor-not-allowed opacity-60"
+          )}
+        />
+        <div className="mt-1.5 flex items-center justify-between text-xs">
+          <span className={cn(bodyError && "text-band-warn-foreground")}>
+            {bodyError?.message ?? " "}
+          </span>
+          <span className="text-subtle-foreground tabular-nums">
+            현재 {bodyCount}자{targetNum ? ` / 목표 ${targetNum}자` : ""}
+          </span>
+        </div>
+        {/* #10 글자수 진척 인디케이터 — 목표 입력 시만 노출. role=progressbar로 a11y. */}
+        {progressState && (
+          <div
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(progressState.rawPct)}
+            aria-label="목표 글자수 대비 진척"
+            className="mt-1.5"
+          >
+            <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full">
+              {/* 인라인 style 정당 — 동적 width는 Tailwind 정적 클래스로 표현 불가(score-bar와 동일 예외) */}
+              <div
+                className={cn(
+                  "h-full transition-all duration-300 motion-reduce:transition-none",
+                  getProgressBarClass(progressState.band),
+                )}
+                style={{ width: `${progressState.pct}%` }}
+              />
+            </div>
+            <p
+              className={cn(
+                "mt-1 break-keep text-[11px]",
+                getProgressTextClass(progressState.band),
+              )}
+            >
+              {progressState.label}
+              <span className="text-subtle-foreground ml-1 tabular-nums">
+                ({progressState.rawPct}%)
+              </span>
+            </p>
+          </div>
+        )}
+        {/* #9 자동 저장 표시 — 한 번이라도 저장된 적이 있으면 노출 */}
+        {lastSavedAt && (
+          <p
+            className="text-subtle-foreground mt-1 text-right text-[11px]"
+            aria-live="polite"
+          >
+            자동 저장됨 · {formatSavedAt(lastSavedAt)}
+          </p>
+        )}
+      </section>
+
+      {/* 블록 B2 — 과제 정보 (paradigm v1 #A: 메타 나중. /me 프로필 prefill 유지) */}
+      <section className="border-border bg-surface rounded-xl border p-5">
+        <h2 className="text-foreground mb-1 text-base font-semibold">
+          2. 과제 정보를 알려 주세요
         </h2>
         <p className="text-muted-foreground mb-4 text-xs">
           선생님이 내준 과제 조건을 입력하면, AI가 그 기준으로 채점해요.
@@ -513,79 +586,6 @@ export default function ScoreForm({
             {promptText.trim().length} / {PROMPT_MAX}자
           </p>
         </div>
-      </section>
-
-      {/* 블록 B2 — 학생 글 (F2) */}
-      <section className="border-border bg-surface rounded-xl border p-5">
-        <h2 className="text-foreground mb-1 text-base font-semibold">
-          2. 쓴 글을 붙여넣어 주세요
-        </h2>
-        <p className="text-muted-foreground mb-3 text-xs">
-          글 전체를 그대로 붙여넣어 주세요. 맞춤법·띄어쓰기는 고치지 말고 쓴 그대로
-          두세요 — 그 부분도 채점 대상이에요.
-        </p>
-        <textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          disabled={locked}
-          rows={12}
-          placeholder="여기에 글 전체를 붙여넣어 주세요 (50자 이상)"
-          className={cn(
-            "border-border bg-background text-foreground w-full resize-y rounded-lg border px-3 py-2 text-sm leading-relaxed",
-            bodyError && "border-band-warn",
-            locked && "cursor-not-allowed opacity-60"
-          )}
-        />
-        <div className="mt-1.5 flex items-center justify-between text-xs">
-          <span className={cn(bodyError && "text-band-warn-foreground")}>
-            {bodyError?.message ?? " "}
-          </span>
-          <span className="text-subtle-foreground tabular-nums">
-            현재 {bodyCount}자{targetNum ? ` / 목표 ${targetNum}자` : ""}
-          </span>
-        </div>
-        {/* #10 글자수 진척 인디케이터 — 목표 입력 시만 노출. role=progressbar로 a11y. */}
-        {progressState && (
-          <div
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(progressState.rawPct)}
-            aria-label="목표 글자수 대비 진척"
-            className="mt-1.5"
-          >
-            <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full">
-              {/* 인라인 style 정당 — 동적 width는 Tailwind 정적 클래스로 표현 불가(score-bar와 동일 예외) */}
-              <div
-                className={cn(
-                  "h-full transition-all duration-300 motion-reduce:transition-none",
-                  getProgressBarClass(progressState.band),
-                )}
-                style={{ width: `${progressState.pct}%` }}
-              />
-            </div>
-            <p
-              className={cn(
-                "mt-1 break-keep text-[11px]",
-                getProgressTextClass(progressState.band),
-              )}
-            >
-              {progressState.label}
-              <span className="text-subtle-foreground ml-1 tabular-nums">
-                ({progressState.rawPct}%)
-              </span>
-            </p>
-          </div>
-        )}
-        {/* #9 자동 저장 표시 — 한 번이라도 저장된 적이 있으면 노출 */}
-        {lastSavedAt && (
-          <p
-            className="text-subtle-foreground mt-1 text-right text-[11px]"
-            aria-live="polite"
-          >
-            자동 저장됨 · {formatSavedAt(lastSavedAt)}
-          </p>
-        )}
       </section>
 
       {/* 블록 B3 — 실행 버튼 (F3) */}
