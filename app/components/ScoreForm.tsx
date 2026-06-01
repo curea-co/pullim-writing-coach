@@ -450,21 +450,53 @@ export default function ScoreForm({
           <span className={cn(bodyError && "text-band-warn-foreground")}>
             {bodyError?.message ?? " "}
           </span>
-          <span className="text-subtle-foreground tabular-nums">
+          <span
+            className={cn(
+              "tabular-nums",
+              bodyCount === 0
+                ? "text-subtle-foreground"
+                : bodyCount < BODY_MIN
+                  ? "text-foreground font-medium"
+                  : "text-subtle-foreground",
+            )}
+          >
             현재 {bodyCount}자{targetNum ? ` / 목표 ${targetNum}자` : ""}
           </span>
         </div>
-        {/* #10 글자수 진척 인디케이터 — 목표 입력 시만 노출. role=progressbar로 a11y. */}
-        {progressState && (
+        {/* #D paradigm v1 — 50자 미만 시 "to-50자" 미니바로 시각 강화.
+            body 비어 있으면 미노출, 50자 이상 → 기존 target-driven progressState 바로 전환. */}
+        {bodyCount > 0 && bodyCount < BODY_MIN && (
+          <div
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={BODY_MIN}
+            aria-valuenow={bodyCount}
+            aria-label="최소 글자수까지 남은 진척"
+            className="mt-2"
+          >
+            <div className="bg-muted h-2 w-full overflow-hidden rounded-full">
+              <div
+                className="bg-muted-foreground/50 h-full transition-all duration-300 motion-reduce:transition-none"
+                style={{ width: `${Math.min(100, (bodyCount / BODY_MIN) * 100)}%` }}
+              />
+            </div>
+            <p className="text-subtle-foreground break-keep mt-1 text-xs">
+              {BODY_MIN - bodyCount}자 더 쓰면 채점받을 수 있어요
+            </p>
+          </div>
+        )}
+        {/* #10 글자수 진척 인디케이터 — 목표 입력 + 본문 ≥50자 시 노출. role=progressbar로 a11y.
+            #D: h-1.5→h-2, text-[11px]→text-xs로 시각 강화. */}
+        {progressState && bodyCount >= BODY_MIN && (
           <div
             role="progressbar"
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={Math.round(progressState.rawPct)}
             aria-label="목표 글자수 대비 진척"
-            className="mt-1.5"
+            className="mt-2"
           >
-            <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full">
+            <div className="bg-muted h-2 w-full overflow-hidden rounded-full">
               {/* 인라인 style 정당 — 동적 width는 Tailwind 정적 클래스로 표현 불가(score-bar와 동일 예외) */}
               <div
                 className={cn(
@@ -476,7 +508,7 @@ export default function ScoreForm({
             </div>
             <p
               className={cn(
-                "mt-1 break-keep text-[11px]",
+                "mt-1 break-keep text-xs",
                 getProgressTextClass(progressState.band),
               )}
             >
