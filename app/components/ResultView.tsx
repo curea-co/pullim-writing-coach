@@ -1,11 +1,11 @@
-"use client";
 // Pullim Writing Coach — 첨삭 결과 뷰 (C1~C5). 정적 샘플(/samples/[id])과
 // 실시간 채점 결과(ScoreForm) 양쪽이 공유하는 단일 UI (WBS P3.3 "결과 화면 재사용").
 //
-// "use client" — captureRef + ExportButtons(#16 PDF/스크린샷) 통합. SSR HTML은 동일 생성.
-// useState/useEffect 없음 → SSG/prerender 영향 0 (P1 mark·anchor id 모두 그대로 prerender).
+// Codex PR #13: server 컴포넌트로 분류 — useRef/CopyButton/ExportButtons는 ExportableResultFrame
+// (client)에 분리. /samples/[id] (server caller)에서 본문 JSX가 client 번들에 안 실림 → hydration 비용 ↓.
+// SectionNav·RevisionBodyView·CopyButton 등 client 자식은 server-rendering 위에서 정상 hydrate.
 
-import { useRef, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { cn } from "@/app/lib/utils";
 // SAMPLES와 분리된 scoring.ts에서 타입·헬퍼만 import → 클라 번들에 샘플 본문 미포함(curea-review-ai 지적).
 import {
@@ -18,8 +18,7 @@ import {
 } from "../data/scoring";
 import { feedbackAreaId } from "../lib/feedback-anchors";
 import type { RevisionEntry } from "../lib/storage";
-import CopyButton from "./CopyButton";
-import ExportButtons from "./ExportButtons";
+import ExportableResultFrame from "./ExportableResultFrame";
 import FeedbackDiff from "./FeedbackDiff";
 import GrowthCard from "./GrowthCard";
 import RevisionBodyView from "./RevisionBodyView";
@@ -92,14 +91,17 @@ export default function ResultView({
     ? new Map(revisionMode.v1.output.scores.map((s) => [s.area, s.score]))
     : null;
 
-  // #16 PDF·스크린샷 캡처 대상. 결과 카드(C1~C3)·성장 카드·본문 토글까지 포함하되
-  //   C4(액션·내보내기 버튼 자체)·C5(면책)는 제외 — 스크린샷에 자기 자신 버튼 들어가지 않게.
-  const captureRef = useRef<HTMLDivElement>(null);
+  // ExportableResultFrame가 captureRef + CopyButton + ExportButtons + actions + 면책을 client에서 처리.
   const exportFilename = `pullim-${assignment.subject}-${assignment.school_level}`;
 
   return (
     <div className={cn("space-y-5", className)}>
-      <div ref={captureRef} className="space-y-5">
+      <ExportableResultFrame
+        copyText={copyText}
+        filenameBase={exportFilename}
+        actions={actions}
+        disclaimer={output.meta.disclaimer}
+      >
       {/* #19 신뢰 라벨 — 결과 보기 전 mental model 정착(AI 채점·교사 검토 권장) */}
       <TrustLabel />
 
@@ -295,19 +297,7 @@ export default function ResultView({
         </ol>
       </div>
 
-      </div>
-
-      {/* C4. 결과 복사·내보내기(F7) + 부가 액션 + C5. 면책 */}
-      <div className="border-border bg-surface space-y-4 rounded-xl border p-5">
-        <div className="flex flex-wrap items-center gap-3">
-          <CopyButton text={copyText} />
-          <ExportButtons targetRef={captureRef} filenameBase={exportFilename} />
-          {actions}
-        </div>
-        <p className="bg-muted text-muted-foreground rounded-md px-3 py-2 text-xs">
-          ※ {output.meta.disclaimer}
-        </p>
-      </div>
+      </ExportableResultFrame>
     </div>
   );
 }
