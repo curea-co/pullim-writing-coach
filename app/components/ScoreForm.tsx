@@ -33,8 +33,10 @@ import {
   addRevision,
   clearDraft,
   type DraftSnapshot,
+  getMostUsedMeta,
   getThread,
   loadDraft,
+  recordMetaUsage,
   type RevisionEntry,
   saveDraft,
 } from "@/app/lib/storage";
@@ -110,10 +112,19 @@ export default function ScoreForm({
     genre?: string;
   };
 }) {
-  const [schoolLevel, setSchoolLevel] = useState(() => defaults?.school_level ?? "");
-  const [subject, setSubject] = useState(() => defaults?.subject ?? "");
-  const [genre, setGenre] = useState(() => defaults?.genre ?? "");
-  const [targetRaw, setTargetRaw] = useState(""); // 빈 문자열 = 제한 없음
+  // 초기값 우선순위(#M3 ③): profile defaults > LRU 최빈값 > 빈 문자열.
+  //   LRU는 채점 성공마다 recordMetaUsage가 학습 — 자주 쓴 학년·과목·장르·목표 분량을 자연 prefill.
+  const [schoolLevel, setSchoolLevel] = useState(
+    () => defaults?.school_level ?? getMostUsedMeta("school_level") ?? "",
+  );
+  const [subject, setSubject] = useState(
+    () => defaults?.subject ?? getMostUsedMeta("subject") ?? "",
+  );
+  const [genre, setGenre] = useState(
+    () => defaults?.genre ?? getMostUsedMeta("genre") ?? "",
+  );
+  // 목표 분량은 프로필에 없음 — LRU만 사용. 빈 문자열 = 제한 없음.
+  const [targetRaw, setTargetRaw] = useState(() => getMostUsedMeta("target_raw") ?? "");
   const [promptText, setPromptText] = useState("");
   const [body, setBody] = useState(""); // 학생이 본 원본 — 정규화 전(화면 보존)
   const [submit, setSubmit] = useState<SubmitState>({ phase: "idle" });
@@ -420,6 +431,15 @@ export default function ScoreForm({
           },
           output,
         });
+
+        // #M3 ③ Meta usage LRU — 채점 성공한 메타를 학습해 다음 진입 시 prefill 강화.
+        //   값이 빈 문자열이면 recordMetaUsage가 자체 가드(기록 안 함).
+        recordMetaUsage("school_level", payload.assignment.school_level);
+        recordMetaUsage("subject", payload.assignment.subject);
+        recordMetaUsage("genre", payload.assignment.genre);
+        if (payload.assignment.target_char_count !== null) {
+          recordMetaUsage("target_raw", String(payload.assignment.target_char_count));
+        }
 
         // #1 수정 전/후 — thread에 이번 제출 추가. 같은 thread면 비교 모드 활성.
         const revRes = addRevision(revisionThreadId, {
