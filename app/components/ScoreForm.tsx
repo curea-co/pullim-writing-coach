@@ -43,7 +43,9 @@ import {
   getProgressBarClass,
   getProgressTextClass,
 } from "@/app/lib/progress";
+import MetaForm from "./MetaForm";
 import ResultView from "./ResultView";
+import TextPreviewCard from "./TextPreviewCard";
 import { DEMO_TOKEN_KEY } from "./TokenGate";
 
 // #9 본문 자동 저장 — saved_at(ISO) → "M/D HH:MM" 짧은 카피.
@@ -137,12 +139,17 @@ export default function ScoreForm({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+  // #M3 E paradigm v1 — Step wizard (1: 글 입력 / 2: 미리보기 + 메타 / 3: 채점 결과).
+  //   한 라우트 내 conditional rendering. 진행 상태도 자체 보존(submit.phase가 idle 아니면 step=3 강제).
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const formTopRef = useRef<HTMLDivElement>(null);
   const outcomeRef = useRef<HTMLDivElement>(null);
 
   // 블록 C(로딩·결과·에러)가 나오면 그 위치로 스크롤 (wireframe §1 — 자동 스크롤)
+  //   #M3 E: submit phase가 loading/result/error로 진입 = Step 3.
   useEffect(() => {
     if (submit.phase !== "idle") {
+      setStep(3);
       outcomeRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [submit.phase]);
@@ -470,7 +477,9 @@ export default function ScoreForm({
 
   function handleResubmit() {
     // 입력으로 복귀(폼 잠금 해제). 다음 새 제출(handleSubmit)에서 attempt_no가 증가한다.
+    //   #M3 E: 글 수정 가능하도록 Step 1로 복귀(메타·target·promptText는 그대로 유지).
     setSubmit({ phase: "idle" });
+    setStep(1);
     formTopRef.current?.scrollIntoView({ behavior: "smooth" });
   }
 
@@ -560,7 +569,13 @@ export default function ScoreForm({
         </section>
       )}
 
-      {/* 블록 B1 — 학생 글 (paradigm v1 #A: 글 먼저, 메타 나중. docs/18_try_paradigm_v1.md) */}
+      {/* #M3 E paradigm v1 — Stepper (1·2·3 진행 표시). conditional 렌더 위 상단에 항상 노출. */}
+      {step !== 3 && (
+        <Stepper current={step} />
+      )}
+
+      {/* Step 1 — 글 입력 (paradigm v1 #A: 글 먼저). #M3 E: conditional 렌더, step=1일 때만. */}
+      {step === 1 && (<>
       <section className="border-border bg-surface rounded-xl border p-5">
         <h2 className="text-foreground mb-1 text-base font-semibold">
           1. 글을 넣어 주세요
@@ -704,7 +719,31 @@ export default function ScoreForm({
         )}
       </section>
 
-      {/* 블록 B2 — 과제 정보 (paradigm v1 #A: 메타 나중. /me 프로필 prefill 유지) */}
+      {/* Step 1 → Step 2 진행 버튼 (#M3 E: bodyOk 시 활성) */}
+      <div className="flex flex-col items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setStep(2)}
+          disabled={!bodyOk || locked}
+          className={cn(
+            "bg-primary text-primary-foreground w-full rounded-lg px-4 py-3 text-base font-semibold transition hover:opacity-90",
+            (!bodyOk || locked) && "cursor-not-allowed opacity-40",
+          )}
+        >
+          다음 단계 →
+        </button>
+        {bodyCount === 0 && (
+          <p className="text-muted-foreground break-keep text-center text-xs">
+            글을 {BODY_MIN}자 이상 넣으면 다음으로 갈 수 있어요
+          </p>
+        )}
+      </div>
+      </>)}
+
+      {/* Step 2 — 글 미리보기 + 과제 정보 + 채점 받기 (#M3 E) */}
+      {step === 2 && (<>
+      <TextPreviewCard body={body} onEdit={() => setStep(1)} />
+
       <section className="border-border bg-surface rounded-xl border p-5">
         <h2 className="text-foreground mb-1 text-base font-semibold">
           2. 과제 정보를 알려 주세요
@@ -712,89 +751,23 @@ export default function ScoreForm({
         <p className="text-muted-foreground mb-4 text-xs">
           선생님이 내준 과제 조건을 입력하면, AI가 그 기준으로 채점해요.
         </p>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <SelectField
-            id="school-level"
-            label="학교·학년"
-            value={schoolLevel}
-            options={SCHOOL_LEVELS}
-            onChange={setSchoolLevel}
-            disabled={locked}
-          />
-          <SelectField
-            id="subject"
-            label="과목"
-            value={subject}
-            options={SUBJECTS}
-            onChange={setSubject}
-            disabled={locked}
-          />
-          <SelectField
-            id="genre"
-            label="어떤 글인가요?"
-            value={genre}
-            options={GENRES}
-            onChange={setGenre}
-            disabled={locked}
-          />
-          <div>
-            <label
-              htmlFor="target"
-              className="text-foreground mb-1.5 block text-sm font-medium"
-            >
-              목표 글자 수{" "}
-              <span className="text-muted-foreground font-normal">(선택)</span>
-            </label>
-            <input
-              id="target"
-              type="number"
-              inputMode="numeric"
-              value={targetRaw}
-              onChange={(e) => setTargetRaw(e.target.value)}
-              disabled={locked}
-              placeholder="예: 800 — 모르면 비워 두세요"
-              className={cn(
-                "border-border bg-background text-foreground w-full rounded-lg border px-3 py-2 text-sm",
-                targetInvalid && "border-band-warn",
-                locked && "cursor-not-allowed opacity-60"
-              )}
-            />
-            {targetInvalid && (
-              <p className="text-band-warn-foreground mt-1 text-xs">
-                목표 글자 수는 50~2,000자로 입력해 주세요
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-4">
-          <label
-            htmlFor="prompt"
-            className="text-foreground mb-1.5 block text-sm font-medium"
-          >
-            과제 내용
-          </label>
-          <textarea
-            id="prompt"
-            value={promptText}
-            onChange={(e) => setPromptText(e.target.value)}
-            disabled={locked}
-            rows={3}
-            maxLength={PROMPT_MAX}
-            placeholder="선생님이 내준 과제를 그대로 적어 주세요. 예: 교복 자율화에 대한 자신의 주장을 근거 2개 이상으로 쓰시오."
-            className={cn(
-              "border-border bg-background text-foreground w-full resize-y rounded-lg border px-3 py-2 text-sm leading-relaxed",
-              locked && "cursor-not-allowed opacity-60"
-            )}
-          />
-          <p className="text-subtle-foreground mt-1 text-right text-xs">
-            {promptText.trim().length} / {PROMPT_MAX}자
-          </p>
-        </div>
+        <MetaForm
+          schoolLevel={schoolLevel}
+          subject={subject}
+          genre={genre}
+          targetRaw={targetRaw}
+          promptText={promptText}
+          targetInvalid={targetInvalid}
+          locked={locked}
+          onChangeSchoolLevel={setSchoolLevel}
+          onChangeSubject={setSubject}
+          onChangeGenre={setGenre}
+          onChangeTargetRaw={setTargetRaw}
+          onChangePromptText={setPromptText}
+        />
       </section>
 
-      {/* 블록 B3 — 실행 버튼 (F3) */}
+      {/* 채점 버튼 + disabled 사유 안내 — 기존 #38 카피 유지(글 길이는 이미 Step 1에서 보장) */}
       <section>
         <form onSubmit={handleSubmit}>
           <button
@@ -802,24 +775,18 @@ export default function ScoreForm({
             disabled={!canSubmit}
             className={cn(
               "bg-primary text-primary-foreground w-full rounded-lg px-4 py-3 text-base font-semibold transition hover:opacity-90",
-              !canSubmit && "cursor-not-allowed opacity-40"
+              !canSubmit && "cursor-not-allowed opacity-40",
             )}
           >
-            {submit.phase === "loading"
-              ? "AI가 글을 읽고 있어요…"
-              : "AI 첨삭 받기"}
+            {submit.phase === "loading" ? "AI가 글을 읽고 있어요…" : "AI 첨삭 받기"}
           </button>
         </form>
-        {/* 입력 미완 안내는 idle에서만 — 에러 상태에선 locked로 canSubmit=false라 오해 유발(curea-review-ai 지적)
-            구체화: 어느 필드가 비어 있는지 명시(prod 보고: "버튼 눌러도 실행 안 됨" → disabled 사유 모호).
-            본문 길이는 < BODY_MIN과 > BODY_MAX 두 방향으로 disabled가 될 수 있어 카피 분리(Codex 리뷰 PR #38). */}
         {submit.phase === "idle" && !canSubmit && (() => {
           const missing: string[] = [];
           if (!schoolLevel) missing.push("학교·학년");
           if (!subject) missing.push("과목");
           if (!genre) missing.push("장르");
           if (!promptOk) missing.push(`과제 내용(${PROMPT_MIN}자 이상)`);
-          // bodyOk = bodyCount ∈ [BODY_MIN, BODY_MAX]. 양 방향 분리 — "더 써라" vs "줄여라"가 정반대.
           if (bodyCount < BODY_MIN) missing.push(`글(${BODY_MIN}자 이상)`);
           else if (bodyCount > BODY_MAX) missing.push(`글(${BODY_MAX}자 이하로 줄여 주세요)`);
           if (targetInvalid) missing.push("목표 글자 수");
@@ -832,6 +799,7 @@ export default function ScoreForm({
           );
         })()}
       </section>
+      </>)}
 
       {/* 블록 C — 로딩 / 결과 / 에러 */}
       {submit.phase === "loading" && (
@@ -904,48 +872,44 @@ export default function ScoreForm({
   );
 }
 
-// ── 드롭다운 필드 (학교·학년 / 과목 / 장르 공용) ─────────────────────
-function SelectField({
-  id,
-  label,
-  value,
-  options,
-  onChange,
-  disabled,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  options: readonly string[];
-  onChange: (v: string) => void;
-  disabled?: boolean;
-}) {
+// ── Stepper — Step 1·2·3 시각 진척 (#M3 E) ────────────────────────────
+function Stepper({ current }: { current: 1 | 2 | 3 }) {
+  const items: { n: 1 | 2; label: string }[] = [
+    { n: 1, label: "글 입력" },
+    { n: 2, label: "과제 정보" },
+  ];
   return (
-    <div>
-      <label
-        htmlFor={id}
-        className="text-foreground mb-1.5 block text-sm font-medium"
-      >
-        {label}
-      </label>
-      <select
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        className={cn(
-          "border-border bg-background w-full rounded-lg border px-3 py-2 text-sm",
-          value ? "text-foreground" : "text-subtle-foreground",
-          disabled && "cursor-not-allowed opacity-60"
-        )}
-      >
-        <option value="">선택해 주세요</option>
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
-      </select>
-    </div>
+    <nav aria-label="진행 단계" className="flex items-center gap-2">
+      {items.map((it, i) => {
+        const active = it.n === current;
+        const done = it.n < current;
+        return (
+          <span key={it.n} className="flex items-center gap-2">
+            <span
+              className={cn(
+                "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums",
+                active && "bg-primary text-primary-foreground",
+                done && "bg-band-good text-white",
+                !active && !done && "bg-muted text-muted-foreground",
+              )}
+              aria-current={active ? "step" : undefined}
+            >
+              {done ? "✓" : it.n}
+            </span>
+            <span
+              className={cn(
+                "text-xs",
+                active ? "text-foreground font-semibold" : "text-muted-foreground",
+              )}
+            >
+              {it.label}
+            </span>
+            {i < items.length - 1 && (
+              <span aria-hidden className="bg-border mx-1 h-px w-6" />
+            )}
+          </span>
+        );
+      })}
+    </nav>
   );
 }
