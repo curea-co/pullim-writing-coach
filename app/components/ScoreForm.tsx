@@ -9,7 +9,7 @@
 //   200이면 결과를 공유 ResultView(=/samples UI)에 바인딩(P3.3). 401이면 TokenGate 재입력.
 
 import { useEffect, useRef, useState } from "react";
-import { cn } from "@/app/lib/utils";
+import { cn, scrollBehavior } from "@/app/lib/utils";
 // 단일 소스 = 트랙 A의 순수 모듈(grading.ts, 계약 §9 S4). enum·길이정책·정규화·char_count·에러카피를
 // FE가 그대로 import해 서버와 한 곳에서 맞춘다(중복 구현 = 분기 위험 제거).
 import {
@@ -161,25 +161,32 @@ export default function ScoreForm({
   useEffect(() => {
     if (submit.phase !== "idle") {
       setStep(3);
-      outcomeRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      outcomeRef.current?.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
     }
   }, [submit.phase]);
 
   // #9 마운트 시 1회 — 저장된 draft가 있으면 배너로 사용자에게 선택권 부여.
-  //   body 비어 있는 draft는 가치 없으니 무시(저장 자체를 안 했어야 함, 방어).
+  //   Codex PR #20: 저장 조건(body OR prompt)과 복원 조건이 어긋나 prompt만 적고 이탈한
+  //   경우 draft가 유실됐음. 저장 조건과 동일 기준(body OR prompt 둘 중 하나라도 있으면)으로 정렬.
   useEffect(() => {
     const draft = loadDraft();
-    if (draft && draft.body.trim().length > 0) {
+    if (
+      draft &&
+      (draft.body.trim().length > 0 || (draft.prompt_text ?? "").trim().length > 0)
+    ) {
       setRestoredDraft(draft);
     }
   }, []);
 
   // #B 마운트 시 1회 — 클립보드에 의미 있는 텍스트가 있으면 배너로 1클릭 붙여넣기 제공.
   //   조건: clipboard API 지원 + 권한 허용 + 30자 이상. 권한 거절·미지원 → 조용히 폴백.
-  //   draft 또는 body 있으면 표시 X — UI 경합 방지(draft 우선).
+  //   Codex PR #36: draft 또는 body 있으면 read 자체 안 함(프라이버시). loadDraft를 직접 호출해
+  //   state batching 이슈 회피(restoredDraft state는 아직 null일 수 있음).
   useEffect(() => {
     // SSR/구버전 가드
     if (typeof navigator === "undefined" || !navigator.clipboard?.readText) return;
+    // draft 있으면 외부 클립보드 read 회피(공용 기기 프라이버시).
+    if (loadDraft() !== null) return;
     let cancelled = false;
     navigator.clipboard
       .readText()
@@ -196,6 +203,14 @@ export default function ScoreForm({
       cancelled = true;
     };
   }, []);
+
+  // Codex PR #36: 사용자가 타이핑 시작한 후 본문 비워도 클립보드 배너 다시 안 나타나도록
+  // 한 번 body가 채워지면 clipboardPreview 영구 클리어(one-shot).
+  useEffect(() => {
+    if (body.length > 0 && clipboardPreview !== null) {
+      setClipboardPreview(null);
+    }
+  }, [body, clipboardPreview]);
 
   // #9 자동 저장 — debounce 800ms. idle phase + restore 배너 결정 전이면 보류.
   //   비어 있는 폼은 저장 X(LS 공간·오해 방지). 변경 후 800ms 침묵 → write.
@@ -301,6 +316,15 @@ export default function ScoreForm({
       } else {
         text = await file.text(); // UTF-8 디코딩
       }
+      // Codex PR #40: 추출된 텍스트가 너무 크면 #9 autosave가 LS quota 초과로 계속 실패.
+      // BODY_MAX(2000자) 한참 초과면 잘라서 안내. 학생도 결국 BODY_MAX 이하로 줄여야 채점 가능.
+      const MAX_EXTRACTED = BODY_MAX * 4; // 8000자 — 여유 두되 LS quota 폭주 차단
+      if (text.length > MAX_EXTRACTED) {
+        setFileError(
+          `파일에서 추출된 텍스트가 너무 길어요(${text.length}자). 직접 ${BODY_MAX}자 이하로 잘라서 붙여넣어 주세요.`,
+        );
+        return;
+      }
       setBody(text);
     } catch {
       setFileError(
@@ -318,7 +342,19 @@ export default function ScoreForm({
     if (e.target) e.target.value = "";
   }
 
+  // Codex PR #37: 파일 드래그만 가로채기. 일반 텍스트(다른 앱/탭에서 드래그) 드롭은
+  // 브라우저 기본 동작(textarea에 텍스트 삽입) 유지 — 회귀 방지.
+  function hasFilesInDataTransfer(dt: DataTransfer): boolean {
+    // DataTransfer.types는 'Files' 문자열을 포함하면 파일 드래그.
+    return Array.from(dt.types || []).includes("Files");
+  }
+
   function handleDrop(e: React.DragEvent<HTMLTextAreaElement>) {
+    if (!hasFilesInDataTransfer(e.dataTransfer)) {
+      // 텍스트 드래그 — 브라우저 기본 동작 그대로(textarea 삽입).
+      setIsDraggingFile(false);
+      return;
+    }
     e.preventDefault();
     setIsDraggingFile(false);
     const file = e.dataTransfer.files?.[0];
@@ -326,7 +362,11 @@ export default function ScoreForm({
   }
 
   function handleDragOver(e: React.DragEvent<HTMLTextAreaElement>) {
-    // preventDefault 안 하면 브라우저가 파일을 새 탭으로 열려 함.
+    if (!hasFilesInDataTransfer(e.dataTransfer)) {
+      // 텍스트 드래그 — 가로채지 않음.
+      return;
+    }
+    // 파일 드래그만: preventDefault로 브라우저 새 탭 동작 차단.
     e.preventDefault();
     if (!isDraggingFile) setIsDraggingFile(true);
   }
@@ -524,7 +564,7 @@ export default function ScoreForm({
     //   #M3 E: 글 수정 가능하도록 Step 1로 복귀(메타·target·promptText는 그대로 유지).
     setSubmit({ phase: "idle" });
     setStep(1);
-    formTopRef.current?.scrollIntoView({ behavior: "smooth" });
+    formTopRef.current?.scrollIntoView({ behavior: scrollBehavior() });
   }
 
   const resubmitButton = (
@@ -548,12 +588,14 @@ export default function ScoreForm({
         >
           <div className="min-w-0 flex-1">
             <p className="text-foreground break-keep text-sm font-semibold">
-              📝 이전에 쓰던 글이 있어요
+              📝 이전에 쓰던 작업이 있어요
             </p>
             <p className="text-muted-foreground break-keep mt-1 text-xs leading-relaxed">
               마지막 저장 {formatSavedAt(restoredDraft.saved_at)} · 본문{" "}
-              {restoredDraft.body.trim().length}자. 이어서 쓸까요?{" "}
-              <span className="text-subtle-foreground">'새로 시작'하면 저장된 글은 지워져요.</span>
+              {restoredDraft.body.trim().length}자
+              {(restoredDraft.prompt_text ?? "").trim().length > 0 && " + 과제 내용"}.
+              이어서 쓸까요?{" "}
+              <span className="text-subtle-foreground">'새로 시작'하면 저장된 내용은 지워져요.</span>
             </p>
           </div>
           <div className="flex shrink-0 gap-2">
@@ -625,7 +667,7 @@ export default function ScoreForm({
           1. 글을 넣어 주세요
         </h2>
         <p className="text-muted-foreground mb-3 text-xs">
-          어디서 가져온 글이든 받아드릴게요. 맞춤법·띄어쓰기는 고치지 말고 쓴 그대로
+          어디서 가져온 글이든 받아들일게요. 맞춤법·띄어쓰기는 고치지 말고 쓴 그대로
           두세요 — 그 부분도 채점 대상이에요.
         </p>
         <textarea
@@ -720,7 +762,11 @@ export default function ScoreForm({
               />
             </div>
             <p className="text-subtle-foreground break-keep mt-1 text-xs">
-              {BODY_MIN - bodyCount}자 더 쓰면 채점받을 수 있어요
+              {/* Codex PR #35: bodyError E11(원본은 충분하나 정규화 후 부족 = 발췌 표기뿐)인
+                  경우엔 "더 써라"가 잘못된 안내 — 발췌 표기 외 본문을 붙여넣어야 함. 분기. */}
+              {bodyError?.code === "E11"
+                ? "발췌 표기(〈중략〉 등) 외 학생이 쓴 실제 본문을 더 붙여넣어 주세요"
+                : `${BODY_MIN - bodyCount}자 더 쓰면 채점받을 수 있어요`}
             </p>
           </div>
         )}
@@ -731,7 +777,10 @@ export default function ScoreForm({
             role="progressbar"
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-valuenow={Math.round(progressState.rawPct)}
+            // Codex PR #23: aria-valuenow가 aria-valuemax 초과 시 invalid → pct로 clamp(0~100).
+            // raw 비율은 aria-valuetext로 별도 전달.
+            aria-valuenow={Math.round(progressState.pct)}
+            aria-valuetext={`${progressState.rawPct}% (${progressState.label})`}
             aria-label="목표 글자수 대비 진척"
             className="mt-2"
           >

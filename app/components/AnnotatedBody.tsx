@@ -9,13 +9,15 @@ import { cn } from "@/app/lib/utils";
 import type { Score } from "../data/scoring";
 import { computeSegments, extractQuotedPhrasesWithSource } from "../lib/annotate";
 import { feedbackAreaId } from "../lib/feedback-anchors";
+import { scrollBehavior } from "../lib/utils";
 
 const FLASH_DURATION_MS = 1600;
 
 function focusFeedbackArea(areaIndex: number): void {
   const el = document.getElementById(feedbackAreaId(areaIndex));
   if (!el) return;
-  el.scrollIntoView({ behavior: "smooth", block: "start" });
+  // Codex PR #12: reduced-motion 사용자에게는 auto 스크롤(jump).
+  el.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
   // 임시 flash — CSS는 globals.css .feedback-flash + reduced-motion 가드
   el.classList.add("feedback-flash");
   window.setTimeout(() => el.classList.remove("feedback-flash"), FLASH_DURATION_MS);

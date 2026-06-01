@@ -30,7 +30,8 @@ export function computeProgress(
   const pct = Math.min(100, Math.max(0, rawPct));            // 시각 width 캡
 
   // 하드 캡 우선 — BODY_MAX 초과는 target 비율과 무관하게 줄여야 함.
-  if (current >= bodyMax) {
+  // bodyOk = current <= BODY_MAX이라 정확히 2000자는 정상 → > bodyMax로 비교(Codex PR #23).
+  if (current > bodyMax) {
     return {
       band: "way-over",
       pct: 100,

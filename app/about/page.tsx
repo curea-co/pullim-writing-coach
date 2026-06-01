@@ -64,7 +64,8 @@ export default function AboutPage() {
       <Section title="데이터는 어떻게 다뤄지나요?">
         <ul className="ml-1 list-disc space-y-2 pl-5">
           <li>
-            프로필(닉네임·학년·과목·학교명)과 본문 임시 저장본은 <strong className="text-foreground">학생 기기의 브라우저 저장소</strong>에만
+            프로필(닉네임·학년·과목·학교명), 본문 임시 저장본, 수정 이력, 채점 결과(최대 20건),
+            자주 쓰는 메타는 모두 <strong className="text-foreground">학생 기기의 브라우저 저장소</strong>에만
             남아요. 서버에 전송·저장하지 않아요.
           </li>
           <li>
@@ -72,7 +73,7 @@ export default function AboutPage() {
           </li>
           <li>
             <Link href="/me" className="text-primary underline-offset-2 hover:underline">내 정보</Link>에서
-            언제든 프로필·이력을 삭제할 수 있어요.
+            언제든 저장된 모든 데이터를 한 번에 삭제할 수 있어요.
           </li>
         </ul>
       </Section>
