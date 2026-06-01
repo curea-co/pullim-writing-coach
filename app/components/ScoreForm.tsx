@@ -314,7 +314,22 @@ export default function ScoreForm({
           return;
         }
       } else {
-        text = await file.text(); // UTF-8 디코딩
+        // Codex PR #37: file.text()는 UTF-8 가정 — CP949/EUC-KR 한글 파일은 깨진 채 "성공"으로 처리.
+        // 네이티브 TextDecoder로 UTF-8 fatal 시도 → 실패 시 EUC-KR fallback. 라이브러리 추가 0.
+        const buffer = await file.arrayBuffer();
+        try {
+          text = new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+        } catch {
+          // UTF-8 실패 → EUC-KR(CP949)로 재시도 (한국 학교 환경 거의 두 가지만)
+          try {
+            text = new TextDecoder("euc-kr").decode(buffer);
+          } catch {
+            setFileError(
+              "파일 인코딩을 알아보지 못했어요. UTF-8로 다시 저장하거나 본문을 직접 붙여넣어 주세요.",
+            );
+            return;
+          }
+        }
       }
       // Codex PR #40: 추출된 텍스트가 너무 크면 #9 autosave가 LS quota 초과로 계속 실패.
       // BODY_MAX(2000자) 한참 초과면 잘라서 안내. 학생도 결국 BODY_MAX 이하로 줄여야 채점 가능.
@@ -330,7 +345,7 @@ export default function ScoreForm({
       setFileError(
         isDocx
           ? "DOCX 파일을 읽지 못했어요. 다른 .docx 파일로 시도하거나 본문을 직접 붙여넣어 주세요."
-          : "파일을 읽지 못했어요. UTF-8 인코딩으로 저장돼 있는지 확인해 주세요.",
+          : "파일을 읽지 못했어요. 본문을 직접 붙여넣어 주세요.",
       );
     }
   }
