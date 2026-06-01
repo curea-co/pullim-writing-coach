@@ -82,4 +82,7 @@
 }
 ```
 
+> ⚠ **Meta 메타데이터 불일치 안내 (Codex PR #31/#32 정합화 2026-06-01)**:
+> 위 raw output의 `meta.model_version = "writing-coach-prompt-v0.4"` 및 `generated_at = 2025-01-10T...`는 **이 spotcheck 실제 실행(`Run 1 — 2026-05-31T04:37:09.185Z`, v0.2 prompt)과 어긋남**. 권위 문서(`docs/12_api_contract_score_v.1`, `app/lib/model-version.ts`)는 `v0.2` + 서버 시각 주입을 규정하지만, 이 raw 파일은 별 트랙에서 생성돼 메타가 그대로 전달됨. 점수·피드백 본문은 v0.2 실행 결과로 신뢰 가능. 후속 spotcheck는 서버 stamping을 거치도록 진행 권장.
+
 ---
