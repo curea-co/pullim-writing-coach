@@ -132,6 +132,11 @@ export default function ScoreForm({
   // #B 클립보드 자동 감지 — 마운트 시 1회 조용히 read. 권한 거절·미지원 → null 유지(폴백).
   //   noise 차단: 30자 미만이면 무시. body·draft 있으면 표시 X(중복 방지).
   const [clipboardPreview, setClipboardPreview] = useState<string | null>(null);
+  // #C 파일 업로드/드롭 — textarea 자체가 dropzone. .txt/.md만 v1 지원, UTF-8 가정.
+  //   에러는 fileError state로 사용자에게 즉시 노출(설계: 친절한 에러 카피).
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const formTopRef = useRef<HTMLDivElement>(null);
   const outcomeRef = useRef<HTMLDivElement>(null);
 
@@ -232,6 +237,60 @@ export default function ScoreForm({
   // #B 미리보기 무시 — state만 클리어, 시스템 클립보드는 건드리지 않음.
   function dismissClipboard() {
     setClipboardPreview(null);
+  }
+
+  // #C 파일 → 텍스트 변환. v1: .txt/.md만, UTF-8 가정. 1MB 하드 캡(LS quota·UI 안정성).
+  //   에러는 fileError로 즉시 노출. 성공 시 body로 채우면 autosave가 800ms 후 LS 저장(기존 #9).
+  async function readTextFile(file: File) {
+    setFileError(null);
+    // 확장자·MIME 둘 다 허용 — 일부 브라우저가 .md를 application/octet-stream으로 분류.
+    const isTextLike =
+      file.type === "text/plain" ||
+      file.type === "text/markdown" ||
+      /\.(txt|md|markdown)$/i.test(file.name);
+    if (!isTextLike) {
+      setFileError(
+        "이 형식은 아직 지원하지 않아요(.txt·.md만 가능). DOCX·HWP·사진·링크는 추후 추가 예정.",
+      );
+      return;
+    }
+    const MAX_FILE = 1 * 1024 * 1024; // 1MB
+    if (file.size > MAX_FILE) {
+      setFileError(
+        `파일이 너무 커요(${Math.round(file.size / 1024)}KB). 1MB 이하로 줄여 주세요.`,
+      );
+      return;
+    }
+    try {
+      const text = await file.text(); // UTF-8 디코딩
+      setBody(text);
+    } catch {
+      setFileError("파일을 읽지 못했어요. UTF-8 인코딩으로 저장돼 있는지 확인해 주세요.");
+    }
+  }
+
+  function handleFileInput(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) void readTextFile(file);
+    // 같은 파일 재선택 시에도 onChange 발화하도록 value 비움.
+    if (e.target) e.target.value = "";
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLTextAreaElement>) {
+    e.preventDefault();
+    setIsDraggingFile(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) void readTextFile(file);
+  }
+
+  function handleDragOver(e: React.DragEvent<HTMLTextAreaElement>) {
+    // preventDefault 안 하면 브라우저가 파일을 새 탭으로 열려 함.
+    e.preventDefault();
+    if (!isDraggingFile) setIsDraggingFile(true);
+  }
+
+  function handleDragLeave() {
+    setIsDraggingFile(false);
   }
 
   // ── 파생 검증값 ─────────────────────────────────────────────────────
@@ -513,15 +572,49 @@ export default function ScoreForm({
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
           disabled={locked}
           rows={12}
-          placeholder="여기에 글 전체를 붙여넣어 주세요 (50자 이상)"
+          placeholder="여기에 글 전체를 붙여넣어 주세요 (50자 이상). .txt·.md 파일을 끌어다 놓아도 돼요."
           className={cn(
-            "border-border bg-background text-foreground w-full resize-y rounded-lg border px-3 py-2 text-sm leading-relaxed",
+            "border-border bg-background text-foreground w-full resize-y rounded-lg border px-3 py-2 text-sm leading-relaxed transition-colors",
             bodyError && "border-band-warn",
+            isDraggingFile && "border-accent-mid bg-accent-mid-surface/40 border-2",
             locked && "cursor-not-allowed opacity-60"
           )}
         />
+        {/* #C 파일 업로드 버튼 + DnD 안내 + 에러 */}
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".txt,.md,.markdown,text/plain,text/markdown"
+            onChange={handleFileInput}
+            className="hidden"
+            aria-hidden
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={locked}
+            className={cn(
+              "border-border bg-surface text-foreground hover:bg-muted inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium",
+              locked && "cursor-not-allowed opacity-60",
+            )}
+          >
+            📎 .txt·.md 파일 업로드
+          </button>
+          <span className="text-subtle-foreground text-[11px]">
+            또는 위 영역에 끌어다 놓으세요. DOCX·HWP·사진·링크는 추후 추가 예정.
+          </span>
+        </div>
+        {fileError && (
+          <p role="alert" className="text-band-warn-foreground break-keep mt-2 text-xs">
+            {fileError}
+          </p>
+        )}
         <div className="mt-1.5 flex items-center justify-between text-xs">
           <span className={cn(bodyError && "text-band-warn-foreground")}>
             {bodyError?.message ?? " "}
