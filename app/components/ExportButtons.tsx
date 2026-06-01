@@ -78,14 +78,29 @@ export default function ExportButtons({
     try {
       const canvas = await capture();
       const { jsPDF } = await import("jspdf");
-      // A4 세로(210x297mm), 좌우상하 10mm 여백 → 이미지 폭 190mm.
+      // A4 세로(210x297mm), 좌우상하 10mm 여백 → 콘텐츠 영역 190x277mm.
       const imgData = canvas.toDataURL("image/png");
       const pdfWidth = 190;
+      const pageContentHeight = 277;
       const aspect = canvas.height / canvas.width;
-      const pdfHeight = pdfWidth * aspect;
+      const imgHeightMm = pdfWidth * aspect;
       const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-      // 단일 페이지(M3 단순화). 길이 초과 시 잘림 가능.
-      pdf.addImage(imgData, "PNG", 10, 10, pdfWidth, pdfHeight);
+
+      // Codex PR #13: 결과가 한 페이지 넘는 경우 자동 분할 — 이전엔 잘려나갔음.
+      // 방식: negative y-offset addImage로 페이지마다 이미지 다른 부분 노출(PDF 뷰어가 페이지
+      // 경계 밖 클리핑). 단점: 파일 사이즈가 페이지 수만큼 증가(데모 1~2페이지 케이스 OK).
+      if (imgHeightMm <= pageContentHeight) {
+        pdf.addImage(imgData, "PNG", 10, 10, pdfWidth, imgHeightMm);
+      } else {
+        let yOffsetMm = 0;
+        let pageNum = 0;
+        while (yOffsetMm < imgHeightMm) {
+          if (pageNum > 0) pdf.addPage();
+          pdf.addImage(imgData, "PNG", 10, 10 - yOffsetMm, pdfWidth, imgHeightMm);
+          yOffsetMm += pageContentHeight;
+          pageNum++;
+        }
+      }
       pdf.save(safeFilename("pdf"));
     } catch (e) {
       setError(e instanceof Error ? e.message : "PDF 저장에 실패했어요");
