@@ -246,33 +246,57 @@ export default function ScoreForm({
     setClipboardPreview(null);
   }
 
-  // #C 파일 → 텍스트 변환. v1: .txt/.md만, UTF-8 가정. 1MB 하드 캡(LS quota·UI 안정성).
+  // #C/#M3 ② 파일 → 텍스트 변환. v1: .txt/.md/.docx 클라 사이드, UTF-8 가정.
   //   에러는 fileError로 즉시 노출. 성공 시 body로 채우면 autosave가 800ms 후 LS 저장(기존 #9).
+  //   DOCX는 mammoth(lazy load, ~300KB)로 클라에서 직접 텍스트 추출 — 서버·외부 API 0.
   async function readTextFile(file: File) {
     setFileError(null);
     // 확장자·MIME 둘 다 허용 — 일부 브라우저가 .md를 application/octet-stream으로 분류.
+    const isDocx =
+      file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      /\.docx$/i.test(file.name);
     const isTextLike =
       file.type === "text/plain" ||
       file.type === "text/markdown" ||
       /\.(txt|md|markdown)$/i.test(file.name);
-    if (!isTextLike) {
+    if (!isDocx && !isTextLike) {
       setFileError(
-        "이 형식은 아직 지원하지 않아요(.txt·.md만 가능). DOCX·HWP·사진·링크는 추후 추가 예정.",
+        "이 형식은 아직 지원하지 않아요(.txt·.md·.docx만 가능). HWP·사진·링크는 추후 추가 예정.",
       );
       return;
     }
-    const MAX_FILE = 1 * 1024 * 1024; // 1MB
+    // DOCX는 텍스트보다 크기가 크니 5MB 캡, 텍스트는 기존 1MB 유지.
+    const MAX_FILE = isDocx ? 5 * 1024 * 1024 : 1 * 1024 * 1024;
     if (file.size > MAX_FILE) {
-      setFileError(
-        `파일이 너무 커요(${Math.round(file.size / 1024)}KB). 1MB 이하로 줄여 주세요.`,
-      );
+      const sizeLabel = isDocx
+        ? `${(file.size / 1024 / 1024).toFixed(1)}MB`
+        : `${Math.round(file.size / 1024)}KB`;
+      const limitLabel = isDocx ? "5MB" : "1MB";
+      setFileError(`파일이 너무 커요(${sizeLabel}). ${limitLabel} 이하로 줄여 주세요.`);
       return;
     }
     try {
-      const text = await file.text(); // UTF-8 디코딩
+      let text: string;
+      if (isDocx) {
+        // mammoth lazy load — 초기 번들 영향 0(사용자가 DOCX 업로드할 때만 fetch).
+        const mammoth = await import("mammoth");
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        text = result.value ?? "";
+        if (!text.trim()) {
+          setFileError("DOCX에서 본문을 찾지 못했어요. 파일이 비어 있거나 손상됐을 수 있어요.");
+          return;
+        }
+      } else {
+        text = await file.text(); // UTF-8 디코딩
+      }
       setBody(text);
     } catch {
-      setFileError("파일을 읽지 못했어요. UTF-8 인코딩으로 저장돼 있는지 확인해 주세요.");
+      setFileError(
+        isDocx
+          ? "DOCX 파일을 읽지 못했어요. 다른 .docx 파일로 시도하거나 본문을 직접 붙여넣어 주세요."
+          : "파일을 읽지 못했어요. UTF-8 인코딩으로 저장돼 있는지 확인해 주세요.",
+      );
     }
   }
 
@@ -595,7 +619,7 @@ export default function ScoreForm({
           onDragLeave={handleDragLeave}
           disabled={locked}
           rows={12}
-          placeholder="여기에 글 전체를 붙여넣어 주세요 (50자 이상). .txt·.md 파일을 끌어다 놓아도 돼요."
+          placeholder="여기에 글 전체를 붙여넣어 주세요 (50자 이상). .txt·.md·.docx 파일을 끌어다 놓아도 돼요."
           className={cn(
             "border-border bg-background text-foreground w-full resize-y rounded-lg border px-3 py-2 text-sm leading-relaxed transition-colors",
             bodyError && "border-band-warn",
@@ -610,10 +634,10 @@ export default function ScoreForm({
             id="body-file-upload"
             name="body-file-upload"
             type="file"
-            accept=".txt,.md,.markdown,text/plain,text/markdown"
+            accept=".txt,.md,.markdown,.docx,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             onChange={handleFileInput}
             className="hidden"
-            aria-label="텍스트 파일 업로드"
+            aria-label="텍스트 또는 DOCX 파일 업로드"
           />
           <button
             type="button"
@@ -624,10 +648,10 @@ export default function ScoreForm({
               locked && "cursor-not-allowed opacity-60",
             )}
           >
-            📎 .txt·.md 파일 업로드
+            📎 .txt·.md·.docx 파일 업로드
           </button>
           <span className="text-subtle-foreground text-[11px]">
-            또는 위 영역에 끌어다 놓으세요. DOCX·HWP·사진·링크는 추후 추가 예정.
+            또는 위 영역에 끌어다 놓으세요. HWP·사진·링크는 추후 추가 예정.
           </span>
         </div>
         {fileError && (
