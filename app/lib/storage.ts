@@ -421,6 +421,22 @@ export function clearAllResults(): void {
   }
 }
 
+// #M3 ④ — 개별 결과 삭제. 존재하지 않는 id는 silent no-op.
+//   타 결과 영향 0. 저장 실패는 호출자에게 알리지 않음(다음 load 시 반영되므로).
+export function removeResult(id: string): { ok: boolean; removed: boolean } {
+  if (typeof window === "undefined") return { ok: false, removed: false };
+  const list = loadResults();
+  const idx = list.findIndex((r) => r.id === id);
+  if (idx === -1) return { ok: true, removed: false };
+  list.splice(idx, 1);
+  try {
+    window.localStorage.setItem(RESULTS_KEY, JSON.stringify(list));
+    return { ok: true, removed: true };
+  } catch {
+    return { ok: false, removed: false };
+  }
+}
+
 // ── #M3 ③ Meta usage LRU — 자주 쓴 장르·목표 분량 학습 ────────────────
 // localStorage["pwc_meta_usage_v1"] = MetaUsage.
 //   채점 성공 시 recordMetaUsage 호출 → 필드별 LRU 5건 유지(count + last_used_at).
