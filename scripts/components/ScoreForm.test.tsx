@@ -30,19 +30,29 @@ const MOCK_OUTPUT = {
 };
 
 describe("ScoreForm 통합 — full wizard state machine", () => {
+  // Codex PR #57: 직전엔 `globalThis.fetch = vi.fn(...)`·`Object.defineProperty(navigator, 'clipboard', ...)`
+  // 으로 전역을 직접 덮어썼는데 `vi.restoreAllMocks()`가 이런 수동 대입은 원복하지 않아
+  // 이 파일 뒤에 실행되는 테스트가 mock을 물려받는 순서 의존성을 만들었음.
+  // → fetch는 `vi.stubGlobal` + `vi.unstubAllGlobals`로, clipboard는 원본 descriptor 저장 후 복원.
+  let originalClipboardDescriptor: PropertyDescriptor | undefined;
+
   beforeEach(() => {
     // sessionStorage mock 토큰 (fetch headers x-demo-token)
     sessionStorage.setItem(DEMO_TOKEN_KEY, "test-mock");
     localStorage.clear();
-    // fetch /api/score mock
-    globalThis.fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve(MOCK_OUTPUT),
-      } as Response),
+    // fetch /api/score mock — stubGlobal은 unstubAllGlobals로 깔끔히 원복.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(MOCK_OUTPUT),
+        } as Response),
+      ),
     );
-    // navigator.clipboard stub — 마운트 시 read 시도 안 함(reject로 silent)
+    // navigator.clipboard stub — 원본 descriptor 보존 후 정의(afterEach에서 복원).
+    originalClipboardDescriptor = Object.getOwnPropertyDescriptor(window.navigator, "clipboard");
     Object.defineProperty(window.navigator, "clipboard", {
       configurable: true,
       value: {
@@ -55,6 +65,14 @@ describe("ScoreForm 통합 — full wizard state machine", () => {
     sessionStorage.clear();
     localStorage.clear();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    // clipboard 원본 복원 — 없었으면 정의 제거, 있었으면 원래 descriptor로.
+    if (originalClipboardDescriptor) {
+      Object.defineProperty(window.navigator, "clipboard", originalClipboardDescriptor);
+    } else {
+      // @ts-expect-error — 원래 미정의였으면 attr 제거(jsdom 환경 기본 상태)
+      delete (window.navigator as { clipboard?: unknown }).clipboard;
+    }
   });
 
   it("초기 마운트 — Step 1 visible, 다음 단계 disabled", () => {
