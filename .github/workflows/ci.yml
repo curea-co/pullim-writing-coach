@@ -75,7 +75,10 @@ jobs:
       # Playwright 브라우저 binary는 별도 캐시 — package.json 변경 없어도 재사용.
       - name: Get installed Playwright version
         id: playwright-version
-        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> $GITHUB_OUTPUT
+        # Codex PR #54: nested double-quote bash parsing 회피 — block scalar로 분리.
+        run: |
+          VERSION=$(node -p "require('@playwright/test/package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Cache Playwright browsers
         id: playwright-cache
