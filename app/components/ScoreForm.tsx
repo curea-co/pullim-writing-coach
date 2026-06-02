@@ -36,6 +36,7 @@ import {
   getMostUsedMeta,
   getThread,
   loadDraft,
+  loadProfile,
   recordMetaUsage,
   type RevisionEntry,
   saveDraft,
@@ -115,17 +116,23 @@ export default function ScoreForm({
 }) {
   // 초기값 우선순위(#M3 ③): profile defaults > LRU 최빈값 > 빈 문자열.
   //   LRU는 채점 성공마다 recordMetaUsage가 학습 — 자주 쓴 학년·과목·장르·목표 분량을 자연 prefill.
+  // Codex PR #56: no-profile 세션(공용 기기/새 사용자)에서는 LRU prefill 안 함 —
+  //   이전 사용자의 학년/과목/장르/분량이 폼에 자동으로 나타나는 노출 차단.
+  //   profile이 있어야만 본인 데이터로 간주, LRU 사용. defaults는 TryClient에서 profile 기반으로 전달.
+  const hasProfileAtMount = typeof window !== "undefined" && loadProfile() !== null;
+  const lruPrefill = (field: Parameters<typeof getMostUsedMeta>[0]) =>
+    hasProfileAtMount ? (getMostUsedMeta(field) ?? "") : "";
   const [schoolLevel, setSchoolLevel] = useState(
-    () => defaults?.school_level ?? getMostUsedMeta("school_level") ?? "",
+    () => defaults?.school_level ?? lruPrefill("school_level"),
   );
   const [subject, setSubject] = useState(
-    () => defaults?.subject ?? getMostUsedMeta("subject") ?? "",
+    () => defaults?.subject ?? lruPrefill("subject"),
   );
   const [genre, setGenre] = useState(
-    () => defaults?.genre ?? getMostUsedMeta("genre") ?? "",
+    () => defaults?.genre ?? lruPrefill("genre"),
   );
-  // 목표 분량은 프로필에 없음 — LRU만 사용. 빈 문자열 = 제한 없음.
-  const [targetRaw, setTargetRaw] = useState(() => getMostUsedMeta("target_raw") ?? "");
+  // 목표 분량은 프로필에 없음 — profile 있을 때만 LRU 사용. 빈 문자열 = 제한 없음.
+  const [targetRaw, setTargetRaw] = useState(() => lruPrefill("target_raw"));
   const [promptText, setPromptText] = useState("");
   const [body, setBody] = useState(""); // 학생이 본 원본 — 정규화 전(화면 보존)
   const [submit, setSubmit] = useState<SubmitState>({ phase: "idle" });
