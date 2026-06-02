@@ -56,8 +56,20 @@ export function loadProfile(): Profile | null {
 export function saveProfile(profile: Profile): { ok: true } | { ok: false; reason: "quota" | "denied" | "invalid" } {
   if (typeof window === "undefined") return { ok: false, reason: "denied" };
   if (!isProfile(profile)) return { ok: false, reason: "invalid" };
+  // Codex PR #56: 새 프로필 생성 시점 = 공용 기기에서 새 사용자일 가능성.
+  //   이전 사용자의 메타 LRU가 그대로 남아 있으면 새 사용자의 /try에 그대로 prefill — 누출.
+  //   기존 profile이 없는 상태에서의 save는 "새 사용자 등록" → 메타 초기화로 격리.
+  //   기존 profile 업데이트(/me 저장)는 본인이므로 메타 유지.
   try {
+    const isFirstCreate = window.localStorage.getItem(PROFILE_KEY) === null;
     window.localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+    if (isFirstCreate) {
+      try {
+        window.localStorage.removeItem(META_USAGE_KEY);
+      } catch {
+        /* 메타 clear 실패는 치명적이지 않음 — 다음 /me 로딩에서 사용자가 직접 지울 수 있음 */
+      }
+    }
     return { ok: true };
   } catch (e) {
     // QuotaExceededError 포함 — Profile은 작아서 거의 안 터지지만 방어.
@@ -595,16 +607,32 @@ export function getMostUsedMeta(field: MetaField): string | null {
 }
 
 // Codex PR #56: MetaUsageCard·기타 UI에서 손상 LS 값 노출 방지용 필터링 진입점.
-//   `loadMetaUsage`(원본 — 디버그/툴 용도) ↔ `loadValidatedMetaUsage`(UI 안전).
-//   getMostUsedMeta와 동일 필터(`isValidMetaValue`) 적용 → /try prefill ↔ /me 노출 일관.
+//   `loadMetaUsage`(schema 손상만 복구) ↔ `loadValidatedMetaUsage`(enum/범위까지).
+//   주의: enum 필터를 cap(LRU 5건) 적용 전에 통과시켜야 함 — 최신 5건이 모두 손상값이고
+//   6번째가 정상이면, cap이 enum 필터보다 먼저 일어나면 정상 이력이 영원히 잘림.
+//   raw LS에서 다시 읽어 enum 필터 → dedup → cap 순서 보장.
 export function loadValidatedMetaUsage(): MetaUsage {
-  const raw = loadMetaUsage();
-  const fields: MetaField[] = ["school_level", "subject", "genre", "target_raw"];
-  const filtered = emptyMetaUsage();
-  for (const f of fields) {
-    filtered[f] = raw[f].filter((e) => isValidMetaValue(f, e.value));
+  if (typeof window === "undefined") return emptyMetaUsage();
+  try {
+    const raw = window.localStorage.getItem(META_USAGE_KEY);
+    if (!raw) return emptyMetaUsage();
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return emptyMetaUsage();
+    const o = parsed as Record<string, unknown>;
+    const result = emptyMetaUsage();
+    const fields: MetaField[] = ["school_level", "subject", "genre", "target_raw"];
+    for (const f of fields) {
+      const arr = o[f];
+      if (!Array.isArray(arr)) continue;
+      const valid = arr
+        .filter(isMetaUsageEntry)
+        .filter((e) => isValidMetaValue(f, e.value));
+      result[f] = dedupAndCapLRU(valid);
+    }
+    return result;
+  } catch {
+    return emptyMetaUsage();
   }
-  return filtered;
 }
 
 export function clearMetaUsage(): void {

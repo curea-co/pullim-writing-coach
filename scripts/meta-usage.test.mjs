@@ -207,6 +207,33 @@ test("loadMetaUsage — 6건 이상 유효 엔트리도 LRU 5건 cap 복원", ()
   assert.deepEqual(values, ["B", "C", "D", "E", "F"]);
 });
 
+test("loadValidatedMetaUsage — 최신 N건이 enum 외(손상)여도 정상 이력 살아남음 (cap before enum 회귀 검증)", async () => {
+  // Codex PR #56: enum 필터를 cap 전에 통과시켜야 — 그렇지 않으면 손상값 5건이 cap 통과,
+  // 정상 6번째 drop → enum 필터 후 빈 결과. raw에서 enum→dedup→cap 순.
+  const { loadValidatedMetaUsage } = await import("../app/lib/storage.ts");
+  mem.set(
+    "pwc_meta_usage_v1",
+    JSON.stringify({
+      school_level: [],
+      subject: [
+        // 최신 5건이 모두 enum 외("???") — 잘못된 값.
+        { value: "???", count: 1, last_used_at: "2026-06-02T15:00:00+09:00" },
+        { value: "???", count: 1, last_used_at: "2026-06-02T14:00:00+09:00" },
+        { value: "???", count: 1, last_used_at: "2026-06-02T13:00:00+09:00" },
+        { value: "???", count: 1, last_used_at: "2026-06-02T12:00:00+09:00" },
+        { value: "???", count: 1, last_used_at: "2026-06-02T11:00:00+09:00" },
+        // 6번째는 enum 내 정상 값. cap이 enum 필터보다 먼저면 drop 됐을 것.
+        { value: "국어", count: 3, last_used_at: "2026-06-01T10:00:00+09:00" },
+      ],
+      genre: [],
+      target_raw: [],
+    }),
+  );
+  const usage = loadValidatedMetaUsage();
+  assert.equal(usage.subject.length, 1, "정상 1건만 남아야 함");
+  assert.equal(usage.subject[0].value, "국어");
+});
+
 test("recordMetaUsage — quota 초과 시 throw 안 함(silent)", () => {
   mode = "quota";
   // 첫 호출은 LS read는 되지만 write quota에서 실패 — throw 없이 silent.

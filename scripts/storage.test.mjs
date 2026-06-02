@@ -182,6 +182,59 @@ test("clear → load = null", () => {
   assert.equal(loadProfile(), null);
 });
 
+test("saveProfile — 신규 생성 시 메타 LRU 초기화 (Codex PR #56 공용 기기 격리)", () => {
+  // 이전 사용자의 메타 LRU만 남고 profile은 비어 있는 공용 기기 상태 시뮬레이션.
+  storageMock.setItem(
+    "pwc_meta_usage_v1",
+    JSON.stringify({
+      school_level: [{ value: "고1", count: 5, last_used_at: "2026-05-28T10:00:00+09:00" }],
+      subject: [{ value: "사회", count: 3, last_used_at: "2026-05-28T10:00:00+09:00" }],
+      genre: [],
+      target_raw: [],
+    }),
+  );
+  // 새 사용자 등록(첫 profile 생성)
+  const result = saveProfile({
+    nickname: "준호",
+    school_level: "중2",
+    primary_subject: "국어",
+    consent_at: "2026-06-02T10:00:00+09:00",
+  });
+  assert.deepEqual(result, { ok: true });
+  // 메타 LRU는 비워져 있어야 함 — 이전 사용자 이력이 새 사용자에게 새지 않음.
+  assert.equal(storageMock.getItem("pwc_meta_usage_v1"), null);
+});
+
+test("saveProfile — 기존 프로필 업데이트 시 메타 LRU 보존 (본인 데이터)", () => {
+  // 첫 저장 — 메타 비어있는 상태이므로 clear는 noop.
+  saveProfile({
+    nickname: "준호",
+    school_level: "중2",
+    primary_subject: "국어",
+    consent_at: "2026-06-02T10:00:00+09:00",
+  });
+  // 그 후 본인이 메타 누적.
+  storageMock.setItem(
+    "pwc_meta_usage_v1",
+    JSON.stringify({
+      school_level: [{ value: "중2", count: 5, last_used_at: "2026-06-02T11:00:00+09:00" }],
+      subject: [{ value: "국어", count: 5, last_used_at: "2026-06-02T11:00:00+09:00" }],
+      genre: [],
+      target_raw: [],
+    }),
+  );
+  // /me에서 프로필 수정 — 기존 profile 있으므로 메타 유지돼야 함.
+  saveProfile({
+    nickname: "준호",
+    school_level: "중3",
+    primary_subject: "국어",
+    consent_at: "2026-06-02T10:00:00+09:00",
+  });
+  const meta = JSON.parse(storageMock.getItem("pwc_meta_usage_v1"));
+  assert.equal(meta.school_level.length, 1);
+  assert.equal(meta.school_level[0].value, "중2");
+});
+
 test("loadProfile — JSON 손상 시 null (조용한 폴백)", () => {
   storageMock.setItem("pwc_profile_v1", "{not json");
   assert.equal(loadProfile(), null);
