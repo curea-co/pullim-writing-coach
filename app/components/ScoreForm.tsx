@@ -721,7 +721,7 @@ export default function ScoreForm({
             id="body-file-upload"
             name="body-file-upload"
             type="file"
-            accept=".txt,.md,.markdown,.docx,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            accept=".txt,.md,.markdown,.docx,.hwp,.hwpx,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             onChange={handleFileInput}
             className="hidden"
             aria-label="텍스트·DOCX 파일 업로드"
