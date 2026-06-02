@@ -60,8 +60,10 @@ export function saveProfile(profile: Profile): { ok: true } | { ok: false; reaso
   //   이전 사용자의 메타 LRU가 그대로 남아 있으면 새 사용자의 /try에 그대로 prefill — 누출.
   //   기존 profile이 없는 상태에서의 save는 "새 사용자 등록" → 메타 초기화로 격리.
   //   기존 profile 업데이트(/me 저장)는 본인이므로 메타 유지.
+  //   "기존 profile 부재" 판정은 loadProfile() 기준 — 손상/스키마 깨진 값이 있어도 화면이
+  //   no-profile로 취급하면 onboarding 경로가 열리므로 그것도 신규 생성으로 본다.
   try {
-    const isFirstCreate = window.localStorage.getItem(PROFILE_KEY) === null;
+    const isFirstCreate = loadProfile() === null;
     window.localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
     if (isFirstCreate) {
       try {
