@@ -721,10 +721,10 @@ export default function ScoreForm({
             id="body-file-upload"
             name="body-file-upload"
             type="file"
-            accept=".txt,.md,.markdown,.docx,.hwp,.hwpx,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            accept=".txt,.md,.markdown,.docx,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             onChange={handleFileInput}
             className="hidden"
-            aria-label="텍스트·DOCX·HWP 파일 업로드"
+            aria-label="텍스트·DOCX 파일 업로드"
           />
           <button
             type="button"
@@ -738,7 +738,7 @@ export default function ScoreForm({
             📎 파일 업로드 (.txt·.md·.docx)
           </button>
           <span className="text-subtle-foreground text-[11px]">
-            또는 위 영역에 끌어다 놓으세요. HWP는 DOCX 변환 후 / 사진·링크는 추후 추가 예정.
+            또는 위 영역에 끌어다 놓으세요. HWP·사진·링크는 추후 추가 예정.
           </span>
         </div>
         {fileError && (

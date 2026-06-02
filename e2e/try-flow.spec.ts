@@ -61,6 +61,16 @@ test.describe("/try 동선 happy path (paradigm v1 wizard)", () => {
   });
 
   test("Step 1 → Step 2 → Step 3 (loading → result) full path", async ({ page }) => {
+    // Codex PR #51: mock 응답을 800ms 지연시켜 loading UI 회귀까지 검증.
+    await page.unroute("**/api/score");
+    await page.route("**/api/score", async (route) => {
+      await new Promise((r) => setTimeout(r, 800));
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_OUTPUT),
+      });
+    });
     await page.goto("/try");
 
     // Step 1
@@ -84,7 +94,10 @@ test.describe("/try 동선 happy path (paradigm v1 wizard)", () => {
     await expect(submitBtn).toBeEnabled();
     await submitBtn.click();
 
-    // Step 3 — 결과 표시 (mock API 즉시 응답). 총점은 #result-score 안의 큰 숫자.
+    // Step 3 — loading UI 회귀(스피너 카피)부터 검증.
+    await expect(page.getByText(/AI가 5가지 기준으로 글을 읽고 있어요/)).toBeVisible();
+
+    // 결과 표시 (mock 800ms 지연 후 fulfill → loading → result).
     await expect(page.locator("#result-score")).toBeVisible({ timeout: 10_000 });
     await expect(page.locator("#result-score").getByText("75").first()).toBeVisible();
     // 5영역 + 수정 가이드 노출 — guide 섹션은 스크롤 아래 있어 scrollIntoView 후 검증.
