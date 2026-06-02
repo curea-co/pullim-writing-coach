@@ -47,6 +47,7 @@ import {
 } from "@/app/lib/progress";
 import MetaForm from "./MetaForm";
 import ResultView from "./ResultView";
+import Stepper from "./Stepper";
 import TextPreviewCard from "./TextPreviewCard";
 import { DEMO_TOKEN_KEY } from "./TokenGate";
 
@@ -1025,45 +1026,4 @@ export default function ScoreForm({
     </div>
   );
 }
-
-// ── Stepper — Step 1·2·3 시각 진척 (#M3 E) ────────────────────────────
-function Stepper({ current }: { current: 1 | 2 | 3 }) {
-  const items: { n: 1 | 2; label: string }[] = [
-    { n: 1, label: "글 입력" },
-    { n: 2, label: "과제 정보" },
-  ];
-  return (
-    <nav aria-label="진행 단계" className="flex items-center gap-2">
-      {items.map((it, i) => {
-        const active = it.n === current;
-        const done = it.n < current;
-        return (
-          <span key={it.n} className="flex items-center gap-2">
-            <span
-              className={cn(
-                "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums",
-                active && "bg-primary text-primary-foreground",
-                done && "bg-band-good text-white",
-                !active && !done && "bg-muted text-muted-foreground",
-              )}
-              aria-current={active ? "step" : undefined}
-            >
-              {done ? "✓" : it.n}
-            </span>
-            <span
-              className={cn(
-                "text-xs",
-                active ? "text-foreground font-semibold" : "text-muted-foreground",
-              )}
-            >
-              {it.label}
-            </span>
-            {i < items.length - 1 && (
-              <span aria-hidden className="bg-border mx-1 h-px w-6" />
-            )}
-          </span>
-        );
-      })}
-    </nav>
-  );
-}
+// Stepper 컴포넌트는 ./Stepper로 추출 (단위 테스트 가능 + 단일 책임). 2026-06-02.
