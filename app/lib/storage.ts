@@ -478,14 +478,17 @@ function emptyMetaUsage(): MetaUsage {
   return { school_level: [], subject: [], genre: [], target_raw: [] };
 }
 
+// Codex PR #56: NaN/음수/빈 last_used_at도 typeof만 보면 통과해 UI에서 ×NaN 또는
+// 정렬 깨짐 발생. 추가 검증으로 손상 항목을 input 단계에서 차단.
 function isMetaUsageEntry(v: unknown): v is MetaUsageEntry {
   if (typeof v !== "object" || v === null) return false;
   const o = v as Record<string, unknown>;
-  return (
-    typeof o.value === "string" &&
-    typeof o.count === "number" &&
-    typeof o.last_used_at === "string"
-  );
+  if (typeof o.value !== "string" || o.value.length === 0) return false;
+  if (typeof o.count !== "number" || !Number.isFinite(o.count) || o.count <= 0) return false;
+  if (typeof o.last_used_at !== "string" || o.last_used_at.length === 0) return false;
+  // ISO 8601 + KST 형식 (consentNow): YYYY-MM-DDTHH:MM:SS...+09:00 또는 Z. 느슨하지만 빈/숫자/random 거부.
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:/.test(o.last_used_at)) return false;
+  return true;
 }
 
 function isMetaUsage(v: unknown): v is MetaUsage {
