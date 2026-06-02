@@ -586,8 +586,10 @@ function isValidMetaValue(field: MetaField, value: string): boolean {
 
 // 최빈값 — count 우선, 동률은 last_used_at(최신 우선). 없으면 null.
 // Codex PR #41: enum 외 손상값은 폴백 무시(다음 유효 항목 시도, 없으면 null).
+// Codex PR #56: loadValidatedMetaUsage()와 동일 경로 — enum 필터를 cap 전에 적용해야
+//   최신 5건이 손상값이고 6번째가 정상인 케이스에서 정상값이 prefill에 살아남음.
 export function getMostUsedMeta(field: MetaField): string | null {
-  const list = loadMetaUsage()[field].filter((e) => isValidMetaValue(field, e.value));
+  const list = loadValidatedMetaUsage()[field];
   if (list.length === 0) return null;
   // count desc, last_used_at desc
   const sorted = [...list].sort((a, b) => {
