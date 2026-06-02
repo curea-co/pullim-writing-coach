@@ -49,6 +49,8 @@ export default function MePage() {
   if (state === "loading") return null;
 
   if (state === "missing") {
+    // Codex PR #56: 프로필이 없어도 메타 사용 이력은 별도 LRU(recordMetaUsage = profile 의존 X).
+    //   여기서도 MetaUsageCard 렌더 — 학습된 패턴이 있으면 "내 패턴" 인지 + 온보딩 유인 강화.
     return (
       <main className="mx-auto w-full max-w-md px-5 py-8">
         <h1 className="text-foreground text-2xl font-bold">내 정보</h1>
@@ -67,6 +69,7 @@ export default function MePage() {
             온보딩 시작하기
           </Link>
         </div>
+        <MetaUsageCard />
       </main>
     );
   }

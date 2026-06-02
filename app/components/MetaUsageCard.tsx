@@ -1,16 +1,19 @@
 "use client";
 // MetaUsageCard — /me에서 학생의 학습된 사용 이력(자주 쓰는 학년·과목·장르·목표 분량) 시각화.
-//   데이터: storage.ts loadMetaUsage (#41 LRU). 이미 채점 성공마다 recordMetaUsage로 학습.
+//   데이터: storage.ts loadValidatedMetaUsage (#41 LRU + Codex PR #56 enum/범위 필터).
 //   UX: 사용자가 "내 패턴이 학습됐다" 인지 → /try 진입 시 자연 prefill을 의식적으로 신뢰.
 //
 // 빈 상태: "아직 학습된 패턴이 없어요" + /try 안내. 결과 없으면 cards X.
+//
+// Codex PR #56: 손상/오래된 LS 값(enum 외, 범위 밖)을 그대로 노출하면 /try prefill 로직
+//   (getMostUsedMeta = 동일 필터)과 어긋남. loadValidatedMetaUsage로 일관 필터링.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   type MetaField,
   type MetaUsage,
-  loadMetaUsage,
+  loadValidatedMetaUsage,
 } from "@/app/lib/storage";
 
 const FIELD_LABELS: Record<MetaField, string> = {
@@ -24,7 +27,7 @@ export default function MetaUsageCard() {
   const [usage, setUsage] = useState<MetaUsage | null>(null);
 
   useEffect(() => {
-    setUsage(loadMetaUsage());
+    setUsage(loadValidatedMetaUsage());
   }, []);
 
   // 마운트 전(SSR snapshot)에는 안 그림 — hydration mismatch 방지.

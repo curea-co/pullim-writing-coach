@@ -568,6 +568,19 @@ export function getMostUsedMeta(field: MetaField): string | null {
   return sorted[0].value;
 }
 
+// Codex PR #56: MetaUsageCard·기타 UI에서 손상 LS 값 노출 방지용 필터링 진입점.
+//   `loadMetaUsage`(원본 — 디버그/툴 용도) ↔ `loadValidatedMetaUsage`(UI 안전).
+//   getMostUsedMeta와 동일 필터(`isValidMetaValue`) 적용 → /try prefill ↔ /me 노출 일관.
+export function loadValidatedMetaUsage(): MetaUsage {
+  const raw = loadMetaUsage();
+  const fields: MetaField[] = ["school_level", "subject", "genre", "target_raw"];
+  const filtered = emptyMetaUsage();
+  for (const f of fields) {
+    filtered[f] = raw[f].filter((e) => isValidMetaValue(f, e.value));
+  }
+  return filtered;
+}
+
 export function clearMetaUsage(): void {
   if (typeof window === "undefined") return;
   try {
