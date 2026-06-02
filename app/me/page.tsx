@@ -29,6 +29,18 @@ export default function MePage() {
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  const handleDelete = () => {
+    // Codex PR #25/#29: 삭제 범위가 profile만이라 "프로필·이력 삭제" 카피와 실제 동작 불일치였음.
+    // 5개 LS 키 모두 clear — 학생/공용 기기에서 "모두 지웠다"는 약속을 실제 보장.
+    // Codex PR #56: missing 분기에서도 호출 — MetaUsageCard로 노출되는 학습 이력 삭제 동선 제공.
+    clearProfile();
+    clearDraft();
+    clearAllRevisions();
+    clearAllResults();
+    clearMetaUsage();
+    router.push("/");
+  };
+
   useEffect(() => {
     const p = loadProfile();
     if (p) {
@@ -51,6 +63,7 @@ export default function MePage() {
   if (state === "missing") {
     // Codex PR #56: 프로필이 없어도 메타 사용 이력은 별도 LRU(recordMetaUsage = profile 의존 X).
     //   여기서도 MetaUsageCard 렌더 — 학습된 패턴이 있으면 "내 패턴" 인지 + 온보딩 유인 강화.
+    //   공용 기기/이전 사용자 흔적 노출 위험 → 동일 삭제 동선도 같이 제공(loaded와 동일 섹션).
     return (
       <main className="mx-auto w-full max-w-md px-5 py-8">
         <h1 className="text-foreground text-2xl font-bold">내 정보</h1>
@@ -70,6 +83,11 @@ export default function MePage() {
           </Link>
         </div>
         <MetaUsageCard />
+        <DataDeleteSection
+          confirmDelete={confirmDelete}
+          setConfirmDelete={setConfirmDelete}
+          onDelete={handleDelete}
+        />
       </main>
     );
   }
@@ -101,17 +119,6 @@ export default function MePage() {
           : "브라우저가 저장을 막고 있어요. 시크릿(비공개) 모드라면 일반 창에서 시도해 주세요.",
       );
     }
-  };
-
-  const handleDelete = () => {
-    // Codex PR #25/#29: 삭제 범위가 profile만이라 "프로필·이력 삭제" 카피와 실제 동작 불일치였음.
-    // 5개 LS 키 모두 clear — 학생/공용 기기에서 "모두 지웠다"는 약속을 실제 보장.
-    clearProfile();
-    clearDraft();
-    clearAllRevisions();
-    clearAllResults();
-    clearMetaUsage();
-    router.push("/");
   };
 
   return (
@@ -158,47 +165,67 @@ export default function MePage() {
       {/* #9 LRU 시각화 — 자주 쓰는 학년·과목·장르·목표 분량 학습 이력 (#41 데이터 기반) */}
       <MetaUsageCard />
 
-      {/* 데이터 삭제 영역 — 시각적으로 분리(band-warn 톤). 2-step confirm 사고 방지. */}
-      <section className="border-band-warn-surface bg-band-warn-surface/30 mt-10 rounded-xl border p-5">
-        <h2 className="text-band-warn-foreground text-sm font-semibold">데이터 삭제</h2>
-        <p className="text-muted-foreground break-keep mt-2 text-justify text-xs leading-relaxed">
-          이 브라우저에 저장된 <strong className="text-foreground">모든 데이터</strong>를 지웁니다:
-          프로필·동의 기록, 본문 임시 저장본, 수정 이력, 채점 결과(최대 20건), 자주 쓰는 메타.
-          이 작업은 되돌릴 수 없습니다.
-        </p>
-
-        {!confirmDelete ? (
-          <button
-            type="button"
-            onClick={() => setConfirmDelete(true)}
-            className="border-band-warn text-band-warn-foreground hover:bg-band-warn-surface mt-4 inline-flex h-10 items-center rounded-lg border px-4 text-xs font-semibold"
-          >
-            데이터 삭제하기
-          </button>
-        ) : (
-          <div className="border-band-warn bg-surface mt-4 rounded-lg border p-3">
-            <p className="text-foreground text-xs font-semibold">
-              정말 모든 데이터를 지울까요?
-            </p>
-            <div className="mt-3 flex gap-2">
-              <button
-                type="button"
-                onClick={handleDelete}
-                className="bg-band-warn hover:bg-band-warn/90 inline-flex h-9 items-center rounded-lg px-4 text-xs font-semibold text-white"
-              >
-                네, 삭제할게요
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmDelete(false)}
-                className="border-border bg-surface text-foreground hover:bg-muted inline-flex h-9 items-center rounded-lg border px-4 text-xs font-medium"
-              >
-                취소
-              </button>
-            </div>
-          </div>
-        )}
-      </section>
+      <DataDeleteSection
+        confirmDelete={confirmDelete}
+        setConfirmDelete={setConfirmDelete}
+        onDelete={handleDelete}
+      />
     </main>
+  );
+}
+
+// 데이터 삭제 영역 — 시각적으로 분리(band-warn 톤). 2-step confirm 사고 방지.
+// Codex PR #56: missing 분기에서도 동일하게 노출 — MetaUsageCard로 보이는 학습 이력을
+// 공용 기기에서 지울 수 있는 동선 보장.
+function DataDeleteSection({
+  confirmDelete,
+  setConfirmDelete,
+  onDelete,
+}: {
+  confirmDelete: boolean;
+  setConfirmDelete: (v: boolean) => void;
+  onDelete: () => void;
+}) {
+  return (
+    <section className="border-band-warn-surface bg-band-warn-surface/30 mt-10 rounded-xl border p-5">
+      <h2 className="text-band-warn-foreground text-sm font-semibold">데이터 삭제</h2>
+      <p className="text-muted-foreground break-keep mt-2 text-justify text-xs leading-relaxed">
+        이 브라우저에 저장된 <strong className="text-foreground">모든 데이터</strong>를 지웁니다:
+        프로필·동의 기록, 본문 임시 저장본, 수정 이력, 채점 결과(최대 20건), 자주 쓰는 메타.
+        이 작업은 되돌릴 수 없습니다.
+      </p>
+
+      {!confirmDelete ? (
+        <button
+          type="button"
+          onClick={() => setConfirmDelete(true)}
+          className="border-band-warn text-band-warn-foreground hover:bg-band-warn-surface mt-4 inline-flex h-10 items-center rounded-lg border px-4 text-xs font-semibold"
+        >
+          데이터 삭제하기
+        </button>
+      ) : (
+        <div className="border-band-warn bg-surface mt-4 rounded-lg border p-3">
+          <p className="text-foreground text-xs font-semibold">
+            정말 모든 데이터를 지울까요?
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={onDelete}
+              className="bg-band-warn hover:bg-band-warn/90 inline-flex h-9 items-center rounded-lg px-4 text-xs font-semibold text-white"
+            >
+              네, 삭제할게요
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(false)}
+              className="border-border bg-surface text-foreground hover:bg-muted inline-flex h-9 items-center rounded-lg border px-4 text-xs font-medium"
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
