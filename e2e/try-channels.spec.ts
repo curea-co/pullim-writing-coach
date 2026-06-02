@@ -83,6 +83,17 @@ test.describe("/try 채널·복원·resubmit (트랙 A 회귀 확장)", () => {
     await expect(page.locator("#body")).toHaveValue(VALID_DRAFT_BODY);
     // 배너 사라짐
     await expect(page.getByText("📝 이전에 쓰던 작업이 있어요")).not.toBeVisible();
+
+    // Codex PR #52: applyRestore가 함께 복원하는 메타·target·promptText 모두 검증.
+    // Step 2 진입해 MetaForm 필드 확인.
+    await page.getByRole("button", { name: /다음 단계/ }).click();
+    await expect(page.locator("#school-level")).toHaveValue("중2");
+    await expect(page.locator("#subject")).toHaveValue("국어");
+    await expect(page.locator("#genre")).toHaveValue("논설문·주장하는 글");
+    await expect(page.locator("#target")).toHaveValue("600");
+    await expect(page.locator("#prompt")).toHaveValue(
+      "교복 자율화에 대한 자신의 주장을 근거 2개 이상으로 쓰시오.",
+    );
   });
 
   test("Draft 복원 배너 — [새로 시작] 클릭 시 LS clear + 배너 닫힘", async ({ page, context }) => {
@@ -106,6 +117,8 @@ test.describe("/try 채널·복원·resubmit (트랙 A 회귀 확장)", () => {
   test("결과 후 handleResubmit — Step 3 → Step 1 복귀 + body·meta 유지", async ({ page }) => {
     await page.goto("/try");
     const body = "오늘 학교에서 글을 썼고, 충분히 긴 본문이라 채점 받을 수 있습니다. 50자 이상 검증 OK.";
+    const prompt = "주장을 근거 2개로 쓰시오 — 충분한 길이";
+    const target = "800";
     await page.locator("#body").fill(body);
     await page.getByRole("button", { name: /다음 단계/ }).click();
 
@@ -113,9 +126,8 @@ test.describe("/try 채널·복원·resubmit (트랙 A 회귀 확장)", () => {
     await page.locator("#school-level").selectOption("중2");
     await page.locator("#subject").selectOption("국어");
     await page.locator("#genre").selectOption("논설문·주장하는 글");
-    await page
-      .locator("#prompt")
-      .fill("주장을 근거 2개로 쓰시오 — 충분한 길이");
+    await page.locator("#target").fill(target);
+    await page.locator("#prompt").fill(prompt);
 
     await page.getByRole("button", { name: "AI 첨삭 받기" }).click();
 
@@ -127,22 +139,26 @@ test.describe("/try 채널·복원·resubmit (트랙 A 회귀 확장)", () => {
     await resubmitBtn.scrollIntoViewIfNeeded();
     await resubmitBtn.click();
 
-    // Step 1으로 복귀 — body·meta 유지
+    // Step 1으로 복귀 — body 유지
     await expect(page.getByRole("heading", { name: "1. 글을 넣어 주세요" })).toBeVisible();
     await expect(page.locator("#body")).toHaveValue(body);
-    // school·subject·genre·prompt는 여전히 메타에 있음 — Step 2 진입해서 확인
+    // Codex PR #52: Step 2 진입해 모든 메타 필드(school·subject·genre·target·prompt) 유지 검증.
     await page.getByRole("button", { name: /다음 단계/ }).click();
     await expect(page.locator("#school-level")).toHaveValue("중2");
     await expect(page.locator("#subject")).toHaveValue("국어");
+    await expect(page.locator("#genre")).toHaveValue("논설문·주장하는 글");
+    await expect(page.locator("#target")).toHaveValue(target);
+    await expect(page.locator("#prompt")).toHaveValue(prompt);
   });
 
-  test("자동저장 인디케이터 — 800ms 후 'M/D HH:MM' 표시", async ({ page }) => {
+  test("자동저장 인디케이터 — 800ms debounce 후 'M/D HH:MM' 포맷 표시", async ({ page }) => {
     await page.goto("/try");
     const body = "자동저장 테스트 본문입니다. 충분히 길게 작성하여 BODY_MIN 50자를 넘기도록 합니다.";
     await page.locator("#body").fill(body);
 
-    // 800ms debounce 후 saveDraft 실행 → setLastSavedAt → 인디케이터 표시
-    await page.waitForTimeout(1200);
-    await expect(page.getByText(/자동 저장됨/)).toBeVisible();
+    // Codex PR #52: waitForTimeout(고정 1200ms) 대신 toBeVisible 자동 대기 — flaky 회피.
+    // 인디케이터 포맷 "자동 저장됨 · M/D HH:MM" 직접 매칭(formatSavedAt 회귀 동시 검증).
+    const indicator = page.getByText(/자동 저장됨 · \d{1,2}\/\d{1,2} \d{2}:\d{2}/);
+    await expect(indicator).toBeVisible({ timeout: 5_000 });
   });
 });
