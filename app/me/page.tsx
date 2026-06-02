@@ -61,9 +61,10 @@ export default function MePage() {
   if (state === "loading") return null;
 
   if (state === "missing") {
-    // Codex PR #56: 프로필이 없어도 메타 사용 이력은 별도 LRU(recordMetaUsage = profile 의존 X).
-    //   여기서도 MetaUsageCard 렌더 — 학습된 패턴이 있으면 "내 패턴" 인지 + 온보딩 유인 강화.
-    //   공용 기기/이전 사용자 흔적 노출 위험 → 동일 삭제 동선도 같이 제공(loaded와 동일 섹션).
+    // Codex PR #56: 공용 기기 보호 — missing 분기는 "내 프로필 없음" = 새 사용자 또는 공용 기기.
+    //   이전 사용자의 LRU 최빈값을 자동 노출하면 1회 노출은 막지 못함. MetaUsageCard 숨김.
+    //   대신 데이터 삭제 동선을 노출 → 이전 사용자 흔적을 "보지 않고도" 지울 수 있음.
+    //   (학습 이력 자체는 prefill 우선순위 profile > LRU에서 여전히 활용 — UI 노출만 차단.)
     return (
       <main className="mx-auto w-full max-w-md px-5 py-8">
         <h1 className="text-foreground text-2xl font-bold">내 정보</h1>
@@ -82,7 +83,6 @@ export default function MePage() {
             온보딩 시작하기
           </Link>
         </div>
-        <MetaUsageCard />
         <DataDeleteSection
           confirmDelete={confirmDelete}
           setConfirmDelete={setConfirmDelete}
