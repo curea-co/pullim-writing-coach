@@ -79,25 +79,40 @@ export default function ExportButtons({
       const canvas = await capture();
       const { jsPDF } = await import("jspdf");
       // A4 세로(210x297mm), 좌우상하 10mm 여백 → 콘텐츠 영역 190x277mm.
-      const imgData = canvas.toDataURL("image/png");
       const pdfWidth = 190;
       const pageContentHeight = 277;
       const aspect = canvas.height / canvas.width;
       const imgHeightMm = pdfWidth * aspect;
       const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
 
-      // Codex PR #13: 결과가 한 페이지 넘는 경우 자동 분할 — 이전엔 잘려나갔음.
-      // 방식: negative y-offset addImage로 페이지마다 이미지 다른 부분 노출(PDF 뷰어가 페이지
-      // 경계 밖 클리핑). 단점: 파일 사이즈가 페이지 수만큼 증가(데모 1~2페이지 케이스 OK).
       if (imgHeightMm <= pageContentHeight) {
-        pdf.addImage(imgData, "PNG", 10, 10, pdfWidth, imgHeightMm);
+        // 단일 페이지 — 원본 그대로.
+        pdf.addImage(canvas.toDataURL("image/png"), "PNG", 10, 10, pdfWidth, imgHeightMm);
       } else {
-        let yOffsetMm = 0;
+        // #10 멀티페이지 캔버스 슬라이싱 — 페이지마다 해당 구간만 잘라 addImage.
+        //   이전 negative y-offset 방식(PR #48)은 같은 이미지를 N번 embed → 파일 사이즈 N배.
+        //   슬라이싱은 각 페이지가 고유 PNG라 사이즈 1배. 메모리 비용은 페이지 수×슬라이스 캔버스.
+        const pageHeightPx = Math.floor(pageContentHeight * (canvas.width / pdfWidth));
+        let yPx = 0;
         let pageNum = 0;
-        while (yOffsetMm < imgHeightMm) {
+        while (yPx < canvas.height) {
+          const sliceHeightPx = Math.min(pageHeightPx, canvas.height - yPx);
+          const sliceCanvas = document.createElement("canvas");
+          sliceCanvas.width = canvas.width;
+          sliceCanvas.height = sliceHeightPx;
+          const ctx = sliceCanvas.getContext("2d");
+          if (!ctx) throw new Error("Canvas 2D context not available");
+          // 원본 캔버스의 (0, yPx, width, sliceHeightPx) 영역을 sliceCanvas의 (0, 0)에 복사.
+          ctx.drawImage(
+            canvas,
+            0, yPx, canvas.width, sliceHeightPx,
+            0, 0, canvas.width, sliceHeightPx,
+          );
+          const sliceData = sliceCanvas.toDataURL("image/png");
+          const sliceHeightMm = (sliceHeightPx / canvas.width) * pdfWidth;
           if (pageNum > 0) pdf.addPage();
-          pdf.addImage(imgData, "PNG", 10, 10 - yOffsetMm, pdfWidth, imgHeightMm);
-          yOffsetMm += pageContentHeight;
+          pdf.addImage(sliceData, "PNG", 10, 10, pdfWidth, sliceHeightMm);
+          yPx += pageHeightPx;
           pageNum++;
         }
       }
