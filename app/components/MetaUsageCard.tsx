@@ -40,7 +40,7 @@ export default function MetaUsageCard() {
     <section className="border-border bg-surface mt-8 rounded-xl border p-5">
       <h2 className="text-foreground text-sm font-semibold">자주 쓰는 메타</h2>
       <p className="text-muted-foreground break-keep mt-1 text-xs leading-relaxed">
-        채점 받을 때마다 자동으로 학습돼요. 다음에 /try 진입 시 기본값으로 자연 prefill.
+        채점 받을 때마다 자동으로 학습돼요. /try 진입 시 프로필 값이 우선 적용되고, 비어 있는 항목은 여기 최빈값이 자연 prefill로 채워져요.
       </p>
 
       {totalEntries === 0 ? (

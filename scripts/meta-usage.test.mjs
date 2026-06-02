@@ -132,6 +132,34 @@ test("loadMetaUsage — 스키마 위반 → 빈 객체 폴백", () => {
   assert.equal(usage.genre.length, 0);
 });
 
+test("loadMetaUsage — 손상 엔트리 1건은 drop하고 나머지 유효 이력은 보존(필드별/엔트리별 정제)", () => {
+  // Codex PR #56 회귀 정정 검증: 이전 isMetaUsage() 통과 검사는 손상 1건에 전체 초기화.
+  // 정제 방식 — bad row만 제거, 나머지 살림.
+  mem.set(
+    "pwc_meta_usage_v1",
+    JSON.stringify({
+      school_level: [
+        { value: "중2", count: 5, last_used_at: "2026-06-02T10:00:00+09:00" },
+        { value: "중3", count: -1, last_used_at: "2026-05-30T10:00:00+09:00" }, // bad: 음수 count
+      ],
+      subject: [
+        { value: "국어", count: 3, last_used_at: "2026-06-02T10:00:00+09:00" },
+        { value: "사회", count: Number.NaN, last_used_at: "2026-06-01T10:00:00+09:00" }, // bad: NaN
+      ],
+      genre: [{ value: "논설문·주장하는 글", count: 2, last_used_at: "not-an-iso-date" }], // bad: invalid date
+      target_raw: [{ value: "600", count: 4, last_used_at: "2026-06-02T10:00:00+09:00" }], // 정상
+    }),
+  );
+  const usage = loadMetaUsage();
+  assert.equal(usage.school_level.length, 1, "중2(정상)만 살아남아야 함");
+  assert.equal(usage.school_level[0].value, "중2");
+  assert.equal(usage.subject.length, 1, "국어(정상)만 살아남아야 함");
+  assert.equal(usage.subject[0].value, "국어");
+  assert.equal(usage.genre.length, 0, "유효 엔트리 없으면 빈 배열");
+  assert.equal(usage.target_raw.length, 1);
+  assert.equal(usage.target_raw[0].value, "600");
+});
+
 test("recordMetaUsage — quota 초과 시 throw 안 함(silent)", () => {
   mode = "quota";
   // 첫 호출은 LS read는 되지만 write quota에서 실패 — throw 없이 silent.

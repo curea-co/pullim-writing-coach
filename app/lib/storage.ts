@@ -491,22 +491,25 @@ function isMetaUsageEntry(v: unknown): v is MetaUsageEntry {
   return true;
 }
 
-function isMetaUsage(v: unknown): v is MetaUsage {
-  if (typeof v !== "object" || v === null) return false;
-  const o = v as Record<string, unknown>;
-  const fields: MetaField[] = ["school_level", "subject", "genre", "target_raw"];
-  return fields.every(
-    (f) => Array.isArray(o[f]) && (o[f] as unknown[]).every(isMetaUsageEntry),
-  );
-}
-
+// Codex PR #56 회귀: 이전엔 isMetaUsage()로 전체 객체 통과 검사 → 손상 엔트리 1개에
+// 전체 LRU 이력이 emptyMetaUsage()로 초기화돼 회복력 0. 필드별/엔트리별 정제로 변경:
+// 잘못된 엔트리만 drop, 나머지 유효 이력은 살림.
 export function loadMetaUsage(): MetaUsage {
   if (typeof window === "undefined") return emptyMetaUsage();
   try {
     const raw = window.localStorage.getItem(META_USAGE_KEY);
     if (!raw) return emptyMetaUsage();
     const parsed = JSON.parse(raw);
-    return isMetaUsage(parsed) ? parsed : emptyMetaUsage();
+    if (typeof parsed !== "object" || parsed === null) return emptyMetaUsage();
+    const o = parsed as Record<string, unknown>;
+    const result = emptyMetaUsage();
+    const fields: MetaField[] = ["school_level", "subject", "genre", "target_raw"];
+    for (const f of fields) {
+      const arr = o[f];
+      if (!Array.isArray(arr)) continue;
+      result[f] = arr.filter(isMetaUsageEntry);
+    }
+    return result;
   } catch {
     return emptyMetaUsage();
   }
