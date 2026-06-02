@@ -491,9 +491,29 @@ function isMetaUsageEntry(v: unknown): v is MetaUsageEntry {
   return true;
 }
 
-// Codex PR #56 회귀: 이전엔 isMetaUsage()로 전체 객체 통과 검사 → 손상 엔트리 1개에
-// 전체 LRU 이력이 emptyMetaUsage()로 초기화돼 회복력 0. 필드별/엔트리별 정제로 변경:
-// 잘못된 엔트리만 drop, 나머지 유효 이력은 살림.
+// Codex PR #56: 손상 LS를 "전체 폐기" 대신 "부분 복구"로 처리하되, 불변식도 같이 복원:
+//   ① 엔트리 유효성 — isMetaUsageEntry(value/count/last_used_at)
+//   ② value 중복 merge — count 합산, last_used_at 더 최신 것 유지 (React key 충돌 방지)
+//   ③ LRU 5건 제한 — last_used_at desc로 정렬 후 상위 5건만 keep
+// 이렇게 해야 MetaUsageCard의 "LRU N/5" 표시가 항상 N≤5, 같은 value 중복 칩 렌더링 0.
+function dedupAndCapLRU(entries: MetaUsageEntry[]): MetaUsageEntry[] {
+  const byValue = new Map<string, MetaUsageEntry>();
+  for (const e of entries) {
+    const prev = byValue.get(e.value);
+    if (prev) {
+      prev.count += e.count;
+      if (e.last_used_at.localeCompare(prev.last_used_at) > 0) {
+        prev.last_used_at = e.last_used_at;
+      }
+    } else {
+      byValue.set(e.value, { value: e.value, count: e.count, last_used_at: e.last_used_at });
+    }
+  }
+  return [...byValue.values()]
+    .sort((a, b) => b.last_used_at.localeCompare(a.last_used_at))
+    .slice(0, MAX_META_USAGE_PER_FIELD);
+}
+
 export function loadMetaUsage(): MetaUsage {
   if (typeof window === "undefined") return emptyMetaUsage();
   try {
@@ -507,7 +527,7 @@ export function loadMetaUsage(): MetaUsage {
     for (const f of fields) {
       const arr = o[f];
       if (!Array.isArray(arr)) continue;
-      result[f] = arr.filter(isMetaUsageEntry);
+      result[f] = dedupAndCapLRU(arr.filter(isMetaUsageEntry));
     }
     return result;
   } catch {

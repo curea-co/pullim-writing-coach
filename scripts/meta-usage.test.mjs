@@ -160,6 +160,53 @@ test("loadMetaUsage — 손상 엔트리 1건은 drop하고 나머지 유효 이
   assert.equal(usage.target_raw[0].value, "600");
 });
 
+test("loadMetaUsage — 중복 value dedup (count 합산, last_used_at 더 최신)", () => {
+  // Codex PR #56: 손상 LS에 같은 value가 2건 이상 들어 있으면 React key 충돌 + 중복 칩.
+  mem.set(
+    "pwc_meta_usage_v1",
+    JSON.stringify({
+      school_level: [],
+      subject: [],
+      genre: [
+        { value: "설명문", count: 3, last_used_at: "2026-05-30T10:00:00+09:00" },
+        { value: "설명문", count: 2, last_used_at: "2026-06-02T10:00:00+09:00" },
+        { value: "감상문·독후감", count: 1, last_used_at: "2026-06-01T10:00:00+09:00" },
+      ],
+      target_raw: [],
+    }),
+  );
+  const usage = loadMetaUsage();
+  assert.equal(usage.genre.length, 2, "설명문 2건 → 1건으로 merge");
+  const merged = usage.genre.find((e) => e.value === "설명문");
+  assert.equal(merged.count, 5, "count는 3+2=5");
+  assert.equal(merged.last_used_at, "2026-06-02T10:00:00+09:00", "last_used_at는 더 최신");
+});
+
+test("loadMetaUsage — 6건 이상 유효 엔트리도 LRU 5건 cap 복원", () => {
+  // Codex PR #56: 변조된 LS에 6건 이상 들어 있으면 카드 'LRU 8/5' 같은 비정상 표시.
+  // load 단계에서 last_used_at desc로 정렬 후 상위 5건만 keep.
+  mem.set(
+    "pwc_meta_usage_v1",
+    JSON.stringify({
+      school_level: [],
+      subject: [],
+      genre: [
+        { value: "A", count: 1, last_used_at: "2026-05-28T10:00:00+09:00" }, // 가장 오래됨 → drop
+        { value: "B", count: 1, last_used_at: "2026-05-29T10:00:00+09:00" },
+        { value: "C", count: 1, last_used_at: "2026-05-30T10:00:00+09:00" },
+        { value: "D", count: 1, last_used_at: "2026-05-31T10:00:00+09:00" },
+        { value: "E", count: 1, last_used_at: "2026-06-01T10:00:00+09:00" },
+        { value: "F", count: 1, last_used_at: "2026-06-02T10:00:00+09:00" }, // 가장 최신
+      ],
+      target_raw: [],
+    }),
+  );
+  const usage = loadMetaUsage();
+  assert.equal(usage.genre.length, MAX_META_USAGE_PER_FIELD, "LRU 5건 cap");
+  const values = usage.genre.map((e) => e.value).sort();
+  assert.deepEqual(values, ["B", "C", "D", "E", "F"]);
+});
+
 test("recordMetaUsage — quota 초과 시 throw 안 함(silent)", () => {
   mode = "quota";
   // 첫 호출은 LS read는 되지만 write quota에서 실패 — throw 없이 silent.
