@@ -182,6 +182,30 @@ test("clear → load = null", () => {
   assert.equal(loadProfile(), null);
 });
 
+test("saveProfile — 메타 LRU 보존 (자동 초기화 X — 익명 사용자 학습 이력 보호)", () => {
+  // Codex PR #56 검토 결과 — 자동 메타 초기화는 동일 사용자가 익명으로 사용하다 나중에
+  // 온보딩하는 정상 경로에서 본인 학습 이력을 지움(target_raw는 복구 불가). 공용 기기
+  // 위험은 /me 명시 삭제 동선으로 처리. saveProfile은 LRU에 손대지 않는다.
+  storageMock.setItem(
+    "pwc_meta_usage_v1",
+    JSON.stringify({
+      school_level: [{ value: "중2", count: 5, last_used_at: "2026-06-02T11:00:00+09:00" }],
+      subject: [],
+      genre: [],
+      target_raw: [{ value: "800", count: 3, last_used_at: "2026-06-02T11:00:00+09:00" }],
+    }),
+  );
+  saveProfile({
+    nickname: "준호",
+    school_level: "중2",
+    primary_subject: "국어",
+    consent_at: "2026-06-02T10:00:00+09:00",
+  });
+  const meta = JSON.parse(storageMock.getItem("pwc_meta_usage_v1"));
+  assert.equal(meta.school_level[0].value, "중2");
+  assert.equal(meta.target_raw[0].value, "800");
+});
+
 test("loadProfile — JSON 손상 시 null (조용한 폴백)", () => {
   storageMock.setItem("pwc_profile_v1", "{not json");
   assert.equal(loadProfile(), null);

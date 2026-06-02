@@ -132,6 +132,108 @@ test("loadMetaUsage — 스키마 위반 → 빈 객체 폴백", () => {
   assert.equal(usage.genre.length, 0);
 });
 
+test("loadMetaUsage — 손상 엔트리 1건은 drop하고 나머지 유효 이력은 보존(필드별/엔트리별 정제)", () => {
+  // Codex PR #56 회귀 정정 검증: 이전 isMetaUsage() 통과 검사는 손상 1건에 전체 초기화.
+  // 정제 방식 — bad row만 제거, 나머지 살림.
+  mem.set(
+    "pwc_meta_usage_v1",
+    JSON.stringify({
+      school_level: [
+        { value: "중2", count: 5, last_used_at: "2026-06-02T10:00:00+09:00" },
+        { value: "중3", count: -1, last_used_at: "2026-05-30T10:00:00+09:00" }, // bad: 음수 count
+      ],
+      subject: [
+        { value: "국어", count: 3, last_used_at: "2026-06-02T10:00:00+09:00" },
+        { value: "사회", count: Number.NaN, last_used_at: "2026-06-01T10:00:00+09:00" }, // bad: NaN
+      ],
+      genre: [{ value: "논설문·주장하는 글", count: 2, last_used_at: "not-an-iso-date" }], // bad: invalid date
+      target_raw: [{ value: "600", count: 4, last_used_at: "2026-06-02T10:00:00+09:00" }], // 정상
+    }),
+  );
+  const usage = loadMetaUsage();
+  assert.equal(usage.school_level.length, 1, "중2(정상)만 살아남아야 함");
+  assert.equal(usage.school_level[0].value, "중2");
+  assert.equal(usage.subject.length, 1, "국어(정상)만 살아남아야 함");
+  assert.equal(usage.subject[0].value, "국어");
+  assert.equal(usage.genre.length, 0, "유효 엔트리 없으면 빈 배열");
+  assert.equal(usage.target_raw.length, 1);
+  assert.equal(usage.target_raw[0].value, "600");
+});
+
+test("loadMetaUsage — 중복 value dedup (count 합산, last_used_at 더 최신)", () => {
+  // Codex PR #56: 손상 LS에 같은 value가 2건 이상 들어 있으면 React key 충돌 + 중복 칩.
+  mem.set(
+    "pwc_meta_usage_v1",
+    JSON.stringify({
+      school_level: [],
+      subject: [],
+      genre: [
+        { value: "설명문", count: 3, last_used_at: "2026-05-30T10:00:00+09:00" },
+        { value: "설명문", count: 2, last_used_at: "2026-06-02T10:00:00+09:00" },
+        { value: "감상문·독후감", count: 1, last_used_at: "2026-06-01T10:00:00+09:00" },
+      ],
+      target_raw: [],
+    }),
+  );
+  const usage = loadMetaUsage();
+  assert.equal(usage.genre.length, 2, "설명문 2건 → 1건으로 merge");
+  const merged = usage.genre.find((e) => e.value === "설명문");
+  assert.equal(merged.count, 5, "count는 3+2=5");
+  assert.equal(merged.last_used_at, "2026-06-02T10:00:00+09:00", "last_used_at는 더 최신");
+});
+
+test("loadMetaUsage — 6건 이상 유효 엔트리도 LRU 5건 cap 복원", () => {
+  // Codex PR #56: 변조된 LS에 6건 이상 들어 있으면 카드 'LRU 8/5' 같은 비정상 표시.
+  // load 단계에서 last_used_at desc로 정렬 후 상위 5건만 keep.
+  mem.set(
+    "pwc_meta_usage_v1",
+    JSON.stringify({
+      school_level: [],
+      subject: [],
+      genre: [
+        { value: "A", count: 1, last_used_at: "2026-05-28T10:00:00+09:00" }, // 가장 오래됨 → drop
+        { value: "B", count: 1, last_used_at: "2026-05-29T10:00:00+09:00" },
+        { value: "C", count: 1, last_used_at: "2026-05-30T10:00:00+09:00" },
+        { value: "D", count: 1, last_used_at: "2026-05-31T10:00:00+09:00" },
+        { value: "E", count: 1, last_used_at: "2026-06-01T10:00:00+09:00" },
+        { value: "F", count: 1, last_used_at: "2026-06-02T10:00:00+09:00" }, // 가장 최신
+      ],
+      target_raw: [],
+    }),
+  );
+  const usage = loadMetaUsage();
+  assert.equal(usage.genre.length, MAX_META_USAGE_PER_FIELD, "LRU 5건 cap");
+  const values = usage.genre.map((e) => e.value).sort();
+  assert.deepEqual(values, ["B", "C", "D", "E", "F"]);
+});
+
+test("loadValidatedMetaUsage — 최신 N건이 enum 외(손상)여도 정상 이력 살아남음 (cap before enum 회귀 검증)", async () => {
+  // Codex PR #56: enum 필터를 cap 전에 통과시켜야 — 그렇지 않으면 손상값 5건이 cap 통과,
+  // 정상 6번째 drop → enum 필터 후 빈 결과. raw에서 enum→dedup→cap 순.
+  const { loadValidatedMetaUsage } = await import("../app/lib/storage.ts");
+  mem.set(
+    "pwc_meta_usage_v1",
+    JSON.stringify({
+      school_level: [],
+      subject: [
+        // 최신 5건이 모두 enum 외("???") — 잘못된 값.
+        { value: "???", count: 1, last_used_at: "2026-06-02T15:00:00+09:00" },
+        { value: "???", count: 1, last_used_at: "2026-06-02T14:00:00+09:00" },
+        { value: "???", count: 1, last_used_at: "2026-06-02T13:00:00+09:00" },
+        { value: "???", count: 1, last_used_at: "2026-06-02T12:00:00+09:00" },
+        { value: "???", count: 1, last_used_at: "2026-06-02T11:00:00+09:00" },
+        // 6번째는 enum 내 정상 값. cap이 enum 필터보다 먼저면 drop 됐을 것.
+        { value: "국어", count: 3, last_used_at: "2026-06-01T10:00:00+09:00" },
+      ],
+      genre: [],
+      target_raw: [],
+    }),
+  );
+  const usage = loadValidatedMetaUsage();
+  assert.equal(usage.subject.length, 1, "정상 1건만 남아야 함");
+  assert.equal(usage.subject[0].value, "국어");
+});
+
 test("recordMetaUsage — quota 초과 시 throw 안 함(silent)", () => {
   mode = "quota";
   // 첫 호출은 LS read는 되지만 write quota에서 실패 — throw 없이 silent.

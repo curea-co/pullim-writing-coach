@@ -115,6 +115,8 @@ export default function ScoreForm({
 }) {
   // 초기값 우선순위(#M3 ③): profile defaults > LRU 최빈값 > 빈 문자열.
   //   LRU는 채점 성공마다 recordMetaUsage가 학습 — 자주 쓴 학년·과목·장르·목표 분량을 자연 prefill.
+  //   /try는 익명 경로도 정상 지원 — no-profile 사용자에게도 본인의 직전 사용 패턴 prefill.
+  //   공용 기기 위험은 /me 데이터 삭제 동선(missing 분기에도 노출)으로 사용자가 인지·차단.
   const [schoolLevel, setSchoolLevel] = useState(
     () => defaults?.school_level ?? getMostUsedMeta("school_level") ?? "",
   );

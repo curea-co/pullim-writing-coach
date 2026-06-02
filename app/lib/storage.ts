@@ -56,6 +56,9 @@ export function loadProfile(): Profile | null {
 export function saveProfile(profile: Profile): { ok: true } | { ok: false; reason: "quota" | "denied" | "invalid" } {
   if (typeof window === "undefined") return { ok: false, reason: "denied" };
   if (!isProfile(profile)) return { ok: false, reason: "invalid" };
+  // Codex PR #56 검토 — 새 프로필 생성 시 메타 자동 초기화는 "동일 사용자가 익명으로 사용
+  //   하다 나중에 온보딩"하는 정상 경로의 학습 이력까지 지우는 회귀(특히 target_raw는 프로필
+  //   에서 복구 불가). 자동 격리는 거짓양성 비용이 너무 큼 — /me 명시 삭제 동선으로 충분.
   try {
     window.localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
     return { ok: true };
@@ -478,23 +481,40 @@ function emptyMetaUsage(): MetaUsage {
   return { school_level: [], subject: [], genre: [], target_raw: [] };
 }
 
+// Codex PR #56: NaN/음수/빈 last_used_at도 typeof만 보면 통과해 UI에서 ×NaN 또는
+// 정렬 깨짐 발생. 추가 검증으로 손상 항목을 input 단계에서 차단.
 function isMetaUsageEntry(v: unknown): v is MetaUsageEntry {
   if (typeof v !== "object" || v === null) return false;
   const o = v as Record<string, unknown>;
-  return (
-    typeof o.value === "string" &&
-    typeof o.count === "number" &&
-    typeof o.last_used_at === "string"
-  );
+  if (typeof o.value !== "string" || o.value.length === 0) return false;
+  if (typeof o.count !== "number" || !Number.isFinite(o.count) || o.count <= 0) return false;
+  if (typeof o.last_used_at !== "string" || o.last_used_at.length === 0) return false;
+  // ISO 8601 + KST 형식 (consentNow): YYYY-MM-DDTHH:MM:SS...+09:00 또는 Z. 느슨하지만 빈/숫자/random 거부.
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:/.test(o.last_used_at)) return false;
+  return true;
 }
 
-function isMetaUsage(v: unknown): v is MetaUsage {
-  if (typeof v !== "object" || v === null) return false;
-  const o = v as Record<string, unknown>;
-  const fields: MetaField[] = ["school_level", "subject", "genre", "target_raw"];
-  return fields.every(
-    (f) => Array.isArray(o[f]) && (o[f] as unknown[]).every(isMetaUsageEntry),
-  );
+// Codex PR #56: 손상 LS를 "전체 폐기" 대신 "부분 복구"로 처리하되, 불변식도 같이 복원:
+//   ① 엔트리 유효성 — isMetaUsageEntry(value/count/last_used_at)
+//   ② value 중복 merge — count 합산, last_used_at 더 최신 것 유지 (React key 충돌 방지)
+//   ③ LRU 5건 제한 — last_used_at desc로 정렬 후 상위 5건만 keep
+// 이렇게 해야 MetaUsageCard의 "LRU N/5" 표시가 항상 N≤5, 같은 value 중복 칩 렌더링 0.
+function dedupAndCapLRU(entries: MetaUsageEntry[]): MetaUsageEntry[] {
+  const byValue = new Map<string, MetaUsageEntry>();
+  for (const e of entries) {
+    const prev = byValue.get(e.value);
+    if (prev) {
+      prev.count += e.count;
+      if (e.last_used_at.localeCompare(prev.last_used_at) > 0) {
+        prev.last_used_at = e.last_used_at;
+      }
+    } else {
+      byValue.set(e.value, { value: e.value, count: e.count, last_used_at: e.last_used_at });
+    }
+  }
+  return [...byValue.values()]
+    .sort((a, b) => b.last_used_at.localeCompare(a.last_used_at))
+    .slice(0, MAX_META_USAGE_PER_FIELD);
 }
 
 export function loadMetaUsage(): MetaUsage {
@@ -503,7 +523,16 @@ export function loadMetaUsage(): MetaUsage {
     const raw = window.localStorage.getItem(META_USAGE_KEY);
     if (!raw) return emptyMetaUsage();
     const parsed = JSON.parse(raw);
-    return isMetaUsage(parsed) ? parsed : emptyMetaUsage();
+    if (typeof parsed !== "object" || parsed === null) return emptyMetaUsage();
+    const o = parsed as Record<string, unknown>;
+    const result = emptyMetaUsage();
+    const fields: MetaField[] = ["school_level", "subject", "genre", "target_raw"];
+    for (const f of fields) {
+      const arr = o[f];
+      if (!Array.isArray(arr)) continue;
+      result[f] = dedupAndCapLRU(arr.filter(isMetaUsageEntry));
+    }
+    return result;
   } catch {
     return emptyMetaUsage();
   }
@@ -557,8 +586,10 @@ function isValidMetaValue(field: MetaField, value: string): boolean {
 
 // 최빈값 — count 우선, 동률은 last_used_at(최신 우선). 없으면 null.
 // Codex PR #41: enum 외 손상값은 폴백 무시(다음 유효 항목 시도, 없으면 null).
+// Codex PR #56: loadValidatedMetaUsage()와 동일 경로 — enum 필터를 cap 전에 적용해야
+//   최신 5건이 손상값이고 6번째가 정상인 케이스에서 정상값이 prefill에 살아남음.
 export function getMostUsedMeta(field: MetaField): string | null {
-  const list = loadMetaUsage()[field].filter((e) => isValidMetaValue(field, e.value));
+  const list = loadValidatedMetaUsage()[field];
   if (list.length === 0) return null;
   // count desc, last_used_at desc
   const sorted = [...list].sort((a, b) => {
@@ -566,6 +597,35 @@ export function getMostUsedMeta(field: MetaField): string | null {
     return b.last_used_at.localeCompare(a.last_used_at);
   });
   return sorted[0].value;
+}
+
+// Codex PR #56: MetaUsageCard·기타 UI에서 손상 LS 값 노출 방지용 필터링 진입점.
+//   `loadMetaUsage`(schema 손상만 복구) ↔ `loadValidatedMetaUsage`(enum/범위까지).
+//   주의: enum 필터를 cap(LRU 5건) 적용 전에 통과시켜야 함 — 최신 5건이 모두 손상값이고
+//   6번째가 정상이면, cap이 enum 필터보다 먼저 일어나면 정상 이력이 영원히 잘림.
+//   raw LS에서 다시 읽어 enum 필터 → dedup → cap 순서 보장.
+export function loadValidatedMetaUsage(): MetaUsage {
+  if (typeof window === "undefined") return emptyMetaUsage();
+  try {
+    const raw = window.localStorage.getItem(META_USAGE_KEY);
+    if (!raw) return emptyMetaUsage();
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return emptyMetaUsage();
+    const o = parsed as Record<string, unknown>;
+    const result = emptyMetaUsage();
+    const fields: MetaField[] = ["school_level", "subject", "genre", "target_raw"];
+    for (const f of fields) {
+      const arr = o[f];
+      if (!Array.isArray(arr)) continue;
+      const valid = arr
+        .filter(isMetaUsageEntry)
+        .filter((e) => isValidMetaValue(f, e.value));
+      result[f] = dedupAndCapLRU(valid);
+    }
+    return result;
+  } catch {
+    return emptyMetaUsage();
+  }
 }
 
 export function clearMetaUsage(): void {
