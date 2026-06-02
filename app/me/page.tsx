@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import MetaUsageCard from "../components/MetaUsageCard";
 import ProfileForm, { type ProfileDraft } from "../components/ProfileForm";
 import {
   clearAllResults,
@@ -150,6 +151,9 @@ export default function MePage() {
         }}
         onSubmit={handleSubmit}
       />
+
+      {/* #9 LRU 시각화 — 자주 쓰는 학년·과목·장르·목표 분량 학습 이력 (#41 데이터 기반) */}
+      <MetaUsageCard />
 
       {/* 데이터 삭제 영역 — 시각적으로 분리(band-warn 톤). 2-step confirm 사고 방지. */}
       <section className="border-band-warn-surface bg-band-warn-surface/30 mt-10 rounded-xl border p-5">
