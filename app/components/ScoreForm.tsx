@@ -286,9 +286,18 @@ export default function ScoreForm({
       file.type === "text/plain" ||
       file.type === "text/markdown" ||
       /\.(txt|md|markdown)$/i.test(file.name);
+    // 한컴 HWP/HWPX 감지 — 클라 파싱 ecosystem 미성숙(hwp.js 5년 미유지)이라 친절한
+    // 변환 가이드로 안내. 학생이 즉시 액션 가능하도록.
+    const isHwp = /\.(hwp|hwpx)$/i.test(file.name);
+    if (isHwp) {
+      setFileError(
+        "HWP 파일은 아직 직접 읽지 못해요. 한컴오피스에서 [다른 이름으로 저장] → 형식을 DOCX(.docx)로 바꿔서 다시 올려 주세요. 또는 본문을 복사해 위 영역에 직접 붙여넣으셔도 돼요.",
+      );
+      return;
+    }
     if (!isDocx && !isTextLike) {
       setFileError(
-        "이 형식은 아직 지원하지 않아요(.txt·.md·.docx만 가능). HWP·사진·링크는 추후 추가 예정.",
+        "이 형식은 아직 지원하지 않아요(.txt·.md·.docx만 가능). 사진·링크는 추후 추가 예정.",
       );
       return;
     }
@@ -712,10 +721,10 @@ export default function ScoreForm({
             id="body-file-upload"
             name="body-file-upload"
             type="file"
-            accept=".txt,.md,.markdown,.docx,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            accept=".txt,.md,.markdown,.docx,.hwp,.hwpx,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             onChange={handleFileInput}
             className="hidden"
-            aria-label="텍스트 또는 DOCX 파일 업로드"
+            aria-label="텍스트·DOCX·HWP 파일 업로드"
           />
           <button
             type="button"
@@ -726,10 +735,10 @@ export default function ScoreForm({
               locked && "cursor-not-allowed opacity-60",
             )}
           >
-            📎 .txt·.md·.docx 파일 업로드
+            📎 파일 업로드 (.txt·.md·.docx)
           </button>
           <span className="text-subtle-foreground text-[11px]">
-            또는 위 영역에 끌어다 놓으세요. HWP·사진·링크는 추후 추가 예정.
+            또는 위 영역에 끌어다 놓으세요. HWP는 DOCX 변환 후 / 사진·링크는 추후 추가 예정.
           </span>
         </div>
         {fileError && (
