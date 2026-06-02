@@ -40,3 +40,60 @@ jobs:
 
       - name: Unit tests (normalizeBody·validate·guards)
         run: npm run test:unit
+
+  components:
+    name: Component tests (Vitest + RTL)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Component tests (MetaForm·TextPreviewCard·Stepper·WhyScoreToggle)
+        run: npm run test:components
+
+  e2e:
+    name: E2E tests (Playwright /try wizard)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      # Playwright 브라우저 binary는 별도 캐시 — package.json 변경 없어도 재사용.
+      - name: Get installed Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Playwright chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install OS deps (cache hit case)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      # webServer로 next dev 자동 기동 (config의 reuseExistingServer는 CI에선 false).
+      - name: E2E tests (/try wizard happy path + 채널·복원·resubmit)
+        run: npm run test:e2e
+        env:
+          CI: "true"
