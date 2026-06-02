@@ -20,3 +20,8 @@ if (typeof window !== "undefined" && !window.matchMedia) {
     }),
   });
 }
+
+// jsdom은 Element.scrollIntoView 미구현 — ScoreForm useEffect에서 호출, stub 없으면 TypeError.
+if (typeof Element !== "undefined" && !Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {};
+}
