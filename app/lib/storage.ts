@@ -56,22 +56,11 @@ export function loadProfile(): Profile | null {
 export function saveProfile(profile: Profile): { ok: true } | { ok: false; reason: "quota" | "denied" | "invalid" } {
   if (typeof window === "undefined") return { ok: false, reason: "denied" };
   if (!isProfile(profile)) return { ok: false, reason: "invalid" };
-  // Codex PR #56: 새 프로필 생성 시점 = 공용 기기에서 새 사용자일 가능성.
-  //   이전 사용자의 메타 LRU가 그대로 남아 있으면 새 사용자의 /try에 그대로 prefill — 누출.
-  //   기존 profile이 없는 상태에서의 save는 "새 사용자 등록" → 메타 초기화로 격리.
-  //   기존 profile 업데이트(/me 저장)는 본인이므로 메타 유지.
-  //   "기존 profile 부재" 판정은 loadProfile() 기준 — 손상/스키마 깨진 값이 있어도 화면이
-  //   no-profile로 취급하면 onboarding 경로가 열리므로 그것도 신규 생성으로 본다.
+  // Codex PR #56 검토 — 새 프로필 생성 시 메타 자동 초기화는 "동일 사용자가 익명으로 사용
+  //   하다 나중에 온보딩"하는 정상 경로의 학습 이력까지 지우는 회귀(특히 target_raw는 프로필
+  //   에서 복구 불가). 자동 격리는 거짓양성 비용이 너무 큼 — /me 명시 삭제 동선으로 충분.
   try {
-    const isFirstCreate = loadProfile() === null;
     window.localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-    if (isFirstCreate) {
-      try {
-        window.localStorage.removeItem(META_USAGE_KEY);
-      } catch {
-        /* 메타 clear 실패는 치명적이지 않음 — 다음 /me 로딩에서 사용자가 직접 지울 수 있음 */
-      }
-    }
     return { ok: true };
   } catch (e) {
     // QuotaExceededError 포함 — Profile은 작아서 거의 안 터지지만 방어.

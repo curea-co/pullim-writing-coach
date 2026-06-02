@@ -182,79 +182,28 @@ test("clear → load = null", () => {
   assert.equal(loadProfile(), null);
 });
 
-test("saveProfile — 신규 생성 시 메타 LRU 초기화 (Codex PR #56 공용 기기 격리)", () => {
-  // 이전 사용자의 메타 LRU만 남고 profile은 비어 있는 공용 기기 상태 시뮬레이션.
-  storageMock.setItem(
-    "pwc_meta_usage_v1",
-    JSON.stringify({
-      school_level: [{ value: "고1", count: 5, last_used_at: "2026-05-28T10:00:00+09:00" }],
-      subject: [{ value: "사회", count: 3, last_used_at: "2026-05-28T10:00:00+09:00" }],
-      genre: [],
-      target_raw: [],
-    }),
-  );
-  // 새 사용자 등록(첫 profile 생성)
-  const result = saveProfile({
-    nickname: "준호",
-    school_level: "중2",
-    primary_subject: "국어",
-    consent_at: "2026-06-02T10:00:00+09:00",
-  });
-  assert.deepEqual(result, { ok: true });
-  // 메타 LRU는 비워져 있어야 함 — 이전 사용자 이력이 새 사용자에게 새지 않음.
-  assert.equal(storageMock.getItem("pwc_meta_usage_v1"), null);
-});
-
-test("saveProfile — 손상된 기존 profile은 신규 생성으로 간주, 메타 초기화", () => {
-  // Codex PR #56: pwc_profile_v1이 남아 있어도 JSON 손상·스키마 위반이면 화면은 no-profile
-  // 취급 → onboarding 진입 가능. 그 경로의 첫 save도 신규 생성으로 간주해야 누출 차단.
-  storageMock.setItem("pwc_profile_v1", "{corrupted-json");
-  storageMock.setItem(
-    "pwc_meta_usage_v1",
-    JSON.stringify({
-      school_level: [{ value: "고1", count: 5, last_used_at: "2026-05-28T10:00:00+09:00" }],
-      subject: [],
-      genre: [],
-      target_raw: [],
-    }),
-  );
-  saveProfile({
-    nickname: "준호",
-    school_level: "중2",
-    primary_subject: "국어",
-    consent_at: "2026-06-02T10:00:00+09:00",
-  });
-  assert.equal(storageMock.getItem("pwc_meta_usage_v1"), null, "메타 초기화");
-});
-
-test("saveProfile — 기존 프로필 업데이트 시 메타 LRU 보존 (본인 데이터)", () => {
-  // 첫 저장 — 메타 비어있는 상태이므로 clear는 noop.
-  saveProfile({
-    nickname: "준호",
-    school_level: "중2",
-    primary_subject: "국어",
-    consent_at: "2026-06-02T10:00:00+09:00",
-  });
-  // 그 후 본인이 메타 누적.
+test("saveProfile — 메타 LRU 보존 (자동 초기화 X — 익명 사용자 학습 이력 보호)", () => {
+  // Codex PR #56 검토 결과 — 자동 메타 초기화는 동일 사용자가 익명으로 사용하다 나중에
+  // 온보딩하는 정상 경로에서 본인 학습 이력을 지움(target_raw는 복구 불가). 공용 기기
+  // 위험은 /me 명시 삭제 동선으로 처리. saveProfile은 LRU에 손대지 않는다.
   storageMock.setItem(
     "pwc_meta_usage_v1",
     JSON.stringify({
       school_level: [{ value: "중2", count: 5, last_used_at: "2026-06-02T11:00:00+09:00" }],
-      subject: [{ value: "국어", count: 5, last_used_at: "2026-06-02T11:00:00+09:00" }],
+      subject: [],
       genre: [],
-      target_raw: [],
+      target_raw: [{ value: "800", count: 3, last_used_at: "2026-06-02T11:00:00+09:00" }],
     }),
   );
-  // /me에서 프로필 수정 — 기존 profile 있으므로 메타 유지돼야 함.
   saveProfile({
     nickname: "준호",
-    school_level: "중3",
+    school_level: "중2",
     primary_subject: "국어",
     consent_at: "2026-06-02T10:00:00+09:00",
   });
   const meta = JSON.parse(storageMock.getItem("pwc_meta_usage_v1"));
-  assert.equal(meta.school_level.length, 1);
   assert.equal(meta.school_level[0].value, "중2");
+  assert.equal(meta.target_raw[0].value, "800");
 });
 
 test("loadProfile — JSON 손상 시 null (조용한 폴백)", () => {
