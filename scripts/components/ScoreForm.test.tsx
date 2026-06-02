@@ -3,7 +3,7 @@
 //   순수 모듈 154 + 컴포넌트 36 + E2E 9 위에 ScoreForm host state 자체 검증.
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ScoreForm from "@/app/components/ScoreForm";
 import { DEMO_TOKEN_KEY } from "@/app/components/TokenGate";
