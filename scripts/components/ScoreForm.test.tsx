@@ -70,7 +70,7 @@ describe("ScoreForm 통합 — full wizard state machine", () => {
     if (originalClipboardDescriptor) {
       Object.defineProperty(window.navigator, "clipboard", originalClipboardDescriptor);
     } else {
-      // @ts-expect-error — 원래 미정의였으면 attr 제거(jsdom 환경 기본 상태)
+      // 원래 미정의였으면 attr 제거(jsdom 환경 기본 상태로 복귀)
       delete (window.navigator as { clipboard?: unknown }).clipboard;
     }
   });
