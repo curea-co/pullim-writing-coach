@@ -724,7 +724,7 @@ export default function ScoreForm({
             accept=".txt,.md,.markdown,.docx,.hwp,.hwpx,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             onChange={handleFileInput}
             className="hidden"
-            aria-label="텍스트 또는 DOCX 파일 업로드"
+            aria-label="텍스트·DOCX·HWP 파일 업로드"
           />
           <button
             type="button"
