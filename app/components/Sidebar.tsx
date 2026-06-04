@@ -3,38 +3,16 @@
 // Pullim Writing Coach — 좌측 내비게이션 (반응형)
 //   데스크톱(md+): 좌측 고정 사이드바 · 모바일(<md): 상단바 + 햄버거 드로어.
 //   wireframe §0 "모바일 우선·세로 1방향"을 지키려고 모바일은 단일 컬럼 흐름을 깨지 않는 드로어로 접는다.
-//   샘플 목록은 data/samples.ts 단일 소스로 렌더, 현재 경로를 활성 표시.
+//   2026-06-02: '샘플 채점 결과' 헤더를 /samples 인덱스 진입점으로 만들고 A~E 개별 항목은
+//   드로어 안에서 숨김 — sidebar는 IA 진입점, 카드 선택은 /samples에서.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { cn } from "@/app/lib/utils";
+import ThemeToggle from "./ThemeToggle";
 
-// 사이드바는 라벨/카테고리/총점만 필요하다. 전체 SAMPLES(본문·피드백)를 client 번들로
-// 끌어오지 않도록, 서버 레이아웃에서 경량 메타데이터만 props로 받는다(curea-review-ai 지적).
-export type NavSample = {
-  id: string;
-  label: string;
-  category: string;
-  total: number;
-};
-
-// 카테고리 점 색 — page.tsx 칩과 같은 시맨틱 밴드/액센트 토큰
-const CATEGORY_DOT: Record<string, string> = {
-  저점: "bg-band-warn",
-  편차: "bg-accent-gap",
-  중점: "bg-band-normal",
-  중상: "bg-accent-mid",
-  고점: "bg-band-good",
-};
-
-function NavLinks({
-  samples,
-  onNavigate,
-}: {
-  samples: NavSample[];
-  onNavigate?: () => void;
-}) {
+function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const itemCls = (active: boolean) =>
     cn(
@@ -43,6 +21,7 @@ function NavLinks({
         ? "bg-muted text-foreground font-semibold"
         : "text-muted-foreground hover:bg-muted hover:text-foreground"
     );
+  const samplesActive = pathname === "/samples" || pathname.startsWith("/samples/");
 
   return (
     <nav className="flex flex-col gap-0.5">
@@ -70,6 +49,14 @@ function NavLinks({
       >
         채점 결과 조회
       </Link>
+      {/* 2026-06-02 '샘플 채점 결과' — 클릭 시 /samples 인덱스로. A~E 개별 항목 노출 X. */}
+      <Link
+        href="/samples"
+        onClick={onNavigate}
+        className={itemCls(samplesActive)}
+      >
+        샘플 채점 결과
+      </Link>
       {/* 2026-05-29 LNB 확장 — 내 정보·서비스 소개 (둘러보기 섹션 끝에 추가) */}
       <Link href="/me" onClick={onNavigate} className={itemCls(pathname === "/me")}>
         내 정보
@@ -81,40 +68,11 @@ function NavLinks({
       >
         서비스 소개
       </Link>
-
-      <div className="text-subtle-foreground mt-4 mb-1 px-3 text-[11px] font-semibold">
-        샘플 채점 결과
-      </div>
-      {samples.map((s) => {
-        const href = `/samples/${s.id}`;
-        return (
-          <Link
-            key={s.id}
-            href={href}
-            onClick={onNavigate}
-            className={itemCls(pathname === href)}
-          >
-            <span
-              className={cn(
-                "h-2 w-2 shrink-0 rounded-full",
-                CATEGORY_DOT[s.category]
-              )}
-              aria-hidden
-            />
-            <span>
-              {s.label} · {s.category}
-            </span>
-            <span className="text-subtle-foreground ml-auto text-xs tabular-nums">
-              {s.total}
-            </span>
-          </Link>
-        );
-      })}
     </nav>
   );
 }
 
-export default function Sidebar({ samples }: { samples: NavSample[] }) {
+export default function Sidebar() {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
 
@@ -132,11 +90,14 @@ export default function Sidebar({ samples }: { samples: NavSample[] }) {
           </span>
         </Link>
         <div className="flex-1 overflow-y-auto p-3">
-          <NavLinks samples={samples} />
+          <NavLinks />
         </div>
-        <p className="border-border text-subtle-foreground border-t px-4 py-3 text-[10px] leading-relaxed">
-          ※ AI 자동 채점 — 교사의 실제 채점과 다를 수 있어요.
-        </p>
+        <div className="border-border space-y-2 border-t px-3 py-3">
+          <ThemeToggle />
+          <p className="text-subtle-foreground text-[10px] leading-relaxed">
+            ※ AI 자동 채점 — 교사의 실제 채점과 다를 수 있어요.
+          </p>
+        </div>
       </aside>
 
       {/* 모바일: 상단바 (햄버거) */}
@@ -191,7 +152,7 @@ export default function Sidebar({ samples }: { samples: NavSample[] }) {
                 </svg>
               </button>
             </div>
-            <NavLinks samples={samples} onNavigate={close} />
+            <NavLinks onNavigate={close} />
           </aside>
         </div>
       )}
