@@ -27,24 +27,24 @@ export function checkRateLimit(
   return { allowed: true };
 }
 
-// Map 크기 cap — 무한 증가 방지(Codex PR #65: IP rotation 공격 시 만료 엔트리 없어도
-//   evict 보장 필요). size > maxSize면 만료 우선, 없으면 가장 오래 들어온 키(Map 삽입
-//   순서 = LRU 근사) 1건 강제 evict. 활성 키도 가끔 evict될 수 있으나 다음 요청에서
-//   새 윈도우로 재진입 — 비용 보호는 약간 약화되지만 메모리 OOM보다 안전.
+// Map 크기 cap — 무한 증가 방지. Codex PR #65: 1건만 evict하면 churn 환경에서 직후 새 키
+//   진입으로 size가 영구 maxSize 초과 → cap 무효. size <= maxSize 될 때까지 반복 evict.
+//   순서: 만료 엔트리 전부 → 그래도 초과면 Map 첫 키(삽입 순서 = LRU 근사) 강제 evict.
 export function cleanupExpired(
   buckets: Map<string, RateLimitBucket>,
   now: number,
   maxSize: number,
 ): void {
   if (buckets.size <= maxSize) return;
-  // 만료 우선 evict
+  // 만료 엔트리 전부 evict (iteration 중 delete는 Map에서 안전).
   for (const [key, bucket] of buckets) {
-    if (bucket.resetAt <= now) {
-      buckets.delete(key);
-      return;
-    }
+    if (buckets.size <= maxSize) return;
+    if (bucket.resetAt <= now) buckets.delete(key);
   }
-  // 만료 없으면 첫 엔트리(Map 삽입 순서) 강제 evict — 메모리 cap 보장.
-  const firstKey = buckets.keys().next().value;
-  if (firstKey !== undefined) buckets.delete(firstKey);
+  // 그래도 cap 초과면 가장 오래된 키부터 강제 evict.
+  while (buckets.size > maxSize) {
+    const firstKey = buckets.keys().next().value;
+    if (firstKey === undefined) break;
+    buckets.delete(firstKey);
+  }
 }

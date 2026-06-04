@@ -19,11 +19,10 @@ import { errorEnvelope } from "@/app/lib/grading";
 
 const BUCKETS = new Map<string, RateLimitBucket>();
 const WINDOW_MS = 60_000;
-const LIMIT = 10;
-// Codex PR #65 ②: 학교/학원 같은 공유 IP 환경에서 IP만 키로 쓰면 30명이 동시 사용 시
-//   1명이 10번 채우면 나머지 모두 429. cookie 익명 ID(첫 진입 시 발급)와 조합해
-//   같은 IP 안에서도 사용자별 카운터 분리. cookie도 회전 가능하나 IP+cookie 조합이면
-//   단순 IP 회전보다 우회 비용 ↑.
+// Codex PR #65: 2-tier 제한 — cookie 무시 봇이 매 요청 새 anonId로 user 카운터 reset 시켜도
+//   IP 카운터에 잡힘. 정상 학교 환경(30명 공유 IP)도 IP_LIMIT 60이면 여유.
+const USER_LIMIT = 10; // IP+cookie 단위 — 정상 데모 사용자 분당 호출 cap
+const IP_LIMIT = 60;   // IP 단위(cookie 무시 봇 / 한 IP 다인 환경 모두 커버)
 const COOKIE_KEY = "pwc-rl-id";
 const COOKIE_MAX_AGE_SEC = 60 * 60 * 24 * 30; // 30일
 
@@ -66,10 +65,23 @@ export function middleware(req: NextRequest) {
   if (ip === null) return NextResponse.next(); // 식별 불가 — bypass
   const now = Date.now();
   const { id: anonId, isNew } = getOrIssueAnonId(req);
-  const key = `${ip}:${anonId}`;
   cleanupExpired(BUCKETS, now, 1000);
-  const result = checkRateLimit(BUCKETS, key, now, WINDOW_MS, LIMIT);
-  const res = result.allowed ? NextResponse.next() : rateLimitResponse(result.retryAfterSec);
+
+  // 2-tier 검사. 두 키 모두 카운터 증가 — 봇이 cookie reset해도 IP 카운터는 누적.
+  // 둘 중 어느 하나라도 차단이면 429. retry-after는 더 큰 retryAfterSec(보수적).
+  const ipResult = checkRateLimit(BUCKETS, `ip:${ip}`, now, WINDOW_MS, IP_LIMIT);
+  const userResult = checkRateLimit(BUCKETS, `usr:${ip}:${anonId}`, now, WINDOW_MS, USER_LIMIT);
+
+  let res: NextResponse;
+  if (!ipResult.allowed || !userResult.allowed) {
+    const retry = Math.max(
+      ipResult.allowed ? 0 : ipResult.retryAfterSec,
+      userResult.allowed ? 0 : userResult.retryAfterSec,
+    );
+    res = rateLimitResponse(retry);
+  } else {
+    res = NextResponse.next();
+  }
   if (isNew) {
     res.cookies.set(COOKIE_KEY, anonId, {
       httpOnly: true,

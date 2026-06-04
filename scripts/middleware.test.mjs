@@ -76,17 +76,30 @@ test("cleanupExpired — size ≤ maxSize면 no-op (cleanup 비용 없음)", () 
   assert.equal(buckets.has("expired"), true, "size=1 ≤ maxSize=10이면 정리 안 함");
 });
 
-test("cleanupExpired — 만료 없어도 size 초과 시 가장 오래된 키 강제 evict (Codex PR #65 IP rotation 방어)", () => {
-  // 모두 유효(만료 없음), size=3, maxSize=2
-  buckets.set("oldest", { count: 1, resetAt: now + 10_000 });
-  buckets.set("mid", { count: 1, resetAt: now + 10_000 });
-  buckets.set("newest", { count: 1, resetAt: now + 10_000 });
+test("cleanupExpired — 만료 없어도 size 초과 시 반복 evict하여 정확히 maxSize 유지 (Codex PR #65 churn 방어)", () => {
+  // 모두 유효, size=5, maxSize=2 — 3건 evict해야 정확히 2건 남음.
+  for (const k of ["a", "b", "c", "d", "e"]) {
+    buckets.set(k, { count: 1, resetAt: now + 10_000 });
+  }
   cleanupExpired(buckets, now, 2);
-  // 첫 삽입 키(Map 순서) 'oldest' evict
-  assert.equal(buckets.has("oldest"), false, "Map 첫 키 evict");
-  assert.equal(buckets.has("mid"), true);
-  assert.equal(buckets.has("newest"), true);
+  assert.equal(buckets.size, 2, "정확히 maxSize까지 줄어듦");
+  // Map 삽입 순서 a,b,c,d,e — a,b,c 가장 오래된 3건 evict, d,e 남음.
+  assert.equal(buckets.has("a"), false);
+  assert.equal(buckets.has("b"), false);
+  assert.equal(buckets.has("c"), false);
+  assert.equal(buckets.has("d"), true);
+  assert.equal(buckets.has("e"), true);
+});
+
+test("cleanupExpired — 만료 다수 + 유효 1건 시 만료만 정리하고 멈춤 (cap 도달까지만)", () => {
+  buckets.set("expired1", { count: 5, resetAt: now - 1000 });
+  buckets.set("expired2", { count: 5, resetAt: now - 1000 });
+  buckets.set("expired3", { count: 5, resetAt: now - 1000 });
+  buckets.set("valid", { count: 1, resetAt: now + 10_000 });
+  // maxSize=2 — 만료 2건만 정리해도 size <= maxSize 만족.
+  cleanupExpired(buckets, now, 2);
   assert.equal(buckets.size, 2);
+  assert.equal(buckets.has("valid"), true);
 });
 
 test("cleanupExpired — 만료 1건 + 유효 다수 시 만료 우선 evict", () => {
