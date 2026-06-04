@@ -14,7 +14,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko" className="h-full antialiased">
+    // suppressHydrationWarning — 아래 inline script가 <html data-theme="..."> 를
+    //   클라이언트에서 추가하므로 SSR HTML(attribute 없음)과 mismatch가 발생한다.
+    //   이 mismatch는 의도된 것(테마는 client 전용 상태)이므로 React에 무시 요청.
+    //   warning은 <html> 한 단계에만 적용되며 자식 트리에는 영향 없음(next-themes 표준 패턴).
+    <html lang="ko" className="h-full antialiased" suppressHydrationWarning>
       <head>
         <link
           rel="stylesheet"
