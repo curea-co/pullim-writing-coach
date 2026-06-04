@@ -75,3 +75,26 @@ test("cleanupExpired — size ≤ maxSize면 no-op (cleanup 비용 없음)", () 
   cleanupExpired(buckets, now, 10);
   assert.equal(buckets.has("expired"), true, "size=1 ≤ maxSize=10이면 정리 안 함");
 });
+
+test("cleanupExpired — 만료 없어도 size 초과 시 가장 오래된 키 강제 evict (Codex PR #65 IP rotation 방어)", () => {
+  // 모두 유효(만료 없음), size=3, maxSize=2
+  buckets.set("oldest", { count: 1, resetAt: now + 10_000 });
+  buckets.set("mid", { count: 1, resetAt: now + 10_000 });
+  buckets.set("newest", { count: 1, resetAt: now + 10_000 });
+  cleanupExpired(buckets, now, 2);
+  // 첫 삽입 키(Map 순서) 'oldest' evict
+  assert.equal(buckets.has("oldest"), false, "Map 첫 키 evict");
+  assert.equal(buckets.has("mid"), true);
+  assert.equal(buckets.has("newest"), true);
+  assert.equal(buckets.size, 2);
+});
+
+test("cleanupExpired — 만료 1건 + 유효 다수 시 만료 우선 evict", () => {
+  buckets.set("valid1", { count: 1, resetAt: now + 10_000 });
+  buckets.set("expired", { count: 5, resetAt: now - 1000 });
+  buckets.set("valid2", { count: 1, resetAt: now + 10_000 });
+  cleanupExpired(buckets, now, 2);
+  assert.equal(buckets.has("expired"), false, "만료 우선");
+  assert.equal(buckets.has("valid1"), true);
+  assert.equal(buckets.has("valid2"), true);
+});

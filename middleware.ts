@@ -20,17 +20,39 @@ const BUCKETS = new Map<string, RateLimitBucket>();
 const WINDOW_MS = 60_000;
 const LIMIT = 10;
 
-// Codex PR #65: IP 식별 실패 시 "unknown" 단일 bucket로 묶으면 dev/proxy 환경 모든
-//   사용자가 같은 카운터 공유 → 정상 사용자도 글로벌 차단 오탐. 식별 불가는 bypass —
-//   prod Vercel은 항상 x-forwarded-for 제공하므로 비용 보호 99%는 유지, dev/edge 케이스는
-//   안전하게 통과.
+// Codex PR #65 ①: 일반 x-forwarded-for는 공격자가 매 요청마다 다른 값 넣어 우회 가능.
+//   Vercel은 자체 검증한 IP를 x-vercel-forwarded-for / x-real-ip에 설정(사용자 입력 헤더
+//   덮어쓰기). 신뢰 가능한 헤더만 사용. dev/non-Vercel은 둘 다 없을 가능성 → null bypass.
 function getClientIp(req: NextRequest): string | null {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) {
-    const first = xff.split(",")[0]?.trim();
+  const vercelXff = req.headers.get("x-vercel-forwarded-for");
+  if (vercelXff) {
+    const first = vercelXff.split(",")[0]?.trim();
     if (first) return first;
   }
-  return req.headers.get("x-real-ip") || null;
+  const realIp = req.headers.get("x-real-ip");
+  if (realIp) return realIp;
+  return null;
+}
+
+// Codex PR #65 ②: 응답 envelope을 /api/score 기존 계약(grading.ts errorEnvelope)과 동일하게.
+//   ScoreForm은 비-200 응답에서 `env.error.code` 읽음. 새 코드 만들지 않고 E-CAP 재사용
+//   (이미 429 매핑 + "사용량 많아요" 카피). 사용자에게 일관된 메시지 + retry-after 헤더 유지.
+function rateLimitResponse(retryAfterSec: number): NextResponse {
+  return new NextResponse(
+    JSON.stringify({
+      error: {
+        code: "E-CAP",
+        message: "요청이 너무 많아요. 잠시 후 다시 시도해 주세요.",
+      },
+    }),
+    {
+      status: 429,
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        "retry-after": String(retryAfterSec),
+      },
+    },
+  );
 }
 
 export function middleware(req: NextRequest) {
@@ -40,20 +62,7 @@ export function middleware(req: NextRequest) {
   cleanupExpired(BUCKETS, now, 1000);
   const result = checkRateLimit(BUCKETS, ip, now, WINDOW_MS, LIMIT);
   if (result.allowed) return NextResponse.next();
-  return new NextResponse(
-    JSON.stringify({
-      error: "E-RATELIMIT",
-      message: "요청이 너무 많아요. 잠시 후 다시 시도해 주세요.",
-      retry_after_sec: result.retryAfterSec,
-    }),
-    {
-      status: 429,
-      headers: {
-        "content-type": "application/json; charset=utf-8",
-        "retry-after": String(result.retryAfterSec),
-      },
-    },
-  );
+  return rateLimitResponse(result.retryAfterSec);
 }
 
 export const config = {
