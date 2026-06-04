@@ -11,11 +11,17 @@
 // 입력 화면 + 세션 보관 + "나가기" + 401 재노출(P3.2): 제출 시 서버가 401이면 ScoreForm이
 //   onAuthExpired()를 호출 → 토큰 폐기 + 입력 화면 재노출 + 사유 안내.
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { cn } from "@/app/lib/utils";
 import ScoreForm from "./ScoreForm";
 
 export const DEMO_TOKEN_KEY = "pwc-demo-token"; // sessionStorage 키 — ScoreForm 제출(P3.2)과 공유
+
+// 2026-06-04: NEXT_PUBLIC_DEMO_TOKEN — 빌드 시점 inline. 설정 시 첫 진입에서 자동 입력 →
+//   사용자 비밀번호 수동 입력 0회. 값은 클라 번들에 노출되므로 비용 통제(rate limit/사용량
+//   상한)는 서버·인프라 단에서 별도 적용 필요. /api/score 검증은 그대로 — 헤더 토큰을 서버
+//   환경변수와 비교.
+const AUTO_TOKEN = process.env.NEXT_PUBLIC_DEMO_TOKEN || "";
 
 // sessionStorage를 외부 스토어로 구독 — useSyncExternalStore로 SSR 안전(서버 스냅샷 null) +
 // 우리 자신의 변경(enter/leave)에도 반응. setState-in-effect 안티패턴 회피.
@@ -47,6 +53,17 @@ export default function TokenGate({
   // 401 때 stale 토큰을 폐기(아래)해도 이 플래그 덕분에 폼이 언마운트되지 않는다(curea-review-ai 지적).
   const [entered, setEntered] = useState(false);
   const showForm = token !== null || entered;
+
+  // 2026-06-04: NEXT_PUBLIC_DEMO_TOKEN 자동 입장 — 빌드 시 값이 설정돼 있고 sessionStorage에
+  //   기존 토큰이 없을 때 1회 자동 저장. 사용자가 '나가기'로 leave()한 후엔 entered=false로
+  //   초기화되지만 AUTO_TOKEN이 있으면 다음 mount(또는 페이지 이동 시 새 마운트)에 다시 채움.
+  //   기존 토큰(401 후 폐기·수동 입력 등)은 덮어쓰지 않음.
+  useEffect(() => {
+    if (!AUTO_TOKEN) return;
+    if (readToken() !== null) return;
+    writeToken(AUTO_TOKEN);
+    setEntered(true);
+  }, []);
 
   // 최초 입장 + 401 후 재입력 공용. 토큰을 갱신하고 입력/오류를 정리한다.
   function enter(e: React.FormEvent) {
