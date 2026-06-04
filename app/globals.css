@@ -1,39 +1,98 @@
 @import "tailwindcss";
 
 /* 시맨틱 토큰 — fe-styling 기준(하드코딩 컬러 금지). 값은 데모용 근사치이며,
-   apps/web 이관 시 @pullim/design-system 토큰으로 대체한다. */
+   apps/web 이관 시 @pullim/design-system 토큰으로 대체한다.
+   다크모드(2026-06-02): 부모 도메인 pullim.ai 톤 참고 — 깊은 navy + 화이트 + muted blue. */
 @theme {
   --font-sans:
     "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
     system-ui, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic",
     sans-serif;
 
-  --color-background: oklch(0.985 0 0);
-  --color-surface: oklch(1 0 0);
-  --color-foreground: oklch(0.21 0.006 285.9);
-  --color-muted-foreground: oklch(0.55 0.014 285.9);
-  --color-subtle-foreground: oklch(0.7 0.014 285.9);
-  --color-border: oklch(0.92 0.004 286.3);
-  --color-muted: oklch(0.967 0.001 286.4);
-  --color-primary: oklch(0.27 0.012 285.9);
-  --color-primary-foreground: oklch(0.985 0 0);
+  --color-background: var(--bg);
+  --color-surface: var(--surface);
+  --color-foreground: var(--fg);
+  --color-muted-foreground: var(--fg-muted);
+  --color-subtle-foreground: var(--fg-subtle);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-fg);
 
   /* 점수 밴드 (rubric §2.2 색상 가이드: 0~9 주의 / 10~14 보통 / 15~20 양호) */
-  --color-band-good: oklch(0.7 0.15 162);
-  --color-band-good-foreground: oklch(0.5 0.13 162);
-  --color-band-good-surface: oklch(0.96 0.03 162);
-  --color-band-normal: oklch(0.77 0.16 70);
-  --color-band-normal-foreground: oklch(0.55 0.13 70);
-  --color-band-normal-surface: oklch(0.96 0.04 83);
-  --color-band-warn: oklch(0.64 0.21 19);
-  --color-band-warn-foreground: oklch(0.51 0.19 19);
-  --color-band-warn-surface: oklch(0.96 0.02 17);
+  --color-band-good: var(--band-good);
+  --color-band-good-foreground: var(--band-good-fg);
+  --color-band-good-surface: var(--band-good-surface);
+  --color-band-normal: var(--band-normal);
+  --color-band-normal-foreground: var(--band-normal-fg);
+  --color-band-normal-surface: var(--band-normal-surface);
+  --color-band-warn: var(--band-warn);
+  --color-band-warn-foreground: var(--band-warn-fg);
+  --color-band-warn-surface: var(--band-warn-surface);
 
   /* 총점 구간 / 카테고리 액센트 */
-  --color-accent-gap: oklch(0.55 0.18 295);
-  --color-accent-gap-surface: oklch(0.96 0.03 295);
-  --color-accent-mid: oklch(0.62 0.17 250);
-  --color-accent-mid-surface: oklch(0.96 0.03 250);
+  --color-accent-gap: var(--accent-gap);
+  --color-accent-gap-surface: var(--accent-gap-surface);
+  --color-accent-mid: var(--accent-mid);
+  --color-accent-mid-surface: var(--accent-mid-surface);
+}
+
+/* 라이트(기본) — :root와 [data-theme="light"] 둘 다 적용. */
+:root,
+:root[data-theme="light"] {
+  --bg: oklch(0.985 0 0);
+  --surface: oklch(1 0 0);
+  --fg: oklch(0.21 0.006 285.9);
+  --fg-muted: oklch(0.55 0.014 285.9);
+  --fg-subtle: oklch(0.7 0.014 285.9);
+  --border: oklch(0.92 0.004 286.3);
+  --muted: oklch(0.967 0.001 286.4);
+  --primary: oklch(0.27 0.012 285.9);
+  --primary-fg: oklch(0.985 0 0);
+
+  --band-good: oklch(0.7 0.15 162);
+  --band-good-fg: oklch(0.5 0.13 162);
+  --band-good-surface: oklch(0.96 0.03 162);
+  --band-normal: oklch(0.77 0.16 70);
+  --band-normal-fg: oklch(0.55 0.13 70);
+  --band-normal-surface: oklch(0.96 0.04 83);
+  --band-warn: oklch(0.64 0.21 19);
+  --band-warn-fg: oklch(0.51 0.19 19);
+  --band-warn-surface: oklch(0.96 0.02 17);
+
+  --accent-gap: oklch(0.55 0.18 295);
+  --accent-gap-surface: oklch(0.96 0.03 295);
+  --accent-mid: oklch(0.62 0.17 250);
+  --accent-mid-surface: oklch(0.96 0.03 250);
+}
+
+/* 다크 — pullim.ai 톤: 진한 navy/charcoal + 화이트 텍스트 + 살아남는 액센트. */
+:root[data-theme="dark"] {
+  --bg: oklch(0.18 0.018 260);            /* 깊은 navy */
+  --surface: oklch(0.23 0.016 260);       /* 카드/sidebar — 약간 밝게 */
+  --fg: oklch(0.96 0.005 270);            /* 화이트(소량 cool tint) */
+  --fg-muted: oklch(0.72 0.012 265);      /* secondary 텍스트 */
+  --fg-subtle: oklch(0.55 0.012 265);     /* tertiary 텍스트 */
+  --border: oklch(0.33 0.014 260);        /* 카드 경계 */
+  --muted: oklch(0.27 0.014 260);         /* 약한 강조 배경 */
+  --primary: oklch(0.96 0.005 270);       /* 다크에서 primary는 화이트 (역전) */
+  --primary-fg: oklch(0.18 0.018 260);
+
+  /* 점수 밴드 — 다크 배경에서 가독성 위해 chroma↑, lightness 유지 */
+  --band-good: oklch(0.74 0.18 162);
+  --band-good-fg: oklch(0.82 0.18 162);
+  --band-good-surface: oklch(0.32 0.06 162);
+  --band-normal: oklch(0.8 0.16 70);
+  --band-normal-fg: oklch(0.85 0.15 70);
+  --band-normal-surface: oklch(0.34 0.06 70);
+  --band-warn: oklch(0.7 0.21 19);
+  --band-warn-fg: oklch(0.82 0.18 19);
+  --band-warn-surface: oklch(0.36 0.08 19);
+
+  --accent-gap: oklch(0.74 0.18 295);
+  --accent-gap-surface: oklch(0.32 0.07 295);
+  --accent-mid: oklch(0.74 0.16 250);
+  --accent-mid-surface: oklch(0.32 0.06 250);
 }
 
 body {

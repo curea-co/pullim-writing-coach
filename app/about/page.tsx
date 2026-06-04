@@ -91,6 +91,23 @@ export default function AboutPage() {
         </div>
       </Section>
 
+      {/* P1-#11 부모 도메인 링크 — Pullim 프로젝트의 일부임을 명시(2026-06-02). */}
+      <Section title="함께하는 프로젝트">
+        <p>
+          Pullim Writing Coach는 학생의 학습을 돕는{" "}
+          <strong className="text-foreground">Pullim 프로젝트</strong>의 일부예요.
+          전체 비전과 다른 도구는 메인 사이트에서 확인할 수 있어요.
+        </p>
+        <a
+          href="https://pullim.ai/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary mt-3 inline-flex items-center gap-1 text-sm font-semibold underline-offset-2 hover:underline"
+        >
+          Pullim 프로젝트 소개 <span aria-hidden>↗</span>
+        </a>
+      </Section>
+
       <div className="mt-12 flex flex-wrap items-center gap-3">
         <Link
           href="/try"
