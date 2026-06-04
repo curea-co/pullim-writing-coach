@@ -3,10 +3,14 @@
 //   초기 테마는 layout.tsx의 inline script가 HTML 렌더 직전에 적용(SSR mismatch + 깜빡임 회피).
 //   여기서는 mount 후 현재 dataset.theme 값 읽어 버튼 상태에 반영, 클릭 시 토글.
 //   pullim.ai 톤 참고 — 다크는 navy, 라이트는 기존 유지.
+//   Codex PR #62: Sidebar가 데스크톱·모바일에 각각 인스턴스를 마운트하므로 한쪽 토글 후
+//     다른 쪽 state가 stale. CustomEvent('pwc:theme-change')로 모든 인스턴스 동기화.
+//     storage event도 구독 — 다른 탭에서 변경 시 같이 따라감.
 
 import { useEffect, useState } from "react";
 
 const THEME_KEY = "pwc_theme_v1";
+const THEME_EVENT = "pwc:theme-change";
 type Theme = "light" | "dark";
 
 function readTheme(): Theme {
@@ -21,6 +25,25 @@ export default function ThemeToggle() {
 
   useEffect(() => {
     setTheme(readTheme());
+    // 같은 탭의 다른 ThemeToggle 인스턴스 동기화 (CustomEvent).
+    const onLocalChange = (e: Event) => {
+      const detail = (e as CustomEvent<Theme>).detail;
+      if (detail === "light" || detail === "dark") setTheme(detail);
+    };
+    // 다른 탭 동기화 (storage event는 같은 탭에선 발생 안 함).
+    const onStorageChange = (e: StorageEvent) => {
+      if (e.key !== THEME_KEY) return;
+      const next = e.newValue;
+      if (next !== "light" && next !== "dark") return;
+      document.documentElement.dataset.theme = next;
+      setTheme(next);
+    };
+    window.addEventListener(THEME_EVENT, onLocalChange);
+    window.addEventListener("storage", onStorageChange);
+    return () => {
+      window.removeEventListener(THEME_EVENT, onLocalChange);
+      window.removeEventListener("storage", onStorageChange);
+    };
   }, []);
 
   const toggle = () => {
@@ -33,6 +56,8 @@ export default function ThemeToggle() {
     } catch {
       /* 시크릿 모드 등 — UI 동작은 유지, 저장만 실패 */
     }
+    // 같은 탭의 다른 ThemeToggle 인스턴스에 알림.
+    window.dispatchEvent(new CustomEvent<Theme>(THEME_EVENT, { detail: next }));
   };
 
   if (theme === null) return null;
