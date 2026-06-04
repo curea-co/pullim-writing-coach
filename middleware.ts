@@ -15,10 +15,17 @@ import {
   cleanupExpired,
   type RateLimitBucket,
 } from "@/app/lib/rate-limit";
+import { errorEnvelope } from "@/app/lib/grading";
 
 const BUCKETS = new Map<string, RateLimitBucket>();
 const WINDOW_MS = 60_000;
 const LIMIT = 10;
+// Codex PR #65 ②: 학교/학원 같은 공유 IP 환경에서 IP만 키로 쓰면 30명이 동시 사용 시
+//   1명이 10번 채우면 나머지 모두 429. cookie 익명 ID(첫 진입 시 발급)와 조합해
+//   같은 IP 안에서도 사용자별 카운터 분리. cookie도 회전 가능하나 IP+cookie 조합이면
+//   단순 IP 회전보다 우회 비용 ↑.
+const COOKIE_KEY = "pwc-rl-id";
+const COOKIE_MAX_AGE_SEC = 60 * 60 * 24 * 30; // 30일
 
 // Codex PR #65 ①: 일반 x-forwarded-for는 공격자가 매 요청마다 다른 값 넣어 우회 가능.
 //   Vercel은 자체 검증한 IP를 x-vercel-forwarded-for / x-real-ip에 설정(사용자 입력 헤더
@@ -34,35 +41,45 @@ function getClientIp(req: NextRequest): string | null {
   return null;
 }
 
-// Codex PR #65 ②: 응답 envelope을 /api/score 기존 계약(grading.ts errorEnvelope)과 동일하게.
-//   ScoreForm은 비-200 응답에서 `env.error.code` 읽음. 새 코드 만들지 않고 E-CAP 재사용
-//   (이미 429 매핑 + "사용량 많아요" 카피). 사용자에게 일관된 메시지 + retry-after 헤더 유지.
+// Codex PR #65: 응답 envelope을 /api/score 기존 계약(grading.ts errorEnvelope)과 단일 소스
+//   공유 — 메시지 카피·코드·HTTP status 일관성 보장. retry-after 헤더는 별도 유지(spec 외).
 function rateLimitResponse(retryAfterSec: number): NextResponse {
-  return new NextResponse(
-    JSON.stringify({
-      error: {
-        code: "E-CAP",
-        message: "요청이 너무 많아요. 잠시 후 다시 시도해 주세요.",
-      },
-    }),
-    {
-      status: 429,
-      headers: {
-        "content-type": "application/json; charset=utf-8",
-        "retry-after": String(retryAfterSec),
-      },
+  return new NextResponse(JSON.stringify(errorEnvelope("E-CAP")), {
+    status: 429,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "retry-after": String(retryAfterSec),
     },
-  );
+  });
+}
+
+// 익명 ID 생성/조회. cookie가 없으면 발급(setCookie=true) + 응답에 attach.
+//   crypto.randomUUID는 Edge runtime 지원.
+function getOrIssueAnonId(req: NextRequest): { id: string; isNew: boolean } {
+  const existing = req.cookies.get(COOKIE_KEY)?.value;
+  if (existing) return { id: existing, isNew: false };
+  return { id: crypto.randomUUID(), isNew: true };
 }
 
 export function middleware(req: NextRequest) {
   const ip = getClientIp(req);
   if (ip === null) return NextResponse.next(); // 식별 불가 — bypass
   const now = Date.now();
+  const { id: anonId, isNew } = getOrIssueAnonId(req);
+  const key = `${ip}:${anonId}`;
   cleanupExpired(BUCKETS, now, 1000);
-  const result = checkRateLimit(BUCKETS, ip, now, WINDOW_MS, LIMIT);
-  if (result.allowed) return NextResponse.next();
-  return rateLimitResponse(result.retryAfterSec);
+  const result = checkRateLimit(BUCKETS, key, now, WINDOW_MS, LIMIT);
+  const res = result.allowed ? NextResponse.next() : rateLimitResponse(result.retryAfterSec);
+  if (isNew) {
+    res.cookies.set(COOKIE_KEY, anonId, {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: COOKIE_MAX_AGE_SEC,
+      secure: process.env.NODE_ENV === "production",
+    });
+  }
+  return res;
 }
 
 export const config = {
