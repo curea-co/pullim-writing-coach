@@ -15,10 +15,21 @@ export default defineConfig({
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
+  // 멀티 브라우저 회귀 (#12 UX polish) — chromium·firefox·webkit 3종 매트릭스.
+  //   로컬: `npm run test:e2e` 모두 실행 (~45초). `--project=chromium`으로 단일 필터.
+  //   CI: 캐시 미스 시 첫 run에서 firefox + webkit 추가 다운로드 (~250MB).
   projects: [
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "firefox",
+      use: { ...devices["Desktop Firefox"] },
+    },
+    {
+      name: "webkit",
+      use: { ...devices["Desktop Safari"] },
     },
   ],
   webServer: {
