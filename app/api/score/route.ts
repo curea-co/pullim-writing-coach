@@ -9,6 +9,7 @@
 //    신규 의존성을 추가하지 않고, grading.ts/prompt.ts 순수성(§9 S4)을 유지하기 위함. (EPO 검수 항목)
 
 import { createHash, timingSafeEqual } from "node:crypto";
+import * as Sentry from "@sentry/nextjs";
 import type { F3Output } from "@/app/data/samples";
 import {
   ERROR_HTTP,
@@ -170,11 +171,16 @@ export async function POST(req: Request): Promise<Response> {
       text = await callModel(userPrompt, remaining);
     } catch (e) {
       // 모델 호출 에러(E4 타임아웃 / E8 네트워크·업스트림)는 스키마 재호출 대상이 아니라 즉시 반환.
+      // Codex PR #60: catch 후 JSON 반환하므로 onRequestError가 못 잡음 — 명시적 captureException.
       if (isModelError(e)) {
         console.error(`[/api/score] model call ${e.code}: ${e.detail}`);
+        Sentry.captureException(new Error(`/api/score model call ${e.code}: ${e.detail}`), {
+          tags: { route: "/api/score", errorCode: e.code },
+        });
         return jsonError(e.code);
       }
       console.error("[/api/score] 예기치 못한 호출 오류", e);
+      Sentry.captureException(e, { tags: { route: "/api/score", errorCode: "E8" } });
       return jsonError("E8");
     }
 
@@ -201,7 +207,12 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   // 재호출까지 무효 → 502 (E5). 깨진 결과는 절대 화면에 내보내지 않음.
+  // Codex PR #60: catch 후 JSON 반환이라 onRequestError가 못 잡음 — 명시적 captureMessage.
   logMetric("schema_fail_502", { errs: lastSchemaErrs });
   console.error(`[/api/score] 재호출 후에도 무효 → 502: ${lastSchemaErrs?.join("; ") ?? "?"}`);
+  Sentry.captureMessage(
+    `/api/score schema fail 502: ${lastSchemaErrs?.join("; ") ?? "?"}`,
+    { level: "error", tags: { route: "/api/score", errorCode: "E5" } },
+  );
   return jsonError("E5");
 }

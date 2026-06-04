@@ -22,7 +22,7 @@ export default function GlobalError({
             문제가 생겼어요
           </h1>
           <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
-            잠시 후 다시 시도해 주세요. 자동으로 알림이 전송됐어요.
+            잠시 후 다시 시도해 주세요.
           </p>
         </main>
       </body>
