@@ -16,7 +16,7 @@ export function checkRateLimit(
   limit: number,
 ): RateLimitResult {
   const bucket = buckets.get(key);
-  if (!bucket || bucket.resetAt < now) {
+  if (!bucket || bucket.resetAt <= now) {
     buckets.set(key, { count: 1, resetAt: now + windowMs });
     return { allowed: true };
   }
@@ -36,7 +36,7 @@ export function cleanupExpired(
 ): void {
   if (buckets.size <= maxSize) return;
   for (const [key, bucket] of buckets) {
-    if (bucket.resetAt < now) {
+    if (bucket.resetAt <= now) {
       buckets.delete(key);
       return;
     }

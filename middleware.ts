@@ -20,17 +20,22 @@ const BUCKETS = new Map<string, RateLimitBucket>();
 const WINDOW_MS = 60_000;
 const LIMIT = 10;
 
-function getClientIp(req: NextRequest): string {
+// Codex PR #65: IP 식별 실패 시 "unknown" 단일 bucket로 묶으면 dev/proxy 환경 모든
+//   사용자가 같은 카운터 공유 → 정상 사용자도 글로벌 차단 오탐. 식별 불가는 bypass —
+//   prod Vercel은 항상 x-forwarded-for 제공하므로 비용 보호 99%는 유지, dev/edge 케이스는
+//   안전하게 통과.
+function getClientIp(req: NextRequest): string | null {
   const xff = req.headers.get("x-forwarded-for");
   if (xff) {
     const first = xff.split(",")[0]?.trim();
     if (first) return first;
   }
-  return req.headers.get("x-real-ip") || "unknown";
+  return req.headers.get("x-real-ip") || null;
 }
 
 export function middleware(req: NextRequest) {
   const ip = getClientIp(req);
+  if (ip === null) return NextResponse.next(); // 식별 불가 — bypass
   const now = Date.now();
   cleanupExpired(BUCKETS, now, 1000);
   const result = checkRateLimit(BUCKETS, ip, now, WINDOW_MS, LIMIT);

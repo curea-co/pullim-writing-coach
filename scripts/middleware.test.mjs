@@ -52,6 +52,14 @@ test("retryAfterSec — resetAt와 now의 차이를 초로 올림", () => {
   assert.equal(blocked.retryAfterSec, 30);
 });
 
+test("경계 시각 resetAt === now에 들어온 요청은 새 윈도우 첫 요청 (Codex PR #65)", () => {
+  // 1차 진입에서 resetAt = now + WINDOW_MS 설정됨.
+  for (let i = 0; i < LIMIT; i++) checkRateLimit(buckets, "ip1", now, WINDOW_MS, LIMIT);
+  // 정확히 만료 시각에 들어온 요청 — 새 윈도우 시작이어야 함.
+  const exactBoundary = checkRateLimit(buckets, "ip1", now + WINDOW_MS, WINDOW_MS, LIMIT);
+  assert.equal(exactBoundary.allowed, true, "resetAt === now는 새 윈도우 첫 요청");
+});
+
 test("cleanupExpired — maxSize 초과 + 만료 엔트리 있을 때 1건 정리", () => {
   // 만료된 엔트리 1건 + 유효 엔트리 1건
   buckets.set("expired", { count: 5, resetAt: now - 1000 });
