@@ -87,13 +87,13 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
 
-      - name: Install Playwright chromium
+      - name: Install Playwright browsers (chromium·firefox·webkit)
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium firefox webkit
 
       - name: Install OS deps (cache hit case)
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
+        run: npx playwright install-deps chromium firefox webkit
 
       # webServer로 next dev 자동 기동 (config의 reuseExistingServer는 CI에선 false).
       - name: E2E tests (/try wizard happy path + 채널·복원·resubmit)
