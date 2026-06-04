@@ -8,7 +8,10 @@ const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
 if (dsn) {
   Sentry.init({
     dsn,
-    environment: process.env.NEXT_PUBLIC_VERCEL_ENV || "development",
+    // Codex PR #60: Vercel이 아닌 prod 배포에서 NEXT_PUBLIC_VERCEL_ENV가 비면 실 prod 에러가
+    // development로 들어감. 서버(VERCEL_ENV || NODE_ENV)와 일치하게 NODE_ENV fallback 추가.
+    environment:
+      process.env.NEXT_PUBLIC_VERCEL_ENV || process.env.NODE_ENV || "development",
     tracesSampleRate: 0.1,
     replaysSessionSampleRate: 0,
     replaysOnErrorSampleRate: 0.1,
