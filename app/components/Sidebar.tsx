@@ -152,7 +152,17 @@ export default function Sidebar() {
                 </svg>
               </button>
             </div>
-            <NavLinks onNavigate={close} />
+            <div className="flex-1 overflow-y-auto">
+              <NavLinks onNavigate={close} />
+            </div>
+            {/* Codex PR #62: 모바일 드로어에도 ThemeToggle — 데스크톱과 동일 노출.
+                OS 기본값 의존 회피 + 모바일 사용자가 수동 전환 가능. */}
+            <div className="border-border mt-3 space-y-2 border-t pt-3">
+              <ThemeToggle />
+              <p className="text-subtle-foreground px-1 text-[10px] leading-relaxed">
+                ※ AI 자동 채점 — 교사의 실제 채점과 다를 수 있어요.
+              </p>
+            </div>
           </aside>
         </div>
       )}
