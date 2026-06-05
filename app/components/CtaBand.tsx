@@ -1,9 +1,11 @@
-// Pullim Writing Coach — 닫는 CTA 밴드 (2026-06-05: floating bottom으로 전환)
-//   스크롤 내려도 항상 viewport 하단에 고정 노출 → 사용자가 어디서든 1-click으로 /try 진입.
-//   호출하는 페이지에만 spacer 자동 삽입 → 호출 안 하는 페이지(/try 등)는 영향 0.
-//   sidebar(데스크톱 w-60) 너비만큼 left offset, 모바일은 full width.
+"use client";
+// Pullim Writing Coach — 닫는 CTA 밴드 (2026-06-05: floating bottom + 실측 spacer + safe-area)
+//   스크롤 내려도 viewport 하단에 항상 고정. spacer는 ResizeObserver로 실측 높이 반영
+//   → 텍스트 줄바꿈·폰트 확대 시에도 spacer가 bar 가림 방지 (Codex PR #66).
+//   iOS safe-area-inset-bottom 처리 — 홈 인디케이터 영역 회피.
 
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 
 export default function CtaBand({
   title = "직접 쓴 글로 채점받아 보세요",
@@ -16,13 +18,31 @@ export default function CtaBand({
   href?: string;
   cta?: string;
 }) {
+  const barRef = useRef<HTMLElement>(null);
+  // SSR fallback — 실제 bar 높이 측정 전 임시값(데스크톱 ~80px, 모바일 ~120px 여유).
+  //   클라 mount 후 ResizeObserver가 실측 height로 override.
+  const [barHeight, setBarHeight] = useState(128);
+
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) setBarHeight(Math.ceil(entry.contentRect.height));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <>
-      {/* 정상 흐름의 spacer — fixed bar에 가려질 만큼 페이지 끝에 여백 확보.
-          CtaBand 호출 안 하는 페이지는 spacer도 없음(컴포넌트 호출 자체가 트리거). */}
-      <div aria-hidden className="h-32 md:h-24" />
+      {/* 실측 spacer — 페이지 흐름 끝에서 fixed bar 높이만큼 자리 확보. */}
+      <div aria-hidden style={{ height: barHeight }} />
       <section
-        className="border-border bg-zinc-700 fixed right-0 bottom-0 left-0 z-30 flex flex-col items-start gap-3 border-t px-5 py-4 text-white shadow-2xl md:left-60 md:flex-row md:items-center md:justify-between md:gap-4 md:px-8 md:py-5"
+        ref={barRef}
+        // bg-zinc-700 + 화이트 — 다크/라이트 양쪽 가독성 충분.
+        // pb는 모바일에서 max(기본, env(safe-area-inset-bottom)) — iOS 홈 인디케이터 회피.
+        className="border-border bg-zinc-700 fixed right-0 bottom-0 left-0 z-30 flex flex-col items-start gap-3 border-t px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-white shadow-2xl md:left-60 md:flex-row md:items-center md:justify-between md:gap-4 md:px-8 md:pt-5 md:pb-5"
         role="complementary"
         aria-label="채점 받기 안내"
       >
