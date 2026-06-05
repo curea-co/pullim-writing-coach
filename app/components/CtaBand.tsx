@@ -26,9 +26,10 @@ export default function CtaBand({
   useEffect(() => {
     const el = barRef.current;
     if (!el) return;
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (entry) setBarHeight(Math.ceil(entry.contentRect.height));
+    // Codex PR #66: contentRect는 content-box(padding/border 제외)라 spacer가 부족.
+    //   offsetHeight는 padding + border 포함 border-box 높이 → fixed bar 가림 방지에 정확.
+    const observer = new ResizeObserver(() => {
+      setBarHeight(el.offsetHeight);
     });
     observer.observe(el);
     return () => observer.disconnect();
@@ -41,8 +42,10 @@ export default function CtaBand({
       <section
         ref={barRef}
         // bg-zinc-700 + 화이트 — 다크/라이트 양쪽 가독성 충분.
-        // pb는 모바일에서 max(기본, env(safe-area-inset-bottom)) — iOS 홈 인디케이터 회피.
-        className="border-border bg-zinc-700 fixed right-0 bottom-0 left-0 z-30 flex flex-col items-start gap-3 border-t px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-white shadow-2xl md:left-60 md:flex-row md:items-center md:justify-between md:gap-4 md:px-8 md:pt-5 md:pb-5"
+        // pb는 calc(기본 + env(safe-area-inset-bottom)) — env가 0인 데스크톱은 기본만,
+        //   iOS 모바일/iPad는 자동으로 홈 인디케이터 회피분 추가. md 분기 없이 단일.
+        //   (Codex PR #66: md:pb-5가 safe-area 덮어쓰던 회귀 정정.)
+        className="border-border bg-zinc-700 fixed right-0 bottom-0 left-0 z-30 flex flex-col items-start gap-3 border-t px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-white shadow-2xl md:left-60 md:flex-row md:items-center md:justify-between md:gap-4 md:px-8 md:pt-5 md:pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
         role="complementary"
         aria-label="채점 받기 안내"
       >
