@@ -74,9 +74,8 @@ export default function Home() {
         </div>
       </header>
 
-      {/* 개인화 배너 + 닫는 CTA — 기존 위치 유지 */}
+      {/* 개인화 배너 — hero 직후. CtaBand는 floating fixed라 페이지 맨 끝에서 호출. */}
       <HomeWelcomeBanner />
-      <CtaBand />
 
       {/* Bento 4-up — 기능 시각화. qanda 'bento card' 톤. */}
       <section className="mt-14">
@@ -157,6 +156,10 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Floating CTA — 페이지 마지막에 호출해야 spacer가 페이지 끝에 들어가 fixed bar가
+          마지막 콘텐츠를 가리지 않음(Codex PR #66 정정). */}
+      <CtaBand />
     </main>
   );
 }

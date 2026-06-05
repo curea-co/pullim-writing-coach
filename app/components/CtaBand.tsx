@@ -1,8 +1,11 @@
-// Pullim Writing Coach — 닫는 CTA 밴드
-//   레퍼런스의 페이지 하단 "닫는 CTA 밴드"("엔진은 라이선스로…") 패턴 차용. 서버 컴포넌트.
-//   배경: zinc-700(진한 회색 ~75%). 기존 bg-primary는 너무 어두워 사용자 피드백 반영(2026-05-29).
+"use client";
+// Pullim Writing Coach — 닫는 CTA 밴드 (2026-06-05: floating bottom + 실측 spacer + safe-area)
+//   스크롤 내려도 viewport 하단에 항상 고정. spacer는 ResizeObserver로 실측 높이 반영
+//   → 텍스트 줄바꿈·폰트 확대 시에도 spacer가 bar 가림 방지 (Codex PR #66).
+//   iOS safe-area-inset-bottom 처리 — 홈 인디케이터 영역 회피.
 
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 
 export default function CtaBand({
   title = "직접 쓴 글로 채점받아 보세요",
@@ -15,19 +18,49 @@ export default function CtaBand({
   href?: string;
   cta?: string;
 }) {
+  const barRef = useRef<HTMLElement>(null);
+  // SSR fallback — 실제 bar 높이 측정 전 임시값(데스크톱 ~80px, 모바일 ~120px 여유).
+  //   클라 mount 후 ResizeObserver가 실측 height로 override.
+  const [barHeight, setBarHeight] = useState(128);
+
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+    // Codex PR #66: contentRect는 content-box(padding/border 제외)라 spacer가 부족.
+    //   offsetHeight는 padding + border 포함 border-box 높이 → fixed bar 가림 방지에 정확.
+    const observer = new ResizeObserver(() => {
+      setBarHeight(el.offsetHeight);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <section className="mt-12 flex flex-col items-start gap-4 rounded-2xl bg-zinc-700 px-6 py-7 text-white md:flex-row md:items-center md:justify-between">
-      <div>
-        <h2 className="text-lg font-bold tracking-tight md:text-xl">{title}</h2>
-        <p className="mt-1 text-sm opacity-90">{description}</p>
-      </div>
-      <Link
-        href={href}
-        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-zinc-800 transition hover:opacity-90"
+    <>
+      {/* 실측 spacer — 페이지 흐름 끝에서 fixed bar 높이만큼 자리 확보. */}
+      <div aria-hidden style={{ height: barHeight }} />
+      <section
+        ref={barRef}
+        // bg-zinc-700 + 화이트 — 다크/라이트 양쪽 가독성 충분.
+        // pb는 calc(기본 + env(safe-area-inset-bottom)) — env가 0인 데스크톱은 기본만,
+        //   iOS 모바일/iPad는 자동으로 홈 인디케이터 회피분 추가. md 분기 없이 단일.
+        //   (Codex PR #66: md:pb-5가 safe-area 덮어쓰던 회귀 정정.)
+        className="border-border bg-zinc-700 fixed right-0 bottom-0 left-0 z-30 flex flex-col items-start gap-3 border-t px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-white shadow-2xl md:left-60 md:flex-row md:items-center md:justify-between md:gap-4 md:px-8 md:pt-5 md:pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
+        role="complementary"
+        aria-label="채점 받기 안내"
       >
-        {cta}
-        <span aria-hidden>→</span>
-      </Link>
-    </section>
+        <div>
+          <h2 className="text-base font-bold tracking-tight md:text-lg">{title}</h2>
+          <p className="mt-0.5 text-xs opacity-90 md:text-sm">{description}</p>
+        </div>
+        <Link
+          href={href}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-zinc-800 transition hover:opacity-90"
+        >
+          {cta}
+          <span aria-hidden>→</span>
+        </Link>
+      </section>
+    </>
   );
 }
