@@ -28,7 +28,9 @@
 - 인증: `DEMO_ACCESS_TOKEN` 데모 비밀번호 게이트 (PR #56 + 운영자가 비밀번호 공유)
 - billing: 부모 시스템 통합 X — 무료 free-only
 - 비용 통제: PR #65 rate limit (IP+cookie 분당 60/10회)
-- 에러 수집: Sentry **자동 no-op** 배포 — `SENTRY_DSN` (서버) **와** `NEXT_PUBLIC_SENTRY_DSN` (클라) **모두 미설정** 시 init 우회. instrumentation·error boundary 코드는 그대로 유지. Vercel function logs로 폴백
+- 에러 수집: Sentry **자동 no-op** 배포 — `SENTRY_DSN` (서버) **와** `NEXT_PUBLIC_SENTRY_DSN` (클라) **모두 미설정** 시 init 우회. instrumentation·error boundary 코드는 그대로 유지하되 `captureException`도 no-op.
+  - **서버측 예외**(`/api/score` 등): Vercel function logs로 폴백
+  - **클라이언트 예외**(error boundary 등): 폴백 없음 — 출시 후 별도 sprint에서 `console.error` 백업 도입 예정
 - dogfood: prod 자연발생 피드백 + EPO 셀프 검증
 
 ## 3. W2 plan 반영 (docs/28 갱신 사항)
