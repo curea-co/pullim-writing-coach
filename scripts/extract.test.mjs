@@ -146,7 +146,6 @@ test("finalizeExtraction — 정상: 모든 필드 보존, 타이핑 채널은 r
   assert.equal(out.genre.value, "논설문·주장하는 글");
   assert.equal(out.target_char_count.value, 800);
   assert.equal(out.target_char_count.confidence, "confirmed");
-  assert.equal(out.target_char_count.requested, undefined);
   assert.deepEqual(out.conditions, ["근거 2개 이상", "개요 포함"]);
   assert.equal(out.teacher_rubric_present, true);
   assert.equal(out.raw_excerpt, undefined, "type 채널은 미리보기 미포함");
@@ -158,11 +157,12 @@ test("finalizeExtraction — file 채널은 raw_excerpt 400자까지 포함", ()
   assert.equal(out.raw_excerpt.length, 400);
 });
 
-test("finalizeExtraction — 분량 5000 (TARGET_MAX 초과) → 2000으로 캡 + requested에 원본 보존", () => {
+test("finalizeExtraction — 분량 5000 (TARGET_MAX 초과)도 표시 정책상 그대로 (Codex PR #67)", () => {
+  // 표시 정책: 교사 안내서 값 그대로. 채점 cap은 score-client 책임.
   const input = { ...VALID_OUTPUT, target_char_count: { value: 5000, confidence: "confirmed" } };
   const out = finalizeExtraction(input, "본문", "type");
-  assert.equal(out.target_char_count.value, 2000, "2000으로 캡");
-  assert.equal(out.target_char_count.requested, 5000, "원본 5000 requested에 보존");
+  assert.equal(out.target_char_count.value, 5000, "원본 보존");
+  assert.equal(out.target_char_count.confidence, "confirmed", "신뢰도 유지");
 });
 
 test("finalizeExtraction — 분량 5(오인식, ≤9) → null + confidence inferred로 강등", () => {
@@ -177,6 +177,14 @@ test("finalizeExtraction — 장르가 enum 외 → '기타'로 정규화 + conf
   const out = finalizeExtraction(input, "본문", "type");
   assert.equal(out.genre.value, "기타");
   assert.equal(out.genre.confidence, "inferred");
+});
+
+test("finalizeExtraction — 장르 trim 후 enum 일치 → confirmed (Codex PR #67)", () => {
+  // 모델이 "설명문 "처럼 공백 섞인 값 출력 시 trim 후 비교.
+  const input = { ...VALID_OUTPUT, genre: { value: "  설명문  ", confidence: "confirmed" } };
+  const out = finalizeExtraction(input, "본문", "type");
+  assert.equal(out.genre.value, "설명문", "trim 적용");
+  assert.equal(out.genre.confidence, "confirmed", "enum 일치 시 confidence 유지");
 });
 
 test("finalizeExtraction — conditions 중복·공백 dedup + 6건 cap", () => {

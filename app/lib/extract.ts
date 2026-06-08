@@ -8,7 +8,7 @@
 //   작성·채점 상한(2,000자)은 AssignmentCard가 별도 주석으로 안내하고, 채점 요청은 score-client가
 //   경계로 클램프한다(표시는 교사값, 채점은 계약 범위). 여기선 정보를 지우지 않는다.
 
-import { capTargetToWritable, type ErrorCode, GENRES } from "./grading";
+import { type ErrorCode, GENRES } from "./grading";
 
 export const RAW_MIN = 5;
 export const RAW_MAX = 8000;
@@ -23,12 +23,10 @@ type Confidence = "confirmed" | "inferred";
 export type ExtractedAssignment = {
   prompt_text: { value: string; confidence: Confidence };
   genre: { value: string; confidence: Confidence };
-  // value: 작성·채점 가능 범위(50~2,000)로 캡한 실효 목표.
-  // requested: 원본이 범위를 벗어나 캡됐을 때의 원래 값(주석용).
+  // value: 안내서에 적힌 교사 의도값 그대로 (5000자도 5000으로). 채점 cap(50~2000)은 score-client 책임.
   target_char_count: {
     value: number | null;
     confidence: Confidence;
-    requested?: number;
   };
   conditions: string[]; // 유의 조건 (근거 2개·개요·출처 등)
   teacher_rubric_present: boolean; // 선생님 루브릭 추출 여부 (CEO doc §3-2 게임체인저)
@@ -127,21 +125,27 @@ export function validateExtractOutput(o: unknown): string[] {
 }
 
 // ── 정규화 → ExtractedAssignment (서버 권위 후처리) ────────────────────────
+//   Codex PR #67: 모델이 "설명문 " 같이 공백 섞인 값을 출력하면 enum 비교 실패 → "기타" 강등.
+//   prompt_text/conditions와 일관되게 trim 후 비교.
 function normGenre(value: string): { value: string; confidence: Confidence } {
-  if ((GENRES as readonly string[]).includes(value)) return { value, confidence: "confirmed" };
+  const trimmed = value.trim();
+  if ((GENRES as readonly string[]).includes(trimmed))
+    return { value: trimmed, confidence: "confirmed" };
   return { value: "기타", confidence: "inferred" };
 }
 
-// 분량 정규화: 작성·채점 가능 범위(50~2,000)로 캡하는 공유 헬퍼(capTargetToWritable)를 쓴다.
-//   모델이 분량 숫자를 줬는데 9 이하라 목표 없음(null)으로 떨어진 경우 = 오인식 → altered(confidence inferred).
+// 분량 정규화 — 표시 정책 (대표님 결정 2026-06-04 + Codex PR #67):
+//   value = 안내서에 적힌 교사 의도값 그대로 (예: 5000자도 5000으로 유지).
+//   작성·채점 가능 범위(50~2,000) cap은 score-client가 채점 호출 시점에 별도 처리.
+//   오인식("5문단"→5 같은 ≤9 숫자)만 여기서 null로 차단 + altered=true(confidence inferred).
 function normalizeTarget(raw: number | null): {
   value: number | null;
-  requested?: number;
   altered: boolean;
 } {
-  const capped = capTargetToWritable(raw);
-  const altered = typeof raw === "number" && Number.isFinite(raw) && capped.value === null;
-  return { ...capped, altered };
+  if (raw === null || !Number.isFinite(raw)) return { value: null, altered: false };
+  const n = Math.round(raw);
+  if (n <= 9) return { value: null, altered: true }; // 오인식 차단
+  return { value: n, altered: false }; // 5000도 표시·channel은 score-client 책임
 }
 
 // 검증 통과한 모델 출력 + 원문/채널 → 화면용 ExtractedAssignment.
@@ -171,8 +175,8 @@ export function finalizeExtraction(
 
   const showExcerpt = channel === "file" || channel === "photo" || channel === "link";
 
-  // 분량: 50~2,000으로 캡한 실효 목표를 value로, 원본이 범위를 벗어났으면 requested에 보존(주석용).
-  const { value: targetValue, requested: targetRequested, altered: targetAltered } = normalizeTarget(
+  // 분량: 교사 의도값 그대로 (오인식 ≤9만 null로 차단). 채점 cap은 score-client 책임.
+  const { value: targetValue, altered: targetAltered } = normalizeTarget(
     parsed.target_char_count.value,
   );
   const targetConfidence: Confidence = targetAltered
@@ -188,7 +192,6 @@ export function finalizeExtraction(
     target_char_count: {
       value: targetValue,
       confidence: targetConfidence,
-      ...(targetRequested != null ? { requested: targetRequested } : {}),
     },
     conditions,
     teacher_rubric_present: parsed.teacher_rubric_present,

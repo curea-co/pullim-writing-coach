@@ -6,12 +6,9 @@
 import { type ExtractedAssignment } from "./extract";
 import { ERROR_MESSAGE, type ErrorCode } from "./grading";
 
-// 라이브 추출 토글 — 채점(NEXT_PUBLIC_USE_LIVE_SCORING)과 분리해 운영 유연성 확보.
-//   추출만 mock으로 두고 채점은 live 운영하는 시나리오(또는 그 반대) 가능.
-//   미설정 시 mock 추출(false). 인벤토리 docs/26 §9에 환경변수 정의.
-export function isLiveExtractionEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_USE_LIVE_EXTRACTION === "true";
-}
+// 라이브/mock 토글 API는 Phase 1 PR D(페이지 통합) 시 도입.
+//   여기는 fetch 래퍼만 — 호출자가 toggle 분기 책임.
+//   예정 env: NEXT_PUBLIC_USE_LIVE_EXTRACTION (인벤토리 docs/26 §9).
 
 export type ExtractErrorCode = ErrorCode | "E-NETWORK";
 

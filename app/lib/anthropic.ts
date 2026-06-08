@@ -1,3 +1,4 @@
+import "server-only";
 // anthropic — 단일 모델 호출 유틸 (서버 전용).
 //   /api/score(route.ts)·/api/extract(route.ts)에서 공유하는 호출 표면.
 //   raw fetch + AbortController, 자동재시도 없음(maxRetries:0), JSON 강제 프리필 "{".
