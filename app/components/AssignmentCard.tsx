@@ -1,0 +1,224 @@
+"use client";
+// AssignmentCard — 안내서에서 추출된 과제 카드.
+//   필드: 과제문·장르·분량·조건·선생님 루브릭 여부. 각 필드는 ConfidenceChip(추정=점선+확인 뱃지).
+//   칩을 탭하면 인라인 편집(InlineEditor). 저장 시 sessionStorage(`pwc_coach_assignment`) + onChange.
+//
+// 2026-06-08 v2 이식 (Phase 1 PR C):
+//   - ExtractedAssignment 타입을 lib/extract에서 import (PR A에서 lib에 정의).
+//   - 분량 표시 정책: 교사값 그대로 유지 — 사용자 수정 시도 cap 없이 raw 저장. 채점 cap은 score-client(PR D 예정)가 호출 시점에. 범위 밖이면 안내 배너만 표시.
+//   - sessionStorage 키 `pwc_coach_assignment` (Phase plan docs/27 §Phase 2 일관).
+
+import { useEffect, useState } from "react";
+import ConfidenceChip from "./ConfidenceChip";
+import { type ExtractedAssignment } from "@/app/lib/extract";
+import { TARGET_MAX, TARGET_MIN } from "@/app/lib/grading";
+
+const STORAGE_KEY = "pwc_coach_assignment";
+
+// 어느 필드를 편집 중인지. 조건은 인덱스로 식별.
+type EditKey = "genre" | "target" | `cond:${number}` | null;
+
+// 인라인 편집 입력칸 — 칩 자리에 그대로 들어가는 작은 폼.
+function InlineEditor({
+  label,
+  initial,
+  numeric,
+  onSave,
+  onCancel,
+}: {
+  label: string;
+  initial: string;
+  numeric?: boolean;
+  onSave: (value: string) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(initial);
+  return (
+    <span className="border-accent-mid bg-surface inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1.5 text-xs">
+      <span className="text-subtle-foreground">{label}</span>
+      <input
+        autoFocus
+        type="text"
+        inputMode={numeric ? "numeric" : "text"}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") onSave(value);
+          else if (e.key === "Escape") onCancel();
+        }}
+        className="text-foreground w-28 bg-transparent font-medium outline-none"
+      />
+      <button
+        type="button"
+        onClick={() => onSave(value)}
+        className="text-accent-mid font-semibold"
+      >
+        저장
+      </button>
+      <button type="button" onClick={onCancel} className="text-subtle-foreground">
+        취소
+      </button>
+    </span>
+  );
+}
+
+export default function AssignmentCard({
+  data,
+  onChange,
+}: {
+  data: ExtractedAssignment;
+  onChange?: (next: ExtractedAssignment) => void;
+}) {
+  const [a, setA] = useState(data);
+  const [editing, setEditing] = useState<EditKey>(null);
+
+  // 부모가 새 안내서를 넘기면(재추출 등) 내부 사본 동기화.
+  useEffect(() => {
+    setA(data);
+  }, [data]);
+
+  // 편집 확정 — 내부 상태 + sessionStorage + 부모 콜백 모두 갱신.
+  const persist = (next: ExtractedAssignment) => {
+    setA(next);
+    if (typeof window !== "undefined") {
+      try {
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        /* swallow — quota 초과는 사용자 의도 외, 화면은 계속 동작 */
+      }
+    }
+    onChange?.(next);
+    setEditing(null);
+  };
+
+  const saveGenre = (value: string) => {
+    const v = value.trim();
+    if (!v) return setEditing(null);
+    persist({ ...a, genre: { value: v, confidence: "confirmed" } });
+  };
+
+  const saveTarget = (value: string) => {
+    const digits = value.replace(/[^\d]/g, "");
+    const parsed = digits === "" ? null : Number(digits);
+    // 분량 표시 정책: raw value 그대로 저장. 채점 cap은 score-client(PR D)가 호출 시점에 처리.
+    // 범위 밖이면 아래 안내 배너로 사용자에게 노출.
+    persist({
+      ...a,
+      target_char_count: { value: parsed, confidence: "confirmed" },
+    });
+  };
+
+  const saveCondition = (index: number, value: string) => {
+    const v = value.trim();
+    const next = [...a.conditions];
+    if (!v) next.splice(index, 1); // 비우면 조건 삭제
+    else next[index] = v;
+    persist({ ...a, conditions: next });
+  };
+
+  const targetValue = a.target_char_count.value;
+  const targetOutOfRange =
+    targetValue != null && (targetValue < TARGET_MIN || targetValue > TARGET_MAX);
+
+  return (
+    <section className="border-border bg-surface rounded-2xl border p-5">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-foreground text-sm font-semibold">
+          📋 과제 카드 — 안내서에서 자동 추출
+        </h3>
+        {a.teacher_rubric_present && (
+          <span className="bg-band-good-surface text-band-good-foreground rounded-full px-2 py-0.5 text-[10px] font-semibold">
+            ★ 선생님 루브릭 인식됨
+          </span>
+        )}
+      </div>
+
+      <p className="text-foreground mb-4 text-sm leading-relaxed">
+        <span className="text-muted-foreground text-xs font-semibold">과제문 · </span>
+        {a.prompt_text.value}
+        {a.prompt_text.confidence === "inferred" && (
+          <span className="text-accent-mid ml-2 text-xs">↻ 확인 필요</span>
+        )}
+      </p>
+
+      <div className="flex flex-wrap gap-2">
+        {editing === "genre" ? (
+          <InlineEditor
+            label="장르"
+            initial={a.genre.value}
+            onSave={saveGenre}
+            onCancel={() => setEditing(null)}
+          />
+        ) : (
+          <ConfidenceChip
+            label="장르"
+            value={a.genre.value}
+            confidence={a.genre.confidence}
+            onEdit={() => setEditing("genre")}
+          />
+        )}
+
+        {editing === "target" ? (
+          <InlineEditor
+            label="분량"
+            initial={targetValue != null ? String(targetValue) : ""}
+            numeric
+            onSave={saveTarget}
+            onCancel={() => setEditing(null)}
+          />
+        ) : (
+          <ConfidenceChip
+            label="분량"
+            value={targetValue != null ? `${targetValue}자` : "제한 없음"}
+            confidence={a.target_char_count.confidence}
+            onEdit={() => setEditing("target")}
+          />
+        )}
+
+        {a.conditions.map((c, i) =>
+          editing === `cond:${i}` ? (
+            <InlineEditor
+              key={`edit-${i}`}
+              label="조건"
+              initial={c}
+              onSave={(v) => saveCondition(i, v)}
+              onCancel={() => setEditing(null)}
+            />
+          ) : (
+            <ConfidenceChip
+              key={c}
+              label="조건"
+              value={c}
+              confidence="confirmed"
+              onEdit={() => setEditing(`cond:${i}`)}
+            />
+          ),
+        )}
+      </div>
+
+      {/* 분량이 작성·채점 가능 범위를 벗어난 경우 사용자에게 한계 안내.
+          정책: value는 교사값 그대로 표시, 안내만 추가. 채점 호출 시 score-client가 별도 cap. */}
+      {targetOutOfRange && (
+        <p className="bg-band-warn-surface text-band-warn-foreground mt-3 rounded-md px-3 py-2 text-[11px] leading-relaxed">
+          ※ 목표 <strong>{targetValue}자</strong>는 이 도구의 작성·채점 범위({TARGET_MIN}~{TARGET_MAX}자)를
+          벗어나요. 채점 시 범위 안으로 자동 조정돼요.
+        </p>
+      )}
+
+      {a.raw_excerpt && (
+        <details className="mt-4">
+          <summary className="text-subtle-foreground cursor-pointer text-xs">
+            안내서 원문 일부 보기
+          </summary>
+          <p className="bg-muted text-muted-foreground mt-2 rounded-md px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap">
+            {a.raw_excerpt}
+          </p>
+        </details>
+      )}
+
+      <p className="text-subtle-foreground mt-4 text-[11px] leading-relaxed">
+        ※ 잘못된 필드는 클릭해서 직접 수정할 수 있어요. 추정값(점선)은 한 번 확인해 주세요.
+      </p>
+    </section>
+  );
+}
