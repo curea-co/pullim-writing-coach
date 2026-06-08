@@ -42,17 +42,36 @@ export class ExtractError extends Error {
   }
 }
 
-// 응답이 ExtractedAssignment 모양인지 최소 검증 — server가 형식 어긋난 200 응답 시 UI 보호.
+// 응답이 ExtractedAssignment 모양인지 깊이 검증 — Codex PR #67: typeof "object"만 보면
+//   null·배열·{value:123} 같은 값도 통과. 각 중첩 필드 value/confidence 타입까지 확인.
+function isConf(v: unknown): boolean {
+  return v === "confirmed" || v === "inferred";
+}
+
 function looksLikeExtractedAssignment(v: unknown): v is ExtractedAssignment {
-  if (!v || typeof v !== "object") return false;
+  if (!v || typeof v !== "object" || Array.isArray(v)) return false;
   const o = v as Record<string, unknown>;
-  return (
-    typeof o.prompt_text === "object" &&
-    typeof o.genre === "object" &&
-    typeof o.target_char_count === "object" &&
-    Array.isArray(o.conditions) &&
-    typeof o.teacher_rubric_present === "boolean"
-  );
+
+  const pt = o.prompt_text;
+  if (!pt || typeof pt !== "object" || Array.isArray(pt)) return false;
+  const ptObj = pt as Record<string, unknown>;
+  if (typeof ptObj.value !== "string" || !isConf(ptObj.confidence)) return false;
+
+  const g = o.genre;
+  if (!g || typeof g !== "object" || Array.isArray(g)) return false;
+  const gObj = g as Record<string, unknown>;
+  if (typeof gObj.value !== "string" || !isConf(gObj.confidence)) return false;
+
+  const t = o.target_char_count;
+  if (!t || typeof t !== "object" || Array.isArray(t)) return false;
+  const tObj = t as Record<string, unknown>;
+  if (!(tObj.value === null || typeof tObj.value === "number")) return false;
+  if (!isConf(tObj.confidence)) return false;
+
+  if (!Array.isArray(o.conditions) || o.conditions.some((c) => typeof c !== "string"))
+    return false;
+  if (typeof o.teacher_rubric_present !== "boolean") return false;
+  return true;
 }
 
 // 안내서 원문 → /api/extract 호출 → 검증된 ExtractedAssignment. 실패는 ExtractError로 throw.

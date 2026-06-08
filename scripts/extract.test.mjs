@@ -179,12 +179,19 @@ test("finalizeExtraction — 장르가 enum 외 → '기타'로 정규화 + conf
   assert.equal(out.genre.confidence, "inferred");
 });
 
-test("finalizeExtraction — 장르 trim 후 enum 일치 → confirmed (Codex PR #67)", () => {
-  // 모델이 "설명문 "처럼 공백 섞인 값 출력 시 trim 후 비교.
+test("finalizeExtraction — 장르 trim 후 enum 일치 (confirmed 유지)", () => {
   const input = { ...VALID_OUTPUT, genre: { value: "  설명문  ", confidence: "confirmed" } };
   const out = finalizeExtraction(input, "본문", "type");
   assert.equal(out.genre.value, "설명문", "trim 적용");
-  assert.equal(out.genre.confidence, "confirmed", "enum 일치 시 confidence 유지");
+  assert.equal(out.genre.confidence, "confirmed");
+});
+
+test("finalizeExtraction — 장르 trim 후 enum 일치라도 원본 inferred는 보존 (Codex PR #67)", () => {
+  // trim·정규화로 confidence 격상하면 안 됨. 모델이 inferred로 추론한 결과는 그대로.
+  const input = { ...VALID_OUTPUT, genre: { value: "  설명문  ", confidence: "inferred" } };
+  const out = finalizeExtraction(input, "본문", "type");
+  assert.equal(out.genre.value, "설명문", "trim 적용");
+  assert.equal(out.genre.confidence, "inferred", "공백 정규화는 신뢰도와 무관");
 });
 
 test("finalizeExtraction — conditions 중복·공백 dedup + 6건 cap", () => {

@@ -127,10 +127,12 @@ export function validateExtractOutput(o: unknown): string[] {
 // ── 정규화 → ExtractedAssignment (서버 권위 후처리) ────────────────────────
 //   Codex PR #67: 모델이 "설명문 " 같이 공백 섞인 값을 출력하면 enum 비교 실패 → "기타" 강등.
 //   prompt_text/conditions와 일관되게 trim 후 비교.
-function normGenre(value: string): { value: string; confidence: Confidence } {
+//   confidence는 trim·정규화에 따라 격상하지 않음 — enum 일치는 원본 confidence 보존,
+//   enum 외만 "기타" + inferred로 강등.
+function normGenre(value: string, original: Confidence): { value: string; confidence: Confidence } {
   const trimmed = value.trim();
   if ((GENRES as readonly string[]).includes(trimmed))
-    return { value: trimmed, confidence: "confirmed" };
+    return { value: trimmed, confidence: original };
   return { value: "기타", confidence: "inferred" };
 }
 
@@ -161,13 +163,7 @@ export function finalizeExtraction(
   rawText: string,
   channel?: string,
 ): ExtractedAssignment {
-  const genreModel = parsed.genre.value;
-  const normalized = normGenre(genreModel);
-  // 모델이 enum 값을 줬으면 모델 confidence 존중, 정규화로 바뀌었으면 inferred.
-  const genre =
-    normalized.value === genreModel
-      ? { value: normalized.value, confidence: parsed.genre.confidence }
-      : normalized;
+  const genre = normGenre(parsed.genre.value, parsed.genre.confidence);
 
   const conditions = Array.from(
     new Set(parsed.conditions.map((c) => c.trim()).filter(Boolean)),
