@@ -51,12 +51,16 @@
 
 ## 5. 외부 의존 P0 — 본 sprint와 병렬
 
-본 sprint(코드)와 무관하게 진행:
+본 sprint(코드)와 무관하게 진행. **5건 정식 정의 source = [docs/29 §4](29_decisions_intake_2026-06-08.md)**:
 
-- Vercel Pro 이관 (대표님 결정 6/5)
-- 도메인 alias
-- 부모 시스템 인증·billing 통합
-- Sentry prod 알람
+- P0-#1 Vercel Pro 이관 (대표님 결정 6/5)
+- P0-#2 도메인 alias
+- P0-#3 부모 인증 SDK
+- P0-#4 부모 billing
+- P0-#6 dogfood 모집
+
+추가 운영 항목 (P0 외 — 출시 후 별도 sprint 대상):
+- Sentry prod 알람 활성화 (현 sprint는 DSN 미설정 no-op)
 - Anthropic 월 예산 + auto-disable
 
 → 코드 sprint 6/15 완료돼도 외부 의존 미해소 시 출시 형태가 **`DEMO_ACCESS_TOKEN` 서버 게이트 보호 데모** 상태로 제한 (`NEXT_PUBLIC_DEMO_TOKEN` 자동입장은 PR #64 도입했으나 2026-06-04 prod env에서 제거 — 운영자가 비밀번호 별도 공유). 완전 출시는 외부 의존 해소 후.
