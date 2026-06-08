@@ -1,0 +1,188 @@
+/* Pullim Writing Coach — U5 코치 UI 스코프 스타일 (docs/27_coach_prototype.html 포팅)
+ *
+ * 경계: Pullim DS 토큰(blue+lemon)은 U6가 globals.css 전역에 추가하는 게 정본이다.
+ *   다만 U5 컴포넌트가 U6 적용 여부와 무관하게 단독으로 정상 렌더되도록, 이 모듈이
+ *   --pullim-* / --pb-* / --r-* / 그림자·폰트 토큰을 .root에 **스코프 폴백**으로 둔다.
+ *   전역(globals.css)에 이미 같은 이름의 토큰이 있으면 자식 요소는 그 값을 상속하므로
+ *   .root의 선언은 폴백일 뿐 전역을 깨지 않는다(같은 값으로 정렬).
+ *
+ * 인라인 transform·세그먼트 pop·바텀시트 트랜지션처럼 Tailwind arbitrary로 표현하기
+ *   까다로운 것만 여기 둔다. 색/간격 대부분은 컴포넌트 className(arbitrary value)에서 처리.
+ */
+
+.root {
+  /* ── Pullim OS 토큰 (U6 미적용 시 폴백) ── */
+  --pullim-blue: #0362da;
+  --pullim-ink: #0d1a1f;
+  --pullim-paper: #f0f6fb;
+  --pullim-lemon: #e6ff4c;
+  --pb-1: #f4faff;
+  --pb-2: #d1e8ff;
+  --pb-3: #9fc8ff;
+  --pb-5: #1f89f5;
+  --pb-8: #00389e;
+  --ink-2: #1f2c32;
+  --ink-3: #45555c;
+  --ink-4: #5e6b72;
+  --ink-5: #b0bcc3;
+  --line: #d6e2ee;
+  --line-2: #e8eff6;
+  --ok: #10b987;
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --r-pill: 999px;
+  --sh-1: 0 1px 2px rgba(13, 26, 31, 0.04), 0 1px 3px rgba(13, 26, 31, 0.06);
+  --sh-2: 0 2px 8px rgba(13, 26, 31, 0.06), 0 8px 24px rgba(13, 26, 31, 0.05);
+  --sh-3: 0 12px 40px rgba(3, 98, 218, 0.12), 0 4px 12px rgba(13, 26, 31, 0.06);
+  --sh-pop: 0 18px 50px rgba(13, 26, 31, 0.16);
+  --f-kr: "Pretendard Variable", "Pretendard", system-ui, sans-serif;
+  --f-brand: "Bai Jamjuree", "Pretendard Variable", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, monospace;
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+
+  font-family: var(--f-kr);
+  color: var(--pullim-ink);
+  line-height: 1.6;
+}
+
+.brandFont {
+  font-family: var(--f-brand);
+}
+.monoFont {
+  font-family: var(--f-mono);
+}
+
+/* 배경 그리드(블루 라인 + 우상단 글로우) — 데스크탑 무대감 */
+.stageBg {
+  background-color: var(--pullim-paper);
+  background-image:
+    linear-gradient(to right, rgba(3, 98, 218, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(3, 98, 218, 0.045) 1px, transparent 1px),
+    radial-gradient(900px 460px at 88% -10%, rgba(3, 98, 218, 0.1), transparent 60%);
+  background-size: 44px 44px, 44px 44px, 100% 100%;
+}
+
+/* ── 캔버스: 노트 줄 배경 ── */
+.canvas {
+  font-family: var(--f-kr);
+  line-height: 2;
+  color: var(--pullim-ink);
+  background-image: repeating-linear-gradient(
+    transparent 0 calc(2em - 1px),
+    var(--line-2) calc(2em - 1px) 2em
+  );
+  background-position: 0 18px;
+}
+.canvas::placeholder {
+  color: var(--ink-5);
+}
+
+/* ── 바텀시트: transform 트랜지션 ── */
+.sheet {
+  background: #fff;
+  border-top: 1px solid var(--line);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  box-shadow: var(--sh-pop);
+  transition: transform 0.42s var(--ease);
+  will-change: transform;
+}
+.grip {
+  width: 44px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--line);
+}
+.arrowBob {
+  display: inline-block;
+  animation: bob 1.5s ease-in-out infinite;
+}
+@keyframes bob {
+  50% {
+    transform: translateY(-4px);
+  }
+}
+.thinkingDots {
+  animation: pulse 1s infinite;
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* ── 성장 막대 세그먼트 ── */
+.seg {
+  flex: 1;
+  height: 12px;
+  border-radius: var(--r-xs);
+  background: var(--line-2);
+  border: 1px solid var(--line);
+}
+.segWas {
+  background: var(--pb-3);
+  border-color: var(--pb-3);
+}
+.segCur {
+  background: var(--pullim-blue);
+  border-color: var(--pullim-blue);
+}
+.segGain {
+  background: var(--pullim-lemon);
+  border-color: var(--pullim-lemon);
+  animation: segPop 0.4s var(--ease) both;
+}
+.segGainStatic {
+  background: var(--pullim-lemon);
+  border-color: var(--pullim-lemon);
+}
+@keyframes segPop {
+  from {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+}
+.segGain:nth-child(2) {
+  animation-delay: 0.05s;
+}
+.segGain:nth-child(3) {
+  animation-delay: 0.12s;
+}
+.segGain:nth-child(4) {
+  animation-delay: 0.19s;
+}
+.segGain:nth-child(5) {
+  animation-delay: 0.26s;
+}
+
+/* ── 완료 화면 슬라이드업 ── */
+.done {
+  background: var(--pullim-paper);
+  transform: translateY(101%);
+  transition: transform 0.5s var(--ease);
+}
+.doneOn {
+  transform: none;
+}
+
+/* 답안 인용 하이라이트(유도질문 b 강조) — 레몬 underline */
+.qHighlight b {
+  color: var(--pullim-ink);
+  background: linear-gradient(transparent 58%, var(--pullim-lemon) 58%);
+  padding: 0 1px;
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet,
+  .done {
+    transition: none;
+  }
+  .arrowBob,
+  .thinkingDots,
+  .segGain {
+    animation: none;
+  }
+}

@@ -1,0 +1,652 @@
+"use client";
+
+// Pullim Writing Coach — U5 코치 상태머신 (docs/27_coach_prototype.html React 포팅)
+//
+// 흐름(킥 UX, 한 호흡에 한 nudge):
+//   write → [봐줘] → checking(POST /api/coach) → nudge(peek→open) → [고쳤어 ✓]
+//     → rechecking(POST /api/coach) → growth(전/후 막대) → [다음] → 다음 nudge … → done(완료화면)
+//
+// 서버 계약(EPIC2 /api/coach, /api/score 패턴 답습): 요청={assignment, submission:{body}},
+//   200 응답=CoachOutput(coach-schema). x-demo-token 헤더(TokenGate와 공유). 401→재인증 유도.
+//   nudge 우선순위는 prioritizeNudges/topNudge(nudge-priority), 성장막대는 revision.ts.
+//
+// 불변식: 코치는 학생 문장을 대신 쓰지 않는다. 이 클라이언트는 서버가 준 diagnosis/guiding_question만
+//   표시하고, 작성은 전적으로 캔버스(학생)에 맡긴다. "코치가 준 문장 0개"를 과정 로그로 증명.
+
+import { useMemo, useReducer, useRef, useState } from "react";
+import type { CoachNudge, CoachOutput } from "@/app/lib/coach-schema";
+import type { AreaName } from "@/app/data/scoring";
+import { validateCoachOutput } from "@/app/lib/coach-schema";
+import { topNudge } from "@/app/lib/nudge-priority";
+import { AREAS } from "@/app/lib/grading";
+import { DEMO_TOKEN_KEY } from "@/app/components/TokenGate";
+import styles from "@/app/coach/coach.module.css";
+import Canvas from "./Canvas";
+import BottomSheet, { type SheetPosition } from "./BottomSheet";
+import NudgeCard from "./NudgeCard";
+import GrowthBars, { GrowthRow } from "./GrowthBars";
+import { BlockIcon, MastGlyph } from "./icons";
+
+// ── 과제 컨텍스트(데모 기본값) ──────────────────────────────────────
+// 실서비스는 프로필/과제 선택에서 주입. 여기선 프로토타입과 동일한 데모 과제.
+const ASSIGNMENT = {
+  school_level: "중2",
+  subject: "과학",
+  genre: "설명문",
+  target_char_count: null as number | null,
+  prompt_text:
+    "화산의 형성 과정과 그것이 우리 삶에 미치는 영향을 설명하는 글을 쓰시오.",
+};
+const ASSIGNMENT_TITLE = "화산의 형성과 영향";
+const SEED = "화산은 마그마가 분출하여 만들어진 지형이다. 화산은 위험하다. 그래서 조심해야 한다.";
+
+// nudge 대상 4영역(성장 가능성 제외) — 루브릭 칩 "약점" 표시용.
+const NUDGEABLE: readonly AreaName[] = ["과제 이해", "내용 충실도", "구조·논리", "표현·문장"];
+const PASS = 14; // 영역 통과 기준(0~20)
+
+// "왜 중요해?" 메타 근거(영역별) — NudgeCard.why로 주입. 대안 문장이 아니라 "이 기준이 왜 점수에
+//   중요한가"의 설명이라 불변식과 무관. 서버가 별도 필드를 주지 않으므로 클라 상수.
+const WHY_BY_AREA: Partial<Record<AreaName, string>> = {
+  "과제 이해": "과제가 요구한 걸 빠짐없이 다뤘는지가 가장 먼저 보는 채점 포인트예요.",
+  "내용 충실도": "설명·주장은 ‘왜 그런지’ 근거가 붙을 때 점수가 올라요. 한 줄이 글을 바꿔요.",
+  "구조·논리": "읽는 사람이 길을 잃지 않으려면 문장과 문장을 잇는 다리가 필요해요.",
+  "표현·문장": "문장 길이·표현에 변화를 주면 글이 단조롭지 않고 잘 읽혀요.",
+};
+
+// ── 상태머신 ────────────────────────────────────────────────────────
+type Phase =
+  | "write" // 작성 중 — peek로 [봐줘] CTA
+  | "checking" // 첫 점검 호출 중
+  | "nudge" // nudge 표시(open)
+  | "rechecking" // 고친 뒤 재점검 호출 중
+  | "growth" // 전/후 막대
+  | "done"; // 완료화면
+
+type ErrorState = { message: string; retryable: boolean } | null;
+
+type State = {
+  phase: Phase;
+  body: string;
+  scores: Record<AreaName, number> | null; // 최신 area 점수
+  baseline: Record<AreaName, number> | null; // 첫 점검 점수(완료화면 비교 기준)
+  focusArea: AreaName | null; // 지금 코칭 중인 영역
+  focusBefore: number; // 코칭 시작 시 점수(성장막대 '전')
+  focusAfter: number; // 재점검 후 점수(성장막대 '후')
+  revisions: number; // 고쳐쓰기 횟수(과정 로그)
+  error: ErrorState;
+};
+
+type Action =
+  | { type: "EDIT"; body: string }
+  | { type: "CHECK_START" }
+  | { type: "CHECK_OK"; scores: Record<AreaName, number>; nudges: CoachNudge[] }
+  | { type: "RECHECK_START" }
+  | { type: "RECHECK_OK"; scores: Record<AreaName, number> }
+  | { type: "NEXT" }
+  | { type: "FINISH" }
+  | { type: "ERROR"; message: string; retryable: boolean }
+  | { type: "AUTH_EXPIRED" } // 401 — 글은 보존하고 write로 복귀
+  | { type: "RESET" };
+
+function emptyScores(): Record<AreaName, number> {
+  return AREAS.reduce(
+    (acc, a) => {
+      acc[a] = 0;
+      return acc;
+    },
+    {} as Record<AreaName, number>,
+  );
+}
+
+// scores+nudges → 다음 코칭 영역(통과 못한 nudgeable 중 우선순위 1위). 없으면 null(=완료).
+function pickFocus(
+  scores: Record<AreaName, number>,
+  nudges: CoachNudge[],
+): { area: AreaName; nudge: CoachNudge } | null {
+  const areaScores = AREAS.map((a) => ({ area: a, score: scores[a] ?? 0 }));
+  // 아직 통과 못한 nudgeable 영역의 nudge만 후보로.
+  const open = nudges.filter(
+    (n) => NUDGEABLE.includes(n.rubric_area) && (scores[n.rubric_area] ?? 0) < PASS,
+  );
+  const top = topNudge(open, areaScores);
+  if (!top) return null;
+  return { area: top.rubric_area, nudge: top };
+}
+
+const initial: State = {
+  phase: "write",
+  body: SEED,
+  scores: null,
+  baseline: null,
+  focusArea: null,
+  focusBefore: 0,
+  focusAfter: 0,
+  revisions: 0,
+  error: null,
+};
+
+function reducer(state: State, action: Action): State {
+  switch (action.type) {
+    case "EDIT":
+      return { ...state, body: action.body };
+    case "CHECK_START":
+      return { ...state, phase: "checking", error: null };
+    case "CHECK_OK": {
+      const baseline = state.baseline ?? action.scores;
+      const focus = pickFocus(action.scores, action.nudges);
+      if (!focus) {
+        return { ...state, phase: "done", scores: action.scores, baseline };
+      }
+      return {
+        ...state,
+        phase: "nudge",
+        scores: action.scores,
+        baseline,
+        focusArea: focus.area,
+        focusBefore: action.scores[focus.area] ?? 0,
+        // nudge 전체를 다시 들고 있을 필요 없음 — focus만 보여주고, 다음은 RECHECK가 재계산.
+        // (focus.nudge는 currentNudge로 컴포넌트가 별도 보관)
+      };
+    }
+    case "RECHECK_START":
+      return { ...state, phase: "rechecking", revisions: state.revisions + 1, error: null };
+    case "RECHECK_OK": {
+      const area = state.focusArea;
+      const after = area ? (action.scores[area] ?? 0) : 0;
+      return { ...state, phase: "growth", scores: action.scores, focusAfter: after };
+    }
+    case "NEXT": {
+      // growth에서 [다음] — 현재 scores로 다음 focus를 다시 고른다(서버 nudges는 NEXT 시 재호출하지 않고
+      // 직전 CHECK/RECHECK 응답을 재활용하지 않으므로, 다음 점검은 사용자가 고치고 다시 [봐줘]로).
+      // MVP: growth → 바로 write로 돌려보내 다음 [봐줘] 유도(서버 1콜=1nudge 사이클 단순화).
+      return { ...state, phase: "write", focusArea: null };
+    }
+    case "FINISH":
+      return { ...state, phase: "done" };
+    case "ERROR":
+      return { ...state, error: { message: action.message, retryable: action.retryable } };
+    case "AUTH_EXPIRED":
+      // 토큰 만료/오류 — 작성한 글은 그대로 두고 write로(재인증 후 다시 [봐줘]).
+      return { ...state, phase: "write", focusArea: null, error: null };
+    case "RESET":
+      return { ...initial };
+    default:
+      return state;
+  }
+}
+
+// ── API 호출 (TryClient/ScoreForm 패턴 답습) ─────────────────────────
+type CoachRequest = {
+  assignment: typeof ASSIGNMENT;
+  submission: { body: string };
+};
+
+async function callCoach(
+  body: string,
+): Promise<
+  | { ok: true; output: CoachOutput }
+  | { ok: false; auth: true }
+  | { ok: false; auth: false; message: string; retryable: boolean }
+> {
+  const token = sessionStorage.getItem(DEMO_TOKEN_KEY) ?? "";
+  if (!token) return { ok: false, auth: true };
+
+  const payload: CoachRequest = { assignment: ASSIGNMENT, submission: { body } };
+
+  let res: Response;
+  try {
+    res = await fetch("/api/coach", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-demo-token": token },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(65_000),
+    });
+  } catch (e) {
+    const isTimeout = e instanceof DOMException && e.name === "TimeoutError";
+    return {
+      ok: false,
+      auth: false,
+      message: isTimeout
+        ? "지금 코치가 글을 읽는 데 시간이 걸리고 있어요. 다시 시도해 주세요."
+        : "인터넷 연결을 확인하고 다시 시도해 주세요.",
+      retryable: true,
+    };
+  }
+
+  if (res.status === 401) return { ok: false, auth: true };
+
+  if (!res.ok) {
+    return {
+      ok: false,
+      auth: false,
+      message: "코치를 잠시 불러올 수 없어요. 잠시 후 다시 시도해 주세요.",
+      retryable: true,
+    };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = await res.json();
+  } catch {
+    return {
+      ok: false,
+      auth: false,
+      message: "결과를 다시 받아야 해요. 다시 시도해 주세요.",
+      retryable: true,
+    };
+  }
+
+  // 서버가 권위지만, FE도 coach-schema로 한 번 더 방어(깨진 결과 화면 노출 금지).
+  if (validateCoachOutput(parsed).length > 0) {
+    return {
+      ok: false,
+      auth: false,
+      message: "결과를 다시 받아야 해요. 다시 시도해 주세요.",
+      retryable: true,
+    };
+  }
+
+  return { ok: true, output: parsed as CoachOutput };
+}
+
+// CoachOutput.area_scores[] → Record<AreaName, number>.
+function toScoreMap(output: CoachOutput): Record<AreaName, number> {
+  const map = emptyScores();
+  for (const s of output.area_scores) map[s.area] = s.score;
+  return map;
+}
+
+// ────────────────────────────────────────────────────────────────────
+export default function CoachClient({ onAuthExpired }: { onAuthExpired?: () => void }) {
+  const [state, dispatch] = useReducer(reducer, initial);
+  const [currentNudge, setCurrentNudge] = useState<CoachNudge | null>(null);
+  const [sheetExpanded, setSheetExpanded] = useState(false); // nudge/growth open↔peek 토글
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const busy = state.phase === "checking" || state.phase === "rechecking";
+
+  // ── 첫 점검 (봐줘) ──
+  // 매 렌더 새 클로저 — 호출 시점의 최신 state.body를 캡처(stale 방지). 의존성 추적 불필요.
+  const runCheck = async () => {
+    dispatch({ type: "CHECK_START" });
+    const r = await callCoach(state.body);
+    if (!r.ok) {
+      if (r.auth) {
+        dispatch({ type: "AUTH_EXPIRED" }); // 글 보존하고 write 복귀
+        onAuthExpired?.();
+        return;
+      }
+      dispatch({ type: "ERROR", message: r.message, retryable: r.retryable });
+      return;
+    }
+    const scores = toScoreMap(r.output);
+    const focus = pickFocus(scores, r.output.nudges);
+    setCurrentNudge(focus?.nudge ?? null);
+    setSheetExpanded(true);
+    dispatch({ type: "CHECK_OK", scores, nudges: r.output.nudges });
+  };
+
+  // ── 재점검 (고쳤어 ✓) ──
+  const runRecheck = async () => {
+    dispatch({ type: "RECHECK_START" });
+    const r = await callCoach(state.body);
+    if (!r.ok) {
+      if (r.auth) {
+        dispatch({ type: "AUTH_EXPIRED" });
+        onAuthExpired?.();
+        return;
+      }
+      dispatch({ type: "ERROR", message: r.message, retryable: r.retryable });
+      return;
+    }
+    const scores = toScoreMap(r.output);
+    setSheetExpanded(true);
+    dispatch({ type: "RECHECK_OK", scores });
+  };
+
+  // ── 다음 (성장막대 → 다음 nudge 또는 완료) ──
+  const runNext = () => {
+    const scores = state.scores ?? emptyScores();
+    // 아직 통과 못한 nudgeable 영역이 남았는지로 완료 판정(서버 재호출은 다음 [봐줘]에서).
+    const remaining = NUDGEABLE.some((a) => (scores[a] ?? 0) < PASS);
+    setCurrentNudge(null);
+    if (!remaining) {
+      dispatch({ type: "FINISH" });
+    } else {
+      dispatch({ type: "NEXT" });
+      setSheetExpanded(false);
+      // 캔버스로 포커스 복귀.
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    }
+  };
+
+  // ── 시트 위치 결정 ──
+  const sheetPosition: SheetPosition = useMemo(() => {
+    if (state.phase === "done") return "hidden";
+    if (state.phase === "write") return "peek"; // [봐줘] CTA만
+    if (state.phase === "checking" || state.phase === "rechecking") return "open";
+    return sheetExpanded ? "open" : "peek";
+  }, [state.phase, sheetExpanded]);
+
+  // ── 루브릭 칩(약점 표시) ──
+  const weakAreas = useMemo(() => {
+    if (!state.scores) return new Set<AreaName>();
+    return new Set(NUDGEABLE.filter((a) => (state.scores?.[a] ?? 0) < PASS));
+  }, [state.scores]);
+
+  const reset = () => {
+    setCurrentNudge(null);
+    setSheetExpanded(false);
+    dispatch({ type: "RESET" });
+  };
+
+  return (
+    <div className={`${styles.root} ${styles.stageBg} flex w-full flex-col items-center`}>
+      {/* OS 토픽바 */}
+      <header className="sticky top-0 z-[60] w-full border-b border-[var(--line)] bg-white/[0.82] backdrop-blur-md backdrop-saturate-150">
+        <div className="mx-auto flex h-[60px] max-w-[1280px] items-center gap-3.5 px-[22px]">
+          <span className="flex items-center gap-[9px]">
+            <span className="grid h-[30px] w-[30px] place-items-center rounded-[9px] bg-[var(--pullim-blue)] shadow-[inset_0_0_0_2px_rgba(255,255,255,0.2)]">
+              <MastGlyph size={20} />
+            </span>
+            <span className={`${styles.brandFont} text-[18px] font-bold tracking-[-0.02em]`}>풀림</span>
+            <span className={`${styles.monoFont} -ml-[3px] text-[11px] text-[var(--ink-4)]`}>OS</span>
+          </span>
+          <span className="flex items-center gap-2 rounded-[var(--r-pill)] bg-[var(--pb-1)] px-3 py-1.5 text-[13px] font-semibold text-[var(--pullim-blue)]">
+            <BlockIcon name="pen" size={18} /> 라이팅 코치
+          </span>
+          <span className="flex-1" />
+          <span
+            className={`${styles.monoFont} inline-block rounded bg-[var(--pullim-lemon)] px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-[var(--pullim-ink)]`}
+          >
+            체험
+          </span>
+        </div>
+      </header>
+
+      {/* 무대 리드 카피 */}
+      <div className="flex w-full max-w-[1280px] items-center justify-between gap-4 px-[22px] pt-[18px]">
+        <p className="max-w-[60ch] text-[13.5px] text-[var(--ink-3)]">
+          직접 고쳐보세요. 코치는 답을 <b className="text-[var(--pullim-ink)]">주지 않고</b> 질문으로
+          끌어냅니다 — 고칠수록 막대가 <b className="text-[var(--pullim-ink)]">블루</b>로 차고, 새로 자란
+          칸은 <b className="text-[var(--pullim-ink)]">레몬</b>으로 빛납니다.
+        </p>
+      </div>
+
+      {/* 디바이스 */}
+      <div className="relative mx-auto mb-[26px] mt-[18px] w-full max-w-[432px] overflow-hidden rounded-[var(--r-xl)] border border-[var(--line)] bg-white shadow-[var(--sh-3)]">
+        <div className="relative flex h-[min(76vh,690px)] min-h-[560px] flex-col overflow-hidden bg-white">
+          {/* 과제 헤더 */}
+          <div className="border-b border-[var(--line-2)] bg-gradient-to-b from-[var(--pb-1)] to-white px-[18px] pb-[13px] pt-4">
+            <div className="flex items-center gap-[11px]">
+              <BlockIcon name="pen" size={38} className="rounded-[var(--r-md)]" />
+              <div>
+                <div className={`${styles.brandFont} text-[16px] font-bold tracking-[-0.01em]`}>
+                  {ASSIGNMENT_TITLE}
+                </div>
+                <div className={`${styles.monoFont} mt-px text-[10.5px] text-[var(--ink-4)]`}>
+                  수행평가 · {ASSIGNMENT.genre} · 채점 5영역
+                </div>
+              </div>
+            </div>
+            {/* 루브릭 칩 */}
+            <div className="mt-[11px] flex flex-wrap gap-1.5" aria-label="채점 5영역">
+              {AREAS.map((a) => {
+                const weak = weakAreas.has(a);
+                return (
+                  <span
+                    key={a}
+                    className={
+                      weak
+                        ? "inline-flex items-center gap-[5px] rounded-[var(--r-pill)] bg-white px-2.5 py-[3px] text-[11.5px] font-semibold text-[var(--pullim-blue)] shadow-[inset_0_0_0_1.5px_var(--pb-3)]"
+                        : "inline-flex items-center gap-[5px] rounded-[var(--r-pill)] bg-[var(--pb-1)] px-2.5 py-[3px] text-[11.5px] font-semibold text-[var(--ink-4)]"
+                    }
+                  >
+                    {weak && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-[var(--pullim-lemon)]" aria-hidden />
+                    )}
+                    {a}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 캔버스 */}
+          <Canvas
+            value={state.body}
+            onChange={(b) => dispatch({ type: "EDIT", body: b })}
+            disabled={busy || state.phase === "done"}
+            textareaRef={textareaRef}
+          />
+
+          {/* 바텀시트 */}
+          <BottomSheet
+            position={sheetPosition}
+            onToggle={
+              state.phase === "nudge" || state.phase === "growth"
+                ? () => setSheetExpanded((v) => !v)
+                : undefined
+            }
+          >
+            <SheetBody
+              state={state}
+              currentNudge={currentNudge}
+              busy={busy}
+              onAsk={runCheck}
+              onFixed={runRecheck}
+              onNext={runNext}
+              onRetry={state.phase === "rechecking" ? runRecheck : runCheck}
+            />
+          </BottomSheet>
+
+          {/* 완료화면 */}
+          <CompletionView state={state} onRestart={reset} />
+        </div>
+      </div>
+
+      <p className={`${styles.monoFont} max-w-[432px] px-[26px] pb-10 text-center text-[10px] leading-[1.7] text-[var(--ink-5)]`}>
+        코치는 설계상 문장을 생성하지 않습니다 · 풀림 OS 디자인 시스템 적용
+      </p>
+    </div>
+  );
+}
+
+// ── 시트 본문(상태별 분기) ──────────────────────────────────────────
+function SheetBody({
+  state,
+  currentNudge,
+  busy,
+  onAsk,
+  onFixed,
+  onNext,
+  onRetry,
+}: {
+  state: State;
+  currentNudge: CoachNudge | null;
+  busy: boolean;
+  onAsk: () => void;
+  onFixed: () => void;
+  onNext: () => void;
+  onRetry: () => void;
+}) {
+  // 에러 우선.
+  if (state.error) {
+    return (
+      <div role="alert" className="py-2">
+        <p className="text-[14px] text-[var(--ink-2)]">{state.error.message}</p>
+        {state.error.retryable && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className={`${styles.brandFont} mt-3 inline-flex w-full items-center justify-center rounded-xl bg-[var(--pullim-blue)] px-4 py-3 text-[14px] font-semibold text-white shadow-[0_4px_14px_rgba(3,98,218,0.24)]`}
+          >
+            다시 시도하기
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  if (state.phase === "checking" || state.phase === "rechecking") {
+    return (
+      <div
+        className={`${styles.monoFont} flex items-center justify-center gap-2 py-[18px] text-[12px] text-[var(--pullim-blue)]`}
+        role="status"
+        aria-live="polite"
+      >
+        <BlockIcon name="mark" size={22} />
+        코치가 글을 읽는 중<span className={styles.thinkingDots}>…</span>
+      </div>
+    );
+  }
+
+  if (state.phase === "write") {
+    return (
+      <button
+        type="button"
+        onClick={onAsk}
+        className={`${styles.brandFont} flex w-full cursor-pointer items-center justify-center gap-[9px] py-3 text-[14px] font-semibold text-[var(--pullim-blue)]`}
+      >
+        ✍️ 다 썼으면 코치에게 봐달라고 해봐 <span className={styles.arrowBob}>↑</span>
+      </button>
+    );
+  }
+
+  if (state.phase === "nudge" && currentNudge) {
+    return (
+      <NudgeCard
+        nudge={currentNudge}
+        onFixed={onFixed}
+        why={WHY_BY_AREA[currentNudge.rubric_area]}
+        busy={busy}
+      />
+    );
+  }
+
+  if (state.phase === "growth" && state.focusArea) {
+    const improved = state.focusAfter > state.focusBefore;
+    const resolved = state.focusAfter >= PASS;
+    const head = resolved
+      ? "좋아졌어 — 통과!"
+      : improved
+        ? "거의 왔어, 한 걸음 더!"
+        : "아직 더 끌어낼 수 있어";
+    return (
+      <div>
+        <div className="flex items-center gap-[9px]">
+          <BlockIcon name="grow" size={30} />
+          <div>
+            <h4 className={`${styles.brandFont} mb-px text-[16px]`}>{head}</h4>
+            <p className={`${styles.monoFont} text-[12px] text-[var(--ink-4)]`}>{state.focusArea}</p>
+          </div>
+        </div>
+        <GrowthRow
+          area={state.focusArea}
+          before={state.focusBefore}
+          after={state.focusAfter}
+        />
+        <div className="mt-3.5 flex gap-2">
+          <button
+            type="button"
+            onClick={onNext}
+            className={`${styles.brandFont} inline-flex flex-1 items-center justify-center rounded-xl bg-[var(--pullim-blue)] px-4 py-3 text-[14px] font-semibold text-white shadow-[0_4px_14px_rgba(3,98,218,0.24)] transition hover:-translate-y-px active:scale-[0.98]`}
+          >
+            다음 ▸
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+// ── 완료화면 ────────────────────────────────────────────────────────
+function CompletionView({ state, onRestart }: { state: State; onRestart: () => void }) {
+  const [wedgeOpen, setWedgeOpen] = useState(false);
+  const on = state.phase === "done";
+  const baseline = state.baseline ?? emptyScores();
+  const scores = state.scores ?? emptyScores();
+  const finalChars = Array.from(state.body.trim()).length;
+
+  const rows = AREAS.map((a) => ({ area: a, before: baseline[a] ?? 0, after: scores[a] ?? 0 }));
+
+  return (
+    <div
+      className={`${styles.done} ${on ? styles.doneOn : ""} absolute inset-0 overflow-auto px-5 pb-[30px] pt-6`}
+      aria-hidden={!on}
+      role={on ? "region" : undefined}
+      aria-label="완료"
+    >
+      <div className={`${styles.monoFont} flex items-center gap-2 text-[11px] tracking-[0.16em] text-[var(--pullim-blue)]`}>
+        <BlockIcon name="seal" size={16} />
+        RECHECK COMPLETE · 통과
+      </div>
+      <h2 className={`${styles.brandFont} mb-1 mt-[9px] text-[25px] tracking-[-0.02em]`}>
+        네 손으로 더 잘 썼어.
+      </h2>
+      <p className="mb-4 text-[14px] text-[var(--ink-3)]">
+        코치는 질문만 했고, 문장은 전부 네가 썼어. 그 ‘과정’이 그대로 남았어.
+      </p>
+
+      <GrowthBars rows={rows} animate={on} />
+
+      {/* 과정 로그 */}
+      <div className="mt-[18px] rounded-[var(--r-lg)] border border-[var(--line)] bg-white p-[18px] shadow-[var(--sh-1)]">
+        <div className={`${styles.monoFont} mb-2.5 flex items-center gap-[7px] text-[11px] tracking-[0.08em] text-[var(--pullim-blue)]`}>
+          <BlockIcon name="seal" size={15} />
+          과정 로그 — 교사·부모가 확인하는 증거
+        </div>
+        <LogRow k="고쳐쓰기" v={`${state.revisions}회`} />
+        <LogRow k="최종 분량" v={`${finalChars.toLocaleString("ko-KR")}자`} />
+        <LogRow k="코치가 준 문장" v="0개" highlight />
+        <LogRow k="작성 주체" v="학생 본인" />
+      </div>
+
+      <span className="mt-3.5 inline-flex items-center gap-2 rounded-[var(--r-pill)] bg-[var(--pullim-lemon)] px-3.5 py-2 text-[12.5px] font-bold text-[var(--pullim-ink)]">
+        🔒 직접 쓴 글 — 들켜도 떳떳해요
+      </span>
+
+      {/* "다른 AI였다면?" 웨지 */}
+      <div className="mt-4 overflow-hidden rounded-[var(--r-lg)] border border-[var(--line)] bg-white">
+        <button
+          type="button"
+          onClick={() => setWedgeOpen((v) => !v)}
+          aria-expanded={wedgeOpen}
+          className="flex w-full cursor-pointer items-center justify-between px-4 py-[13px] text-[13.5px] font-semibold"
+        >
+          <span>다른 AI였다면?</span>
+          <span aria-hidden>{wedgeOpen ? "－" : "＋"}</span>
+        </button>
+        {wedgeOpen && (
+          <div className="px-4 pb-4 text-[13px] leading-relaxed text-[var(--ink-3)]">
+            <p className="text-[#E5484D]">
+              ❌ 베끼는 AI: 완성 문장을 통째로 만들어 붙여넣기 끝 — 들키면 0점.
+            </p>
+            <p className="mt-2 font-semibold text-[var(--ok)]">
+              ✓ 풀림: 같은 결론도 ‘네가’ 끌어내 썼고, 과정 로그가 그걸 증명해요.
+            </p>
+          </div>
+        )}
+      </div>
+
+      <button
+        type="button"
+        onClick={onRestart}
+        className={`${styles.brandFont} mt-4 inline-flex w-full items-center justify-center rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[14px] font-semibold text-[var(--ink-2)] transition hover:border-[var(--ink-4)] hover:bg-[var(--pb-1)]`}
+      >
+        다시 해보기 ↺
+      </button>
+    </div>
+  );
+}
+
+function LogRow({ k, v, highlight }: { k: string; v: string; highlight?: boolean }) {
+  return (
+    <div className="flex items-center justify-between border-b border-dashed border-[var(--line)] py-[7px] text-[13px] last:border-0">
+      <span>{k}</span>
+      <b className={`${styles.brandFont} ${highlight ? "text-[var(--ok)]" : ""}`}>{v}</b>
+    </div>
+  );
+}

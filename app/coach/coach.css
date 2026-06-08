@@ -1,0 +1,606 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   Pullim Writing Coach — 코치 화면 컴포넌트 CSS (U6 / EPIC3)
+   원본: docs/27_coach_prototype.html (검증된 코치 UX). React/Next 포팅의 클래스 소스.
+   브랜드 토큰(--pullim-*, --pb-*, --line, --ok, --r-*, --sh-*, --ease)은
+   app/globals.css :root 에 정의됨(테마 무관·블루+레몬 락). 이 파일은 클래스만 제공.
+
+   적용 규칙(중요):
+   - 이 시트는 코치 화면 전용 컴포넌트 클래스만 정의한다. 태그 셀렉터(body/html 등)나
+     전역 리셋은 두지 않는다 → 기존 화면(채점/결과/온보딩) 회귀 방지(additive).
+   - 코치 라우트의 컨테이너에 .coach-scope 를 부여해 폰트/배경 컨텍스트를 격리한다.
+   - 접근성: 모션 클래스는 prefers-reduced-motion 가드(파일 하단)로 무력화.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* 코치 화면 루트 컨텍스트 — 브랜드 폰트/잉크 컬러를 이 하위에서만 기본값으로. */
+.coach-scope {
+  font-family: var(--font-brand, "Bai Jamjuree", "Pretendard Variable", sans-serif);
+  color: var(--pullim-ink);
+}
+.coach-scope .kr {
+  font-family: var(--font-sans);
+}
+.coach-scope .mono {
+  font-family: var(--font-mono);
+}
+.coach-scope .brandf {
+  font-family: var(--font-brand);
+}
+
+/* 종이결 + 블루 그리드 배경 — 코치 무대(stage) 한정. body엔 적용하지 않음. */
+.coach-stage-bg {
+  background-color: var(--pullim-paper);
+  background-image: linear-gradient(
+      to right,
+      rgba(3, 98, 218, 0.045) 1px,
+      transparent 1px
+    ),
+    linear-gradient(to bottom, rgba(3, 98, 218, 0.045) 1px, transparent 1px),
+    radial-gradient(900px 460px at 88% -10%, rgba(3, 98, 218, 0.1), transparent 60%);
+  background-size: 44px 44px, 44px 44px, 100% 100%;
+}
+
+/* ── 블록형 아이콘(블루 라운드 컨테이너 + 화이트 도형 + 레몬 액센트) ──
+   docs/27 ICON 세트 어법: <span class="pb-icon"><svg>…</svg></span>.
+   svg 내부에 rect(블루 바탕)·흰 도형·레몬 포인트를 둔다(컴포넌트가 SVG 주입). */
+.pb-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  line-height: 0;
+}
+.pb-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.pb-icon--sm {
+  width: 18px;
+  height: 18px;
+}
+.pb-icon--lg {
+  width: 38px;
+  height: 38px;
+}
+/* SVG를 못 쓰는 폴백/순수 CSS 블록 아이콘(컨테이너만 필요할 때). */
+.pb-icon--block {
+  background: var(--pullim-blue);
+  border-radius: 9px;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+
+/* ── 칩(루브릭 영역 태그) ── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  font-size: 11.5px;
+  font-weight: 600;
+  background: var(--pb-1);
+  color: var(--ink-4);
+}
+.chip--weak {
+  background: #fff;
+  color: var(--pullim-blue);
+  box-shadow: inset 0 0 0 1.5px var(--pb-3);
+}
+.chip .dotw {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pullim-lemon);
+}
+
+/* ── 레몬 핀(라벨 알약) ── */
+.lemon-pill {
+  display: inline-block;
+  padding: 3px 9px;
+  background: var(--pullim-lemon);
+  color: var(--pullim-ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  border-radius: 4px;
+}
+
+/* ── 버튼 ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-family: var(--font-brand);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  border: 0;
+  transition: 0.16s var(--ease);
+  white-space: nowrap;
+}
+.btn:active {
+  transform: scale(0.98);
+}
+.btn:focus-visible {
+  outline: 2px solid var(--pullim-blue);
+  outline-offset: 2px;
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-primary {
+  background: var(--pullim-blue);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(3, 98, 218, 0.24);
+  flex: 1;
+}
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+
+.btn-accent {
+  background: var(--pullim-lemon);
+  color: var(--pullim-ink);
+  box-shadow: 0 4px 14px rgba(230, 255, 76, 0.5);
+  flex: 1;
+}
+.btn-accent:hover:not(:disabled) {
+  filter: brightness(1.02);
+  transform: translateY(-1px);
+}
+
+.btn-ghost {
+  background: #fff;
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+}
+.btn-ghost:hover:not(:disabled) {
+  border-color: var(--ink-4);
+  background: var(--pb-1);
+}
+
+.acts {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+/* ── 디바이스/스크린 (모바일 캔버스 프레임) ── */
+.device {
+  width: 100%;
+  max-width: 432px;
+  margin: 18px auto 26px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-3);
+  overflow: hidden;
+  position: relative;
+}
+.screen {
+  height: min(76vh, 690px);
+  min-height: 560px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+}
+
+/* ── 과제 헤더 ── */
+.ahead {
+  padding: 16px 18px 13px;
+  border-bottom: 1px solid var(--line-2);
+  background: linear-gradient(180deg, var(--pb-1), #fff);
+}
+.ahead .row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.ahead .sg {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--r-md);
+  flex: 0 0 auto;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+.ahead .t {
+  font-family: var(--font-brand);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+.ahead .meta {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-4);
+  margin-top: 1px;
+}
+.rubric {
+  margin-top: 11px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ── 글쓰기 캔버스(노트 라인 배경) ── */
+.canvas-wrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+textarea.canvas {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  resize: none;
+  padding: 18px 18px 130px;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 2;
+  color: var(--pullim-ink);
+  outline: none;
+  background-image: repeating-linear-gradient(
+    transparent 0 calc(2em - 1px),
+    var(--line-2) calc(2em - 1px) 2em
+  );
+  background-position: 0 18px;
+}
+.countbar {
+  position: absolute;
+  top: 8px;
+  right: 14px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-5);
+}
+
+/* ── 바텀시트(코치 너지) ── */
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #fff;
+  border-top: 1px solid var(--line);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  box-shadow: var(--sh-pop);
+  transition: transform 0.42s var(--ease);
+  will-change: transform;
+}
+.sheet .grip {
+  width: 44px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--line);
+  margin: 11px auto 2px;
+  cursor: pointer;
+}
+.sheet .body {
+  padding: 6px 18px 20px;
+}
+.peek-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  font-family: var(--font-brand);
+  font-weight: 600;
+  font-size: 14px;
+  padding: 13px;
+  cursor: pointer;
+  color: var(--pullim-blue);
+  background: none;
+  border: 0;
+}
+.peek-btn .arrow {
+  animation: coach-bob 1.5s ease-in-out infinite;
+}
+@keyframes coach-bob {
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/* 너지 행 — 영역 태그 / 진단 / 안내질문 / 근거(why) */
+.nrow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.nrow .ic {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+}
+.area-tag {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--pullim-blue);
+}
+.area-tag .step {
+  color: var(--ink-4);
+}
+.diag {
+  font-family: var(--font-brand);
+  font-weight: 700;
+  font-size: 17px;
+  margin: 9px 0 6px;
+  letter-spacing: -0.01em;
+}
+.q {
+  color: var(--ink-3);
+  font-size: 14px;
+  line-height: 1.65;
+}
+/* 안내질문 내 강조 — 레몬 하이라이트(코치는 답을 주지 않고 질문만 강조). */
+.q b {
+  color: var(--pullim-ink);
+  background: linear-gradient(transparent 58%, var(--pullim-lemon) 58%);
+  padding: 0 1px;
+}
+.why {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  background: var(--pb-1);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  display: none;
+}
+.why.on {
+  display: block;
+}
+
+/* ── 성장 막대(블루=기존/현재, 레몬=새로 자란 칸) ──
+   revision.ts toBarSegments/growthBar 결과를 세그먼트로 렌더.
+   .seg.was = 이전(연블루), .seg.cur = 현재(블루), .seg.gain = 새로 자란 칸(레몬). */
+.grow h4 {
+  font-family: var(--font-brand);
+  margin: 2px 0 1px;
+  font-size: 16px;
+}
+.grow .sub {
+  color: var(--ink-4);
+  font-size: 12px;
+  margin: 0 0 12px;
+  font-family: var(--font-mono);
+}
+.grow-row {
+  margin: 11px 0;
+}
+.grow-row .nm {
+  font-size: 12.5px;
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.grow-row .up {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--pullim-blue);
+}
+.grow-row .same {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-5);
+}
+.bar {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  margin-top: 6px;
+}
+.bar .lab {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-4);
+  width: 18px;
+}
+.seg {
+  flex: 1;
+  height: 12px;
+  border-radius: var(--r-xs);
+  background: var(--line-2);
+  border: 1px solid var(--line);
+}
+.seg.was {
+  background: var(--pb-3);
+  border-color: var(--pb-3);
+}
+.seg.cur {
+  background: var(--pullim-blue);
+  border-color: var(--pullim-blue);
+}
+.seg.gain {
+  background: var(--pullim-lemon);
+  border-color: var(--pullim-lemon);
+  animation: coach-pop 0.4s var(--ease) both;
+}
+@keyframes coach-pop {
+  from {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+}
+.seg.gain:nth-child(2) {
+  animation-delay: 0.05s;
+}
+.seg.gain:nth-child(3) {
+  animation-delay: 0.12s;
+}
+.seg.gain:nth-child(4) {
+  animation-delay: 0.19s;
+}
+.seg.gain:nth-child(5) {
+  animation-delay: 0.26s;
+}
+
+/* ── 완료 화면(증명/요약) ── */
+.done {
+  position: absolute;
+  inset: 0;
+  background: var(--pullim-paper);
+  overflow: auto;
+  padding: 24px 20px 30px;
+  transform: translateY(101%);
+  transition: transform 0.5s var(--ease);
+}
+.done.on {
+  transform: none;
+}
+.crown {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--pullim-blue);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.done h2 {
+  font-family: var(--font-brand);
+  font-size: 25px;
+  margin: 9px 0 4px;
+  letter-spacing: -0.02em;
+}
+.done .p {
+  color: var(--ink-3);
+  font-size: 14px;
+  margin: 0 0 16px;
+}
+.card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 18px;
+  box-shadow: var(--sh-1);
+}
+.card .lt {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--pullim-blue);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.lrow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  padding: 7px 0;
+  border-bottom: 1px dashed var(--line);
+}
+.lrow:last-child {
+  border: 0;
+}
+.lrow b {
+  font-family: var(--font-brand);
+}
+.seal {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  background: var(--pullim-lemon);
+  color: var(--pullim-ink);
+  border-radius: var(--r-pill);
+  padding: 8px 14px;
+}
+
+/* ── wedge(접이식 상세: 무엇이 나빴고/좋아졌나) ── */
+.wedge {
+  margin-top: 16px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.wedge .h {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 13px 16px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13.5px;
+}
+.wedge .c {
+  display: none;
+  padding: 0 16px 16px;
+  font-size: 13px;
+  color: var(--ink-3);
+  line-height: 1.6;
+}
+.wedge.open .c {
+  display: block;
+}
+.wedge .bad {
+  color: #e5484d;
+}
+.wedge .good {
+  color: var(--ok);
+  font-weight: 600;
+}
+.restart {
+  margin-top: 16px;
+  width: 100%;
+}
+
+/* ── 코치 "읽는 중" 인디케이터 ── */
+.thinking {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--pullim-blue);
+  padding: 18px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.thinking .ic {
+  width: 22px;
+  height: 22px;
+}
+.thinking .d {
+  animation: coach-pulse 1s infinite;
+}
+@keyframes coach-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* ── 접근성: 모션 민감 사용자 — 코치 화면 모든 애니메이션 무력화 ── */
+@media (prefers-reduced-motion: reduce) {
+  .sheet,
+  .done,
+  .btn,
+  .peek-btn .arrow,
+  .seg.gain,
+  .thinking .d {
+    transition: none !important;
+    animation: none !important;
+  }
+}

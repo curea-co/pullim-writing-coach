@@ -35,6 +35,88 @@
   --color-accent-gap-surface: var(--accent-gap-surface);
   --color-accent-mid: var(--accent-mid);
   --color-accent-mid-surface: var(--accent-mid-surface);
+
+  /* ── Pullim 디자인 시스템(브랜드 락=blue+lemon) — additive (U6).
+        기존 시맨틱(oklch) 토큰과 별개의 브랜드 팔레트. Tailwind v4 유틸로 노출:
+        bg-pullim-blue, text-pullim-ink, border-line 등. docs/27 어법과 정합. */
+  --color-pullim-blue: var(--pullim-blue);
+  --color-pullim-lemon: var(--pullim-lemon);
+  --color-pullim-ink: var(--pullim-ink);
+  --color-pullim-paper: var(--pullim-paper);
+  --color-pb-1: var(--pb-1);
+  --color-pb-2: var(--pb-2);
+  --color-pb-3: var(--pb-3);
+  --color-pb-5: var(--pb-5);
+  --color-pb-8: var(--pb-8);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-ok: var(--ok);
+  --color-ok-surface: var(--ok-bg);
+
+  /* 브랜드 폰트(라벨/모노 포함) — Tailwind v4 font-* 유틸로 노출.
+     font-brand=Bai Jamjuree, font-mono=JetBrains Mono. font-sans(Pretendard)은 위에 정의. */
+  --font-brand:
+    "Bai Jamjuree", "Pretendard Variable", Pretendard, system-ui, sans-serif;
+  --font-mono:
+    "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
+    Consolas, "Liberation Mono", monospace;
+
+  /* 반경 스케일 — ⚠️ Tailwind v4 빌트인 --radius-sm/md/lg/xl 을 덮으면 전 앱의 rounded-* 가
+     리스케일된다(회귀). 별도 네임스페이스 --radius-pb-* 로 격리(rounded-pb-* 유틸 생성).
+     코치 CSS Modules는 원시 var(--r-*) 를 직접 참조하므로 영향 없음. */
+  --radius-pb-xs: var(--r-xs);
+  --radius-pb-sm: var(--r-sm);
+  --radius-pb-md: var(--r-md);
+  --radius-pb-lg: var(--r-lg);
+  --radius-pb-xl: var(--r-xl);
+  --radius-pb-pill: var(--r-pill);
+
+  /* 그림자 — Tailwind v4 shadow-* 유틸로 노출(shadow-1..shadow-3, shadow-pop). */
+  --shadow-1: var(--sh-1);
+  --shadow-2: var(--sh-2);
+  --shadow-3: var(--sh-3);
+  --shadow-pop: var(--sh-pop);
+}
+
+/* Pullim 디자인 시스템 raw 변수(U6) — 브랜드 락이므로 테마 무관(라이트/다크 공통).
+   값은 docs/27 코치 프로토타입(추출 pullim-web 토큰)과 1:1. 위 @theme 매핑이 이 변수들을 참조하고,
+   코치 CSS Modules(coach.module.css)도 이 raw 변수를 직접 쓴다. */
+:root {
+  --pullim-blue: #0362da;
+  --pullim-ink: #0d1a1f;
+  --pullim-paper: #f0f6fb;
+  --pullim-lemon: #e6ff4c;
+
+  --pb-1: #f4faff;
+  --pb-2: #d1e8ff;
+  --pb-3: #9fc8ff;
+  --pb-5: #1f89f5;
+  --pb-8: #00389e;
+
+  --ink-2: #1f2c32;
+  --ink-3: #45555c;
+  --ink-4: #5e6b72;
+  --ink-5: #b0bcc3;
+
+  --line: #d6e2ee;
+  --line-2: #e8eff6;
+
+  --ok: #10b987;
+  --ok-bg: #e7f8f1;
+
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --r-pill: 999px;
+
+  --sh-1: 0 1px 2px rgba(13, 26, 31, 0.04), 0 1px 3px rgba(13, 26, 31, 0.06);
+  --sh-2: 0 2px 8px rgba(13, 26, 31, 0.06), 0 8px 24px rgba(13, 26, 31, 0.05);
+  --sh-3: 0 12px 40px rgba(3, 98, 218, 0.12), 0 4px 12px rgba(13, 26, 31, 0.06);
+  --sh-pop: 0 18px 50px rgba(13, 26, 31, 0.16);
+
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 /* 라이트(기본) — :root와 [data-theme="light"] 둘 다 적용. */
