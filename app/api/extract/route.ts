@@ -37,13 +37,16 @@ export async function POST(req: Request): Promise<Response> {
   if (!isAuthorized(req)) return jsonError("E-AUTH");
 
   // [G2] 본문 파싱 — 요청 본문이 valid JSON 아님(클라 fetch body 자체 문제).
-  //   Codex PR #69: E-PARSE는 "모델 응답 파싱 실패"용으로만 사용 — 의미 혼선 방지.
-  //   클라 본문 문제는 E1 (입력 invalid)로 매핑 + EXTRACT_MESSAGE 안내.
+  //   Codex PR #69: E-PARSE는 모델 응답 파싱 실패용으로만 사용. 클라 본문 문제는 E1 매핑하되,
+  //   validateExtractRequest의 구체 메시지("요청 본문이 올바르지 않아요.")와 일관되게 명시.
+  //   jsonError("E1")의 일반 카피("안내서 정보가 올바르지 않아요...")는 입력 자체 invalid에 안 맞음.
   let raw: unknown;
   try {
     raw = await req.json();
   } catch {
-    return jsonError("E1");
+    return Response.json(errorEnvelope("E1", "요청 본문이 올바르지 않아요."), {
+      status: ERROR_HTTP.E1,
+    });
   }
 
   // [V1] 입력 검증 + 정규화 (raw_text 길이·channel 화이트리스트)
