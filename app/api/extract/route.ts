@@ -36,12 +36,14 @@ export async function POST(req: Request): Promise<Response> {
   // [G1] 토큰 게이트
   if (!isAuthorized(req)) return jsonError("E-AUTH");
 
-  // [G2] 본문 파싱
+  // [G2] 본문 파싱 — 요청 본문이 valid JSON 아님(클라 fetch body 자체 문제).
+  //   Codex PR #69: E-PARSE는 "모델 응답 파싱 실패"용으로만 사용 — 의미 혼선 방지.
+  //   클라 본문 문제는 E1 (입력 invalid)로 매핑 + EXTRACT_MESSAGE 안내.
   let raw: unknown;
   try {
     raw = await req.json();
   } catch {
-    return jsonError("E-PARSE");
+    return jsonError("E1");
   }
 
   // [V1] 입력 검증 + 정규화 (raw_text 길이·channel 화이트리스트)
