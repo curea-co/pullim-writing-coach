@@ -61,6 +61,12 @@
 
 → 코드 sprint 6/15 완료돼도 외부 의존 미해소 시 출시 형태가 **NEXT_PUBLIC_DEMO_TOKEN 보호 데모** 상태로 제한. 완전 출시는 외부 의존 해소 후.
 
+### 6/8 의사결정 반영 (docs/29)
+
+6/5 보고 의사결정 4건 결과 — Sentry 보류·Pro 이관 6/13 재검토·부모 시스템 출시 후 단계적·dogfood 출시 후 수집. **외부 의존 P0 5건 중 4건 보류/별도** → docs/21 룰 D Free-only backup 시나리오 사실상 채택. 출시 형태 = `DEMO_ACCESS_TOKEN` 게이트 + rate limit + Vercel 기본 URL.
+
+상세: [`docs/29_decisions_intake_2026-06-08.md`](29_decisions_intake_2026-06-08.md)
+
 ## 6. 회귀 보장 — 기존 169 unit + 45 components + 9 E2E
 
 | 기존 자산 | 본 sprint 영향 | 보장 방법 |
