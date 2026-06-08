@@ -6,19 +6,41 @@
 //   write → [봐줘] → checking(POST /api/coach) → nudge(peek→open) → [고쳤어 ✓]
 //     → rechecking(POST /api/coach) → growth(전/후 막대) → [다음] → 다음 nudge … → done(완료화면)
 //
-// 서버 계약(EPIC2 /api/coach, /api/score 패턴 답습): 요청={assignment, submission:{body}},
+// 서버 계약(EPIC2 /api/coach, /api/score 패턴 답습): 요청={assignment, rubric?, submission:{body}},
 //   200 응답=CoachOutput(coach-schema). x-demo-token 헤더(TokenGate와 공유). 401→재인증 유도.
 //   nudge 우선순위는 prioritizeNudges/topNudge(nudge-priority), 성장막대는 revision.ts.
 //
 // 불변식: 코치는 학생 문장을 대신 쓰지 않는다. 이 클라이언트는 서버가 준 diagnosis/guiding_question만
 //   표시하고, 작성은 전적으로 캔버스(학생)에 맡긴다. "코치가 준 문장 0개"를 과정 로그로 증명.
+//
+// ── 이번 웨이브: 라이브 루프 배선 ──────────────────────────────────────
+// 자체 useReducer 루프는 유지하되, 순수 모듈을 라이브 데이터에 배선한다(동작 변화는 가산적):
+//   (1) coach-session.ts(createSession·recordRevision)로 세션을 모델링하고 localStorage
+//       'pwc-coach-session-v1'에 영속(SSR 가드). 새로고침 시 복원.
+//   (2) 루프가 갱신될 때 process-log.ts buildProcessLog(session)를 계산해 localStorage
+//       'pwc-process-log-v1'에 저장(교사 /teacher/log가 읽음).
+//   (3) 시작 시 localStorage 'pwc-teacher-rubric-v1'(TeacherRubric)이 있으면 읽어
+//       teacher-rubric.serializeRubricForPrompt로 텍스트화 → /api/coach 요청 rubric 필드로 전송.
+// 순수 모듈은 import만(수정 금지). 부수효과(localStorage·window)는 전부 이 "use client" 파일에.
 
-import { useMemo, useReducer, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { CoachNudge, CoachOutput } from "@/app/lib/coach-schema";
 import type { AreaName } from "@/app/data/scoring";
 import { validateCoachOutput } from "@/app/lib/coach-schema";
 import { topNudge } from "@/app/lib/nudge-priority";
 import { AREAS } from "@/app/lib/grading";
+import {
+  type AreaScore,
+  type CoachSession,
+  type SessionAssignment,
+  createSession,
+  recordRevision,
+} from "@/app/lib/coach-session";
+import { buildProcessLog } from "@/app/lib/process-log";
+import {
+  type TeacherRubric,
+  serializeRubricForPrompt,
+} from "@/app/lib/teacher-rubric";
 import { DEMO_TOKEN_KEY } from "@/app/components/TokenGate";
 import styles from "@/app/coach/coach.module.css";
 import Canvas from "./Canvas";
@@ -53,6 +75,13 @@ const WHY_BY_AREA: Partial<Record<AreaName, string>> = {
   "표현·문장": "문장 길이·표현에 변화를 주면 글이 단조롭지 않고 잘 읽혀요.",
 };
 
+// ── localStorage 키 (공유 계약) ─────────────────────────────────────
+//   세션: 코치 루프 전체 궤적(클라 영속, MVP). 과정로그: 교사 /teacher/log가 읽음.
+//   루브릭: 교사 /teacher/rubric이 씀(EPIC5) — 여기선 읽기만.
+const SESSION_KEY = "pwc-coach-session-v1";
+const PROCESS_LOG_KEY = "pwc-process-log-v1";
+const TEACHER_RUBRIC_KEY = "pwc-teacher-rubric-v1";
+
 // ── 상태머신 ────────────────────────────────────────────────────────
 type Phase =
   | "write" // 작성 중 — peek로 [봐줘] CTA
@@ -86,6 +115,13 @@ type Action =
   | { type: "FINISH" }
   | { type: "ERROR"; message: string; retryable: boolean }
   | { type: "AUTH_EXPIRED" } // 401 — 글은 보존하고 write로 복귀
+  | {
+      type: "RESTORE"; // 새로고침 복원: 저장 세션의 본문·점수·기준선·회차를 write 단계로 되살림
+      body: string;
+      scores: Record<AreaName, number>;
+      baseline: Record<AreaName, number>;
+      revisions: number;
+    }
   | { type: "RESET" };
 
 function emptyScores(): Record<AreaName, number> {
@@ -168,6 +204,16 @@ function reducer(state: State, action: Action): State {
     case "AUTH_EXPIRED":
       // 토큰 만료/오류 — 작성한 글은 그대로 두고 write로(재인증 후 다시 [봐줘]).
       return { ...state, phase: "write", focusArea: null, error: null };
+    case "RESTORE":
+      // 저장된 세션을 write 단계로 복원(점수·기준선·회차 반영, 다음 [봐줘]로 라이브 루프 재개).
+      return {
+        ...initial,
+        phase: "write",
+        body: action.body,
+        scores: action.scores,
+        baseline: action.baseline,
+        revisions: action.revisions,
+      };
     case "RESET":
       return { ...initial };
     default:
@@ -175,14 +221,131 @@ function reducer(state: State, action: Action): State {
   }
 }
 
+// ── 세션 영속 (storage.ts 패턴 — SSR 가드 + 방어적 파싱) ──────────────
+// 순수 모듈(coach-session·process-log·teacher-rubric)은 import만 하고, 부수효과는 여기서만.
+
+// ASSIGNMENT(데모 과제) → 세션 메타(target_char_count 제외).
+function sessionAssignment(): SessionAssignment {
+  return {
+    school_level: ASSIGNMENT.school_level,
+    subject: ASSIGNMENT.subject,
+    genre: ASSIGNMENT.genre,
+    prompt_text: ASSIGNMENT.prompt_text,
+  };
+}
+
+// Record<AreaName,number> → AreaScore[] (AREAS 권위 순서 보존).
+function toAreaScores(scores: Record<AreaName, number>): AreaScore[] {
+  return AREAS.map((a) => ({ area: a, score: scores[a] ?? 0 }));
+}
+
+// AreaScore[] → Record<AreaName,number> (복원용).
+function fromAreaScores(scores: AreaScore[] | undefined): Record<AreaName, number> {
+  const map = emptyScores();
+  if (Array.isArray(scores)) {
+    for (const s of scores) {
+      if (s && (AREAS as readonly string[]).includes(s.area) && typeof s.score === "number") {
+        map[s.area] = s.score;
+      }
+    }
+  }
+  return map;
+}
+
+function saveSession(session: CoachSession): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  } catch {
+    /* swallow — quota/denied. 세션은 작아서 거의 안 터짐. 영속 실패가 루프를 막지 않는다. */
+  }
+}
+
+// 저장된 세션을 방어적으로 복원(다른 탭 손상·schema 변화 대비). 모양이 안 맞으면 null.
+function loadSession(): CoachSession | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const o = JSON.parse(raw) as Partial<CoachSession>;
+    if (typeof o !== "object" || o === null) return null;
+    if (!Array.isArray(o.draftHistory) || o.draftHistory.length === 0) return null;
+    if (!Array.isArray(o.baseline) || !Array.isArray(o.areaScores)) return null;
+    if (typeof o.assignment !== "object" || o.assignment === null) return null;
+    const last = o.draftHistory[o.draftHistory.length - 1];
+    if (!last || typeof last.body !== "string") return null;
+    return o as CoachSession;
+  } catch {
+    return null;
+  }
+}
+
+function clearSession(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(SESSION_KEY);
+  } catch {
+    /* swallow */
+  }
+}
+
+// 세션 → 과정 로그 영속(교사 /teacher/log가 'pwc-process-log-v1'을 읽음).
+function saveProcessLog(session: CoachSession): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(PROCESS_LOG_KEY, JSON.stringify(buildProcessLog(session)));
+  } catch {
+    /* swallow */
+  }
+}
+
+function clearProcessLog(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(PROCESS_LOG_KEY);
+  } catch {
+    /* swallow */
+  }
+}
+
+// 세션+로그를 함께 영속(루프가 갱신될 때마다 한 묶음으로 저장).
+function persist(session: CoachSession): void {
+  saveSession(session);
+  saveProcessLog(session);
+}
+
+// 교사 루브릭 읽어 프롬프트 텍스트로 직렬화. 없거나 채운 기준이 없으면 undefined(미전송).
+function loadRubricText(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  try {
+    const raw = window.localStorage.getItem(TEACHER_RUBRIC_KEY);
+    if (!raw) return undefined;
+    const r = JSON.parse(raw) as TeacherRubric;
+    if (typeof r !== "object" || r === null || !Array.isArray(r.perArea)) return undefined;
+    const text = serializeRubricForPrompt(r);
+    return text.length > 0 ? text : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+// ── 초기 상태 ─────────────────────────────────────────────────────────
+// 첫 페인트는 항상 initial(SEED) — SSR과 클라 hydration이 동일해야 깜빡임/불일치가 없다.
+//   저장 세션 복원(이어쓰기)은 hydration 이후 useEffect에서 RESTORE 액션으로 수행한다.
+function initState(): State {
+  return initial;
+}
+
 // ── API 호출 (TryClient/ScoreForm 패턴 답습) ─────────────────────────
 type CoachRequest = {
   assignment: typeof ASSIGNMENT;
+  rubric?: string;
   submission: { body: string };
 };
 
 async function callCoach(
   body: string,
+  rubricText?: string,
 ): Promise<
   | { ok: true; output: CoachOutput }
   | { ok: false; auth: true }
@@ -191,7 +354,12 @@ async function callCoach(
   const token = sessionStorage.getItem(DEMO_TOKEN_KEY) ?? "";
   if (!token) return { ok: false, auth: true };
 
-  const payload: CoachRequest = { assignment: ASSIGNMENT, submission: { body } };
+  const payload: CoachRequest = {
+    assignment: ASSIGNMENT,
+    submission: { body },
+    // 교사 루브릭이 있으면 rubric 필드로 전송(route.ts 요청 계약). 없으면 미전송.
+    ...(rubricText ? { rubric: rubricText } : {}),
+  };
 
   let res: Response;
   try {
@@ -258,18 +426,44 @@ function toScoreMap(output: CoachOutput): Record<AreaName, number> {
 
 // ────────────────────────────────────────────────────────────────────
 export default function CoachClient({ onAuthExpired }: { onAuthExpired?: () => void }) {
-  const [state, dispatch] = useReducer(reducer, initial);
+  const [state, dispatch] = useReducer(reducer, undefined, initState);
   const [currentNudge, setCurrentNudge] = useState<CoachNudge | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(false); // nudge/growth open↔peek 토글
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // 라이브 세션(순수 CoachSession 모델) — 반복 갱신은 항상 새 객체로 교체(불변). 부수효과는 영속 헬퍼.
+  const sessionRef = useRef<CoachSession | null>(null);
+  // 교사 루브릭 직렬화 텍스트(마운트 시 1회 읽음). 있으면 /api/coach rubric 필드로 전송.
+  const rubricRef = useRef<string | undefined>(undefined);
+
   const busy = state.phase === "checking" || state.phase === "rechecking";
+
+  // ── 마운트: 루브릭 읽기 + 저장된 세션 복원(이어쓰기) ──
+  // hydration 불일치를 피하려고 복원은 첫 페인트 이후(useEffect)로 미룬다(초기는 항상 SEED).
+  useEffect(() => {
+    rubricRef.current = loadRubricText();
+
+    const saved = loadSession();
+    if (saved) {
+      sessionRef.current = saved;
+      const lastDraft = saved.draftHistory[saved.draftHistory.length - 1];
+      // 본문·점수·기준선·회차를 write 단계로 복원(다음 [봐줘]로 라이브 루프 재개).
+      dispatch({
+        type: "RESTORE",
+        body: lastDraft.body,
+        scores: fromAreaScores(saved.areaScores),
+        baseline: fromAreaScores(saved.baseline),
+        revisions: Math.max(0, saved.draftHistory.length - 1),
+      });
+    }
+    // 마운트 1회(루브릭 읽기 + 세션 복원). dispatch는 안정적이라 deps 불필요.
+  }, []);
 
   // ── 첫 점검 (봐줘) ──
   // 매 렌더 새 클로저 — 호출 시점의 최신 state.body를 캡처(stale 방지). 의존성 추적 불필요.
   const runCheck = async () => {
     dispatch({ type: "CHECK_START" });
-    const r = await callCoach(state.body);
+    const r = await callCoach(state.body, rubricRef.current);
     if (!r.ok) {
       if (r.auth) {
         dispatch({ type: "AUTH_EXPIRED" }); // 글 보존하고 write 복귀
@@ -283,13 +477,37 @@ export default function CoachClient({ onAuthExpired }: { onAuthExpired?: () => v
     const focus = pickFocus(scores, r.output.nudges);
     setCurrentNudge(focus?.nudge ?? null);
     setSheetExpanded(true);
+
+    // ── 세션 배선 ──
+    // 첫 점검(세션 없음): createSession으로 최초 draft+점수+rubricText(교사 정렬 기준) 기록.
+    // 이후 [봐줘](복원 후 등): 본문이 직전 draft에서 바뀌었을 때만 recordRevision(불필요한 회차 인플레 방지).
+    //   바뀌지 않았으면 점수만 최신화(같은 draft 재점검) — 세션을 새 객체로 교체하되 draftHistory는 보존.
+    const areaScores = toAreaScores(scores);
+    const sess = sessionRef.current;
+    if (!sess) {
+      sessionRef.current = createSession(sessionAssignment(), state.body, areaScores, rubricRef.current);
+    } else {
+      const lastBody = sess.draftHistory[sess.draftHistory.length - 1]?.body ?? "";
+      if (state.body !== lastBody) {
+        // 본문이 바뀐 채로 다시 [봐줘] = 고쳐쓰기 1회. focus 영역 기준 before/after 기록.
+        const area = focus?.area ?? AREAS[0];
+        const before = sess.areaScores.find((s) => s.area === area)?.score ?? 0;
+        const after = scores[area] ?? 0;
+        sessionRef.current = recordRevision(sess, state.body, areaScores, area, before, after);
+      } else {
+        // 같은 본문 재점검 — draftHistory는 그대로 두고 최신 areaScores만 갱신(불변 교체).
+        sessionRef.current = { ...sess, areaScores };
+      }
+    }
+    persist(sessionRef.current);
+
     dispatch({ type: "CHECK_OK", scores, nudges: r.output.nudges });
   };
 
   // ── 재점검 (고쳤어 ✓) ──
   const runRecheck = async () => {
     dispatch({ type: "RECHECK_START" });
-    const r = await callCoach(state.body);
+    const r = await callCoach(state.body, rubricRef.current);
     if (!r.ok) {
       if (r.auth) {
         dispatch({ type: "AUTH_EXPIRED" });
@@ -301,6 +519,18 @@ export default function CoachClient({ onAuthExpired }: { onAuthExpired?: () => v
     }
     const scores = toScoreMap(r.output);
     setSheetExpanded(true);
+
+    // ── 세션 배선: 고쳐쓰기 1회 기록(손본 영역=focusArea, before=focusBefore, after=새 점수) ──
+    const area = state.focusArea ?? AREAS[0];
+    const before = state.focusBefore;
+    const after = scores[area] ?? 0;
+    const areaScores = toAreaScores(scores);
+    // 세션이 없으면(이론상 RECHECK 전 CHECK 필수라 발생 불가) 방어적으로 생성.
+    sessionRef.current = sessionRef.current
+      ? recordRevision(sessionRef.current, state.body, areaScores, area, before, after)
+      : createSession(sessionAssignment(), state.body, areaScores, rubricRef.current);
+    persist(sessionRef.current);
+
     dispatch({ type: "RECHECK_OK", scores });
   };
 
@@ -311,6 +541,8 @@ export default function CoachClient({ onAuthExpired }: { onAuthExpired?: () => v
     const remaining = NUDGEABLE.some((a) => (scores[a] ?? 0) < PASS);
     setCurrentNudge(null);
     if (!remaining) {
+      // 완료 시점 과정 로그를 한 번 더 확정 저장(교사 /teacher/log).
+      if (sessionRef.current) persist(sessionRef.current);
       dispatch({ type: "FINISH" });
     } else {
       dispatch({ type: "NEXT" });
@@ -337,6 +569,10 @@ export default function CoachClient({ onAuthExpired }: { onAuthExpired?: () => v
   const reset = () => {
     setCurrentNudge(null);
     setSheetExpanded(false);
+    // 라이브 세션·과정 로그도 초기화(새 라운드는 깨끗한 궤적에서 시작).
+    sessionRef.current = null;
+    clearSession();
+    clearProcessLog();
     dispatch({ type: "RESET" });
   };
 
