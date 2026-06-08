@@ -19,7 +19,7 @@
 | 6/10 (수) | Phase 2 분기+진입점 | ModeSelector·/coach 페이지·홈 Hero CTA 교체 | D·E |
 | 6/11~6/12 (목금) | Phase 3 4단계 wizard | AssistantBubble·/coach/prepare(v2 mock 그대로) | F·G |
 | 6/13 (토) | Phase 4 채점+/try deprecation | score-client.ts·/coach/evaluate·/try → /coach redirect | H |
-| 6/14~6/15 (일출시D-day) | Phase 5 회귀+dogfood | E2E·Lighthouse·다크 시각·prod dogfood | I·J |
+| 6/14 (일) ~ 6/15 (월 D-day) | Phase 5 회귀+EPO 셀프 dogfood | E2E·Lighthouse·다크 시각·prod 자연발생 피드백 모니터링 (외부 학생 모집 없음, docs/29 §7) | I·J |
 
 **결정 잠금 (6/8 09:30)**:
 - v1↔v2 = 완전 교체
@@ -46,8 +46,8 @@
 | 6/11 (목) | Phase 3 AssistantBubble + 4-step 골격 (PR F) | sessionStorage 상태 머신 | tsc + unit |
 | 6/12 (금) | Phase 3 mock 콘텐츠 + 완성 트리거 (PR G) | E2E /coach 시나리오 초안 | tsc + unit + components |
 | 6/13 (토) | Phase 4 score-client + evaluate + /try redirect (PR H) | ResultView 재사용 검증 | tsc + unit + components + E2E |
-| 6/14 (일) | Phase 5 E2E 3브라우저 + Lighthouse + 다크 시각 회귀 (PR I) | dogfood 1회 | 전체 회귀 |
-| 6/15 (월 D-day) | dogfood 피드백 반영 + 미세 조정 (PR J 옵션) + prod 배포 | 출시 공지 안 (외부 의존 P0 따라) | prod 전수 검증 |
+| 6/14 (일) | Phase 5 E2E 3브라우저 + Lighthouse + 다크 시각 회귀 (PR I) | EPO 셀프 dogfood (외부 학생 모집 0 — docs/29 §7) | 전체 회귀 |
+| 6/15 (월 D-day) | 미세 조정 (PR J 옵션) + prod 배포 + 자연발생 prod 피드백 모니터링 룰 가동 | 출시 공지 안 (외부 의존 P0 따라) | prod 전수 검증 |
 
 ## 5. 외부 의존 P0 — 본 sprint와 병렬
 
@@ -59,11 +59,11 @@
 - Sentry prod 알람
 - Anthropic 월 예산 + auto-disable
 
-→ 코드 sprint 6/15 완료돼도 외부 의존 미해소 시 출시 형태가 **NEXT_PUBLIC_DEMO_TOKEN 보호 데모** 상태로 제한. 완전 출시는 외부 의존 해소 후.
+→ 코드 sprint 6/15 완료돼도 외부 의존 미해소 시 출시 형태가 **`DEMO_ACCESS_TOKEN` 서버 게이트 보호 데모** 상태로 제한 (`NEXT_PUBLIC_DEMO_TOKEN` 자동입장은 PR #64 도입했으나 2026-06-04 prod env에서 제거 — 운영자가 비밀번호 별도 공유). 완전 출시는 외부 의존 해소 후.
 
 ### 6/8 의사결정 반영 (docs/29)
 
-6/5 보고 의사결정 4건 결과 — Sentry 보류·Pro 이관 6/13 재검토·부모 시스템 출시 후 단계적·dogfood 출시 후 수집. **외부 의존 P0 5건 중 4건 보류/별도** → docs/21 룰 D Free-only backup 시나리오 사실상 채택. 출시 형태 = `DEMO_ACCESS_TOKEN` 게이트 + rate limit + Vercel 기본 URL.
+6/5 보고 의사결정 4건 결과 — Sentry 보류·Pro 이관 6/13 재검토·부모 시스템 출시 후 단계적·dogfood 출시 후 수집. **외부 의존 P0 5건 중 4건 보류/별도** → W1 plan(워크스페이스 로컬) 룰 D backup 시나리오 사실상 채택. 출시 형태 = `DEMO_ACCESS_TOKEN` 서버 게이트 + rate limit + Vercel 기본 URL. Sentry는 DSN 미설정 자동 no-op.
 
 상세: [`docs/29_decisions_intake_2026-06-08.md`](29_decisions_intake_2026-06-08.md)
 
