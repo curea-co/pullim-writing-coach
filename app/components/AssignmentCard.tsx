@@ -18,7 +18,47 @@ import { capTargetToWritable, TARGET_MAX, TARGET_MIN } from "@/app/lib/grading";
 //   부모가 onChange로 받은 값을 sessionStorage에 저장하고, 다음 마운트 시 data prop으로 주입.
 
 // 어느 필드를 편집 중인지. 조건은 인덱스로 식별, "cond:new"는 신규 추가 모드.
-type EditKey = "genre" | "target" | `cond:${number}` | "cond:new" | null;
+type EditKey = "prompt" | "genre" | "target" | `cond:${number}` | "cond:new" | null;
+
+// 과제문 인라인 편집기 — 1~3문장 길이라 textarea로. Codex PR #70.
+function PromptEditor({
+  initial,
+  onSave,
+  onCancel,
+}: {
+  initial: string;
+  onSave: (value: string) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(initial);
+  return (
+    <div className="space-y-2">
+      <textarea
+        autoFocus
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) onSave(value);
+          else if (e.key === "Escape") onCancel();
+        }}
+        rows={3}
+        className="border-border bg-background text-foreground w-full rounded-md border px-3 py-2 text-sm leading-relaxed outline-none"
+      />
+      <div className="flex items-center gap-2 text-xs">
+        <button
+          type="button"
+          onClick={() => onSave(value)}
+          className="bg-primary text-primary-foreground rounded-md px-3 py-1.5 font-semibold"
+        >
+          저장 (Ctrl/⌘+Enter)
+        </button>
+        <button type="button" onClick={onCancel} className="text-subtle-foreground">
+          취소
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // 인라인 편집 입력칸 — 칩 자리에 그대로 들어가는 작은 폼.
 function InlineEditor({
@@ -86,6 +126,14 @@ export default function AssignmentCard({
     setEditing(null);
   };
 
+  // Codex PR #70: 과제문(prompt_text) 인라인 편집 — 추출이 잘못 요약하거나 inferred로 떨어진
+  //   경우 사용자가 직접 정정. 채점 요청 assignment.prompt_text로 그대로 들어가므로 핵심 동선.
+  const savePrompt = (value: string) => {
+    const v = value.trim();
+    if (!v) return setEditing(null);
+    persist({ ...a, prompt_text: { value: v, confidence: "confirmed" } });
+  };
+
   const saveGenre = (value: string) => {
     const v = value.trim();
     if (!v) return setEditing(null);
@@ -148,13 +196,35 @@ export default function AssignmentCard({
         )}
       </div>
 
-      <p className="text-foreground mb-4 text-sm leading-relaxed">
-        <span className="text-muted-foreground text-xs font-semibold">과제문 · </span>
-        {a.prompt_text.value}
-        {a.prompt_text.confidence === "inferred" && (
-          <span className="text-accent-mid ml-2 text-xs">↻ 확인 필요</span>
-        )}
-      </p>
+      {/* Codex PR #70: 과제문 인라인 편집 — 추출 잘못/inferred 시 사용자 직접 정정.
+          편집 모드는 textarea 형식 (단문보다 보통 1~3문장이라 InlineEditor input은 부적합). */}
+      {editing === "prompt" ? (
+        <div className="border-accent-mid bg-surface mb-4 rounded-xl border-2 p-3">
+          <label className="text-muted-foreground mb-1.5 block text-xs font-semibold">
+            과제문 수정
+          </label>
+          <PromptEditor
+            initial={a.prompt_text.value}
+            onSave={savePrompt}
+            onCancel={() => setEditing(null)}
+          />
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditing("prompt")}
+          className="text-foreground hover:bg-muted mb-4 w-full rounded-md p-1 text-left text-sm leading-relaxed transition"
+        >
+          <span className="text-muted-foreground text-xs font-semibold">과제문 · </span>
+          {a.prompt_text.value}
+          {a.prompt_text.confidence === "inferred" && (
+            <span className="text-accent-mid ml-2 text-xs">↻ 확인 필요 (눌러 수정)</span>
+          )}
+          {a.prompt_text.confidence === "confirmed" && (
+            <span className="text-subtle-foreground ml-2 text-xs">(눌러 수정)</span>
+          )}
+        </button>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {editing === "genre" ? (

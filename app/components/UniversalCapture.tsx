@@ -38,12 +38,14 @@ export type CaptureResult = {
   url?: string;
 };
 
+// Codex PR #70: 실제 처리하는 형식만 라벨에 명시. HWP·PDF·이미지·링크 본문·음성은 alert로
+//   준비 중 안내 — 라벨에서 약속하지 않음.
 const CHANNELS: { id: CaptureChannel; icon: string; label: string; help: string }[] = [
-  { id: "photo", icon: "📷", label: "사진/스캔", help: "공책·종이 답안지를 폰으로 촬영" },
-  { id: "file", icon: "📄", label: "파일", help: "HWP · DOCX · PDF · 이미지" },
+  { id: "photo", icon: "📷", label: "사진/스캔", help: "공책·종이 답안지를 폰으로 촬영 (OCR 준비 중)" },
+  { id: "file", icon: "📄", label: "파일", help: "DOCX · TXT (HWP/PDF는 준비 중)" },
   { id: "paste", icon: "📋", label: "붙여넣기", help: "이미 복사해 둔 글" },
-  { id: "link", icon: "🔗", label: "링크", help: "구글 독스 · 노션 공개 링크" },
-  { id: "voice", icon: "🎤", label: "말로 불러주기", help: "받아쓰기 — 보강용" },
+  { id: "link", icon: "🔗", label: "링크", help: "구글 독스 · 노션 (준비 중)" },
+  { id: "voice", icon: "🎤", label: "말로 불러주기", help: "받아쓰기 (준비 중)" },
   { id: "type", icon: "⌨️", label: "직접 타이핑", help: "여기에 바로 작성" },
 ];
 
@@ -315,7 +317,9 @@ export default function UniversalCapture({
         <input
           ref={fileRef}
           type="file"
-          accept=".hwp,.hwpx,.docx,.pdf,.txt,.md,image/*"
+          // Codex PR #70: 실제 처리하는 형식만 accept — HWP·PDF·이미지는 OS 파일 선택기에서
+          //   보이지 않게 (사용자가 미지원 형식 선택 후 alert 받는 dead-end 차단).
+          accept=".docx,.txt,.md"
           onChange={(e) => {
             if (e.target.files?.[0]) void handleFile("file", e.target.files[0]);
             e.target.value = "";
