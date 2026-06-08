@@ -58,6 +58,14 @@ export default function UniversalCapture({
     meta?: { filename?: string; url?: string },
   ) => {
     if (!payload.trim() && channel !== "file" && channel !== "photo") return;
+    // Codex PR #70: type/paste 경로도 RAW_MAX 가드 — file 경로만 가드하면 직접 타이핑/붙여넣기로
+    //   8000자 초과 시 클라에서 즉시 안내 못 하고 /api/extract E3로 늦게 거절됨.
+    if (payload.length > RAW_MAX) {
+      window.alert(
+        `텍스트가 너무 길어요(${payload.length}자). 안내서는 ${RAW_MAX}자까지 분석할 수 있어요. 본문만 잘라서 다시 시도해 주세요.`,
+      );
+      return;
+    }
     onCapture({ channel, text: payload, ...meta });
   };
 

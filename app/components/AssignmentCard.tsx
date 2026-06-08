@@ -13,7 +13,9 @@ import ConfidenceChip from "./ConfidenceChip";
 import { type ExtractedAssignment } from "@/app/lib/extract";
 import { capTargetToWritable, TARGET_MAX, TARGET_MIN } from "@/app/lib/grading";
 
-const STORAGE_KEY = "pwc_coach_assignment";
+// Codex PR #70: sessionStorage 저장/복원은 부모(/coach 페이지, Phase 2 PR D)의 책임.
+//   본 컴포넌트는 onChange 콜백으로만 알림 — 저장만 하고 hydrate 없으면 새로고침 시 복원 X.
+//   부모가 onChange로 받은 값을 sessionStorage에 저장하고, 다음 마운트 시 data prop으로 주입.
 
 // 어느 필드를 편집 중인지. 조건은 인덱스로 식별.
 type EditKey = "genre" | "target" | `cond:${number}` | null;
@@ -77,16 +79,9 @@ export default function AssignmentCard({
     setA(data);
   }, [data]);
 
-  // 편집 확정 — 내부 상태 + sessionStorage + 부모 콜백 모두 갱신.
+  // 편집 확정 — 내부 상태 + 부모 콜백. 저장은 부모 책임(위 주석).
   const persist = (next: ExtractedAssignment) => {
     setA(next);
-    if (typeof window !== "undefined") {
-      try {
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        /* swallow — quota 초과는 사용자 의도 외, 화면은 계속 동작 */
-      }
-    }
     onChange?.(next);
     setEditing(null);
   };
