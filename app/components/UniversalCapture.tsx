@@ -199,7 +199,9 @@ export default function UniversalCapture({
         <div className="bg-muted-foreground/25 mx-auto mt-3 h-1 w-24 rounded-full" aria-hidden />
       </div>
 
-      {/* 채널 버튼 — 카메라·파일·링크·말·붙여넣기 (큰 영역과 별개의 한 줄) */}
+      {/* 채널 버튼 — 카메라·파일·링크·말·붙여넣기 (큰 영역과 별개의 한 줄)
+          Codex PR #70: 미구현 채널(photo OCR · link fetch · voice STT)은 disabled + "준비 중"
+          뱃지. 사진 채널의 "추천" 강조는 실제 OCR 미구현이라 misleading — 제거. */}
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
         {CHANNELS.map((c) => {
           const isPhoto = c.id === "photo";
@@ -207,15 +209,25 @@ export default function UniversalCapture({
           const isVoice = c.id === "voice";
           const isLink = c.id === "link";
           const isPaste = c.id === "paste";
+          // 미구현 채널 disabled — UX dead-end 차단. file은 .txt/.md/.docx만 실제 처리되지만
+          // 그건 UI에서 미리 알 수 없으므로 enabled 유지 (handleFile이 미지원 형식 alert).
+          const isDisabled = isPhoto || isLink || isVoice;
           return (
             <button
               key={c.id}
               type="button"
               title={c.help}
+              disabled={isDisabled}
               onClick={() => {
-                if (isPhoto) photoRef.current?.click();
-                else if (isFile) fileRef.current?.click();
-                else if (isPaste)
+                if (isFile) fileRef.current?.click();
+                else if (isPaste) {
+                  // Codex PR #70 (ScoreForm 패턴): clipboard API 없는 환경 가드.
+                  if (!navigator.clipboard?.readText) {
+                    window.alert(
+                      "이 브라우저는 클립보드 자동 읽기를 지원하지 않아요. 큰 입력창에 직접 붙여넣어(Ctrl/⌘+V) 주세요.",
+                    );
+                    return;
+                  }
                   navigator.clipboard
                     .readText()
                     .then((t) => {
@@ -227,28 +239,24 @@ export default function UniversalCapture({
                         "클립보드 읽기 권한이 없어요. 큰 입력창에 직접 붙여넣어(Ctrl/⌘+V) 주세요.",
                       ),
                     );
-                else if (isLink) {
-                  setLinkOpen((v) => !v);
-                } else if (isVoice) {
-                  window.alert("말로 불러주기 (받아쓰기)는 다음 마일스톤에서 활성화됩니다.");
                 } else {
                   // type — 큰 영역에 포커스 (querySelector 대신 ref 사용 — Codex PR #67 학습)
                   textareaRef.current?.focus();
                 }
               }}
               className={cn(
-                "border-border bg-surface text-foreground hover:bg-muted flex flex-col items-center gap-1 rounded-xl border px-2 py-3 transition",
-                isPhoto && "border-accent-mid bg-accent-mid-surface",
-                isLink && linkOpen && "border-accent-mid bg-accent-mid-surface",
+                "border-border bg-surface text-foreground flex flex-col items-center gap-1 rounded-xl border px-2 py-3 transition",
+                !isDisabled && "hover:bg-muted",
+                isDisabled && "cursor-not-allowed opacity-50",
               )}
             >
               <span className="text-xl" aria-hidden>
                 {c.icon}
               </span>
               <span className="text-xs font-medium leading-tight text-center">{c.label}</span>
-              {isPhoto && (
-                <span className="bg-accent-mid text-primary-foreground rounded-full px-1.5 py-0.5 text-[9px] font-semibold">
-                  추천
+              {isDisabled && (
+                <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[9px] font-semibold">
+                  준비 중
                 </span>
               )}
             </button>

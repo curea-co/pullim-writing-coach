@@ -11,7 +11,7 @@
 import { useEffect, useState } from "react";
 import ConfidenceChip from "./ConfidenceChip";
 import { type ExtractedAssignment } from "@/app/lib/extract";
-import { TARGET_MAX, TARGET_MIN } from "@/app/lib/grading";
+import { capTargetToWritable, TARGET_MAX, TARGET_MIN } from "@/app/lib/grading";
 
 const STORAGE_KEY = "pwc_coach_assignment";
 
@@ -100,11 +100,17 @@ export default function AssignmentCard({
   const saveTarget = (value: string) => {
     const digits = value.replace(/[^\d]/g, "");
     const parsed = digits === "" ? null : Number(digits);
-    // 분량 표시 정책: raw value 그대로 저장. 채점 cap은 score-client(PR D)가 호출 시점에 처리.
-    // 범위 밖이면 아래 안내 배너로 사용자에게 노출.
+    // Codex PR #70: 사용자 수동 수정 시 capTargetToWritable로 채점 가능 범위(50~2,000) 적용.
+    //   범위 밖 값을 그대로 저장하면 /api/score가 E10으로 거절 — 안내 문구와 실제 동작 어긋남.
+    //   원본은 requested에 보존해 안내 배너에 표시 ("원본 N자 → M자로 조정").
+    const { value: capped, requested } = capTargetToWritable(parsed);
     persist({
       ...a,
-      target_char_count: { value: parsed, confidence: "confirmed" },
+      target_char_count: {
+        value: capped,
+        confidence: "confirmed",
+        ...(requested != null ? { requested } : {}),
+      },
     });
   };
 
@@ -117,6 +123,9 @@ export default function AssignmentCard({
   };
 
   const targetValue = a.target_char_count.value;
+  const targetRequested = a.target_char_count.requested;
+  // 추출(extract.ts)에서 raw value 그대로 보존된 경우 범위 밖일 수 있음 → 사용자에게 안내.
+  // 사용자 수동 수정(saveTarget)은 이미 cap 적용 → requested가 원본 보존.
   const targetOutOfRange =
     targetValue != null && (targetValue < TARGET_MIN || targetValue > TARGET_MAX);
 
@@ -197,12 +206,20 @@ export default function AssignmentCard({
         )}
       </div>
 
-      {/* 분량이 작성·채점 가능 범위를 벗어난 경우 사용자에게 한계 안내.
-          정책: value는 교사값 그대로 표시, 안내만 추가. 채점 호출 시 score-client가 별도 cap. */}
-      {targetOutOfRange && (
+      {/* 분량 안내 — 두 케이스:
+          (1) 사용자 수동 수정 시 capTargetToWritable이 원본 → requested에 보존.
+          (2) 추출 결과 raw value가 범위 밖.
+          (1)이 우선 — 사용자가 직접 입력한 원본을 알려주는 게 더 명확. */}
+      {targetRequested != null && targetValue != null && (
         <p className="bg-band-warn-surface text-band-warn-foreground mt-3 rounded-md px-3 py-2 text-[11px] leading-relaxed">
-          ※ 목표 <strong>{targetValue}자</strong>는 이 도구의 작성·채점 범위({TARGET_MIN}~{TARGET_MAX}자)를
-          벗어나요. 채점 시 범위 안으로 자동 조정돼요.
+          ※ 입력하신 <strong>{targetRequested}자</strong>는 작성·채점 범위({TARGET_MIN}~{TARGET_MAX}자)를
+          벗어나 <strong>{targetValue}자</strong>로 조정됐어요.
+        </p>
+      )}
+      {targetRequested == null && targetOutOfRange && (
+        <p className="bg-band-warn-surface text-band-warn-foreground mt-3 rounded-md px-3 py-2 text-[11px] leading-relaxed">
+          ※ 안내서의 목표 <strong>{targetValue}자</strong>는 작성·채점 범위({TARGET_MIN}~{TARGET_MAX}자)를
+          벗어나요. 분량 칩을 눌러 범위 안으로 수정해 주세요.
         </p>
       )}
 
