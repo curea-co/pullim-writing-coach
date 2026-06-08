@@ -185,8 +185,9 @@ export default function AssignmentCard({
               onCancel={() => setEditing(null)}
             />
           ) : (
+            // Codex PR #70: 같은 조건 두 번 입력 시 key 충돌 → 인덱스+value 조합으로 안정화.
             <ConfidenceChip
-              key={c}
+              key={`cond-${i}-${c}`}
               label="조건"
               value={c}
               confidence="confirmed"

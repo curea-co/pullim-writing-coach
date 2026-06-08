@@ -59,10 +59,11 @@ export default function UniversalCapture({
   const submitLink = () => {
     const url = linkUrl.trim();
     if (!url) return;
-    submit(
-      "link",
-      `[링크 본문 mock — ${url}]\n\n실제 출시 시 server fetch + readability로 본문 추출. 다음 단계서 미리보기.`,
-      { url },
+    // Codex PR #70: 링크 본문 fetch + readability 미구현 — mock 본문을 onCapture에 넘기면
+    //   상위가 실제 본문으로 추출/채점 진행해 잘못된 결과. 사용자에게 안내만, onCapture 호출 X.
+    //   fetch + readability 도입은 별도 PR (W3 또는 출시 후).
+    window.alert(
+      "링크 본문 자동 추출은 아직 준비 중이에요. 링크된 문서의 본문을 직접 복사해 붙여넣어 주세요.",
     );
     setLinkUrl("");
     setLinkOpen(false);
@@ -74,11 +75,14 @@ export default function UniversalCapture({
     Array.from(dt.types || []).includes("Files");
 
   const handleFile = async (channel: "file" | "photo", f: File) => {
-    // 시각 프로토타입: 텍스트 파일이면 직접 읽고, 그 외엔 파일명만 보고 mock 텍스트(OCR/파서 자리).
+    // Codex PR #70: mock placeholder 본문을 onCapture에 넘기면 상위가 그걸 실제 본문으로
+    //   추출/채점 → 잘못된 결과. 지원 형식(txt/md/docx)만 실제 파싱, 그 외(hwp·pdf·이미지)는
+    //   alert + return. PDF·HWP·이미지 OCR 파싱은 별도 PR (W3 또는 출시 후).
     const isText = /\.(txt|md)$/i.test(f.name);
+    const isDocx = /\.docx$/i.test(f.name);
+
     if (isText) {
-      // Codex PR #70 (ScoreForm PR #37 패턴): file.text()는 UTF-8 가정 → CP949/EUC-KR 한글
-      //   파일 깨짐. UTF-8 fatal 시도 → 실패 시 EUC-KR fallback.
+      // ScoreForm PR #37 패턴: UTF-8 fatal 시도 → 실패 시 EUC-KR fallback.
       const buffer = await f.arrayBuffer();
       let text: string;
       try {
@@ -94,21 +98,36 @@ export default function UniversalCapture({
         }
       }
       submit(channel, text, { filename: f.name });
-    } else {
-      submit(
-        channel,
-        `[${f.name}에서 추출된 본문 — OCR/파서 mock]\n\n실제 출시 시 ${
-          /\.hwp/i.test(f.name)
-            ? "HWP 파서"
-            : /\.docx/i.test(f.name)
-              ? "DOCX 파서(mammoth)"
-              : /\.pdf/i.test(f.name)
-                ? "PDF 파서"
-                : "비전 OCR"
-        }로 본문을 자동 추출합니다. 다음 단계서 미리보기·수정 가능.`,
-        { filename: f.name },
-      );
+      return;
     }
+
+    if (isDocx) {
+      // ScoreForm 패턴 — mammoth lazy import (초기 번들 영향 0).
+      try {
+        const mammoth = await import("mammoth");
+        const arrayBuffer = await f.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        const text = result.value?.trim() ?? "";
+        if (!text) {
+          window.alert("DOCX에서 본문을 찾지 못했어요. 파일이 비어 있거나 손상됐을 수 있어요.");
+          return;
+        }
+        submit(channel, text, { filename: f.name });
+      } catch {
+        window.alert(
+          "DOCX 파일을 읽지 못했어요. 다른 .docx 파일로 시도하거나 본문을 직접 붙여넣어 주세요.",
+        );
+      }
+      return;
+    }
+
+    // HWP·PDF·이미지 — 파싱·OCR 미구현. 사용자에게 직접 입력 안내, mock 본문은 넘기지 않음.
+    const guidance = /\.hwp/i.test(f.name)
+      ? "HWP 파싱은 아직 준비 중이에요. PDF나 텍스트로 변환해 다시 올리거나 본문을 직접 붙여넣어 주세요."
+      : /\.pdf/i.test(f.name)
+        ? "PDF 파싱은 아직 준비 중이에요. 본문을 복사해 붙여넣거나 텍스트 파일로 변환해 주세요."
+        : "사진/이미지 OCR은 아직 준비 중이에요. 본문을 직접 타이핑하거나 텍스트로 붙여넣어 주세요.";
+    window.alert(guidance);
   };
 
   return (
