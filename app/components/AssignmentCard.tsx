@@ -17,8 +17,8 @@ import { capTargetToWritable, TARGET_MAX, TARGET_MIN } from "@/app/lib/grading";
 //   본 컴포넌트는 onChange 콜백으로만 알림 — 저장만 하고 hydrate 없으면 새로고침 시 복원 X.
 //   부모가 onChange로 받은 값을 sessionStorage에 저장하고, 다음 마운트 시 data prop으로 주입.
 
-// 어느 필드를 편집 중인지. 조건은 인덱스로 식별.
-type EditKey = "genre" | "target" | `cond:${number}` | null;
+// 어느 필드를 편집 중인지. 조건은 인덱스로 식별, "cond:new"는 신규 추가 모드.
+type EditKey = "genre" | "target" | `cond:${number}` | "cond:new" | null;
 
 // 인라인 편집 입력칸 — 칩 자리에 그대로 들어가는 작은 폼.
 function InlineEditor({
@@ -117,6 +117,17 @@ export default function AssignmentCard({
     persist({ ...a, conditions: next });
   };
 
+  // Codex PR #70: 안내서 카드가 MetaForm 대체하려면 조건 append 동선 필요 — 추출이 놓친
+  //   조건을 사용자가 추가하거나, 빈 conditions에서도 손댈 수 있도록.
+  const addCondition = (value: string) => {
+    const v = value.trim();
+    if (!v) {
+      setEditing(null);
+      return;
+    }
+    persist({ ...a, conditions: [...a.conditions, v] });
+  };
+
   const targetValue = a.target_char_count.value;
   const targetRequested = a.target_char_count.requested;
   // 추출(extract.ts)에서 raw value 그대로 보존된 경우 범위 밖일 수 있음 → 사용자에게 안내.
@@ -198,6 +209,24 @@ export default function AssignmentCard({
               onEdit={() => setEditing(`cond:${i}`)}
             />
           ),
+        )}
+
+        {/* Codex PR #70: 조건 추가 동선 — 추출이 놓친 조건/빈 conditions 복구 가능. */}
+        {editing === "cond:new" ? (
+          <InlineEditor
+            label="조건"
+            initial=""
+            onSave={addCondition}
+            onCancel={() => setEditing(null)}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditing("cond:new")}
+            className="border-border text-muted-foreground hover:text-foreground hover:border-accent-mid inline-flex items-center gap-1 rounded-full border border-dashed px-3 py-1.5 text-xs font-medium transition"
+          >
+            + 조건 추가
+          </button>
         )}
       </div>
 

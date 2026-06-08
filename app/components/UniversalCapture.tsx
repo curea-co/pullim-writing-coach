@@ -9,11 +9,25 @@
 import { useRef, useState } from "react";
 import { cn } from "@/app/lib/utils";
 import { type ExtractChannel, RAW_MAX } from "@/app/lib/extract";
+import { BODY_MAX } from "@/app/lib/grading";
 
-// Codex PR #70: ScoreForm 패턴 — 파일 크기 가드(메모리 OOM 차단) + 추출 텍스트 길이 가드
-//   (서버 E3 거절 대신 클라에서 즉시 피드백). RAW_MAX는 lib/extract와 단일 source.
+// Codex PR #70: ScoreForm 패턴 — 파일 크기 가드(메모리 OOM 차단) + 텍스트 길이 가드
+//   (서버 거절 대신 클라에서 즉시 피드백).
 const MAX_FILE_DOCX = 5 * 1024 * 1024; // 5MB
 const MAX_FILE_TEXT = 1 * 1024 * 1024; // 1MB
+
+// variant별 길이 한계 + 컨텍스트 카피.
+//   assignment(안내서): RAW_MAX = 8000자 (lib/extract).
+//   writing(학생 글): BODY_MAX = 2000자 (lib/grading, /api/score 검증과 일치).
+function getLimits(variant: "assignment" | "writing"): {
+  maxChars: number;
+  ctxName: string;
+  endpointHint: string;
+} {
+  return variant === "writing"
+    ? { maxChars: BODY_MAX, ctxName: "글", endpointHint: "채점" }
+    : { maxChars: RAW_MAX, ctxName: "안내서", endpointHint: "분석" };
+}
 
 export type CaptureChannel = ExtractChannel;
 
@@ -44,6 +58,7 @@ export default function UniversalCapture({
   hint: string;
   onCapture: (result: CaptureResult) => void;
 }) {
+  const { maxChars, ctxName, endpointHint } = getLimits(variant);
   const [text, setText] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
@@ -60,9 +75,9 @@ export default function UniversalCapture({
     if (!payload.trim() && channel !== "file" && channel !== "photo") return;
     // Codex PR #70: type/paste 경로도 RAW_MAX 가드 — file 경로만 가드하면 직접 타이핑/붙여넣기로
     //   8000자 초과 시 클라에서 즉시 안내 못 하고 /api/extract E3로 늦게 거절됨.
-    if (payload.length > RAW_MAX) {
+    if (payload.length > maxChars) {
       window.alert(
-        `텍스트가 너무 길어요(${payload.length}자). 안내서는 ${RAW_MAX}자까지 분석할 수 있어요. 본문만 잘라서 다시 시도해 주세요.`,
+        `텍스트가 너무 길어요(${payload.length}자). ${ctxName}은 ${maxChars}자까지 ${endpointHint}할 수 있어요. 본문만 잘라서 다시 시도해 주세요.`,
       );
       return;
     }
@@ -118,13 +133,7 @@ export default function UniversalCapture({
           return;
         }
       }
-      // Codex PR #70: 추출 후 RAW_MAX 초과면 즉시 피드백 (서버 E3 거절 회피).
-      if (text.length > RAW_MAX) {
-        window.alert(
-          `텍스트가 너무 길어요(${text.length}자). 안내서는 ${RAW_MAX}자까지 분석할 수 있어요. 본문만 잘라서 다시 시도해 주세요.`,
-        );
-        return;
-      }
+      // Codex PR #70: 추출 후 maxChars 초과면 즉시 피드백 (서버 거절 회피, variant별 다른 한계).
       submit(channel, text, { filename: f.name });
       return;
     }
@@ -140,12 +149,7 @@ export default function UniversalCapture({
           window.alert("DOCX에서 본문을 찾지 못했어요. 파일이 비어 있거나 손상됐을 수 있어요.");
           return;
         }
-        if (text.length > RAW_MAX) {
-          window.alert(
-            `DOCX에서 추출된 본문이 너무 길어요(${text.length}자). ${RAW_MAX}자 이내로 잘라서 다시 시도해 주세요.`,
-          );
-          return;
-        }
+        // DOCX 추출 후 길이는 submit()의 maxChars 가드가 한 번 더 검증 (variant별).
         submit(channel, text, { filename: f.name });
       } catch {
         window.alert(
