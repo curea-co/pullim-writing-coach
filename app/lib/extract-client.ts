@@ -4,7 +4,7 @@
 // 2026-06-08 v2 이식 (Phase 1 PR A) — ExtractedAssignment를 컴포넌트가 아니라 lib/extract에서 import.
 // Codex PR #67: 성공 경로 JSON 파싱·스키마 방어 + 추출 전용 메시지 맵 분리.
 
-import { type ExtractedAssignment } from "./extract";
+import { type ExtractChannel, type ExtractedAssignment } from "./extract";
 import { type ErrorCode } from "./grading";
 
 export type ExtractErrorCode = ErrorCode | "E-NETWORK" | "E-PARSE";
@@ -77,7 +77,7 @@ function looksLikeExtractedAssignment(v: unknown): v is ExtractedAssignment {
 // 안내서 원문 → /api/extract 호출 → 검증된 ExtractedAssignment. 실패는 ExtractError로 throw.
 export async function extractAssignment(
   rawText: string,
-  channel: string,
+  channel: ExtractChannel,
   token: string,
 ): Promise<ExtractedAssignment> {
   let res: Response;
