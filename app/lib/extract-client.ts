@@ -6,9 +6,11 @@
 import { type ExtractedAssignment } from "./extract";
 import { ERROR_MESSAGE, type ErrorCode } from "./grading";
 
-// 라이브 AI 토글은 채점과 공유(NEXT_PUBLIC_USE_LIVE_SCORING). 미설정 시 mock 추출 유지.
+// 라이브 추출 토글 — 채점(NEXT_PUBLIC_USE_LIVE_SCORING)과 분리해 운영 유연성 확보.
+//   추출만 mock으로 두고 채점은 live 운영하는 시나리오(또는 그 반대) 가능.
+//   미설정 시 mock 추출(false). 인벤토리 docs/26 §9에 환경변수 정의.
 export function isLiveExtractionEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_USE_LIVE_SCORING === "true";
+  return process.env.NEXT_PUBLIC_USE_LIVE_EXTRACTION === "true";
 }
 
 export type ExtractErrorCode = ErrorCode | "E-NETWORK";
