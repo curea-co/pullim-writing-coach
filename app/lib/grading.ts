@@ -41,6 +41,19 @@ export const TARGET_MAX = 2000;
 export const PROMPT_MIN = 10;
 export const PROMPT_MAX = 1000;
 
+// 분량을 작성·채점 가능 범위(50~2,000)로 캡하는 단일 소스 (추출·mock·수동수정 공용).
+//   value = 실효 목표(50~2,000 또는 null). 원본이 범위를 벗어나 캡됐으면 requested에 원본 보존.
+//   9 이하('5문단'→'5' 같은 분량 아닌 숫자 오인식)·null·비수치는 목표 없음(null).
+//   2026-06-08 v2 이식 (Phase 1 PR A) — 안내서 추출 결과를 채점 가능 범위로 정규화.
+export function capTargetToWritable(raw: number | null): { value: number | null; requested?: number } {
+  if (raw === null || !Number.isFinite(raw)) return { value: null };
+  const n = Math.round(raw);
+  if (n <= 9) return { value: null };
+  if (n > TARGET_MAX) return { value: TARGET_MAX, requested: n };
+  if (n < TARGET_MIN) return { value: TARGET_MIN, requested: n };
+  return { value: n };
+}
+
 // ════════════════════════════════════════════════════════════════════
 // 에러 모델 (12 §5) — code → HTTP status / 기본 한국어 메시지
 // ════════════════════════════════════════════════════════════════════
