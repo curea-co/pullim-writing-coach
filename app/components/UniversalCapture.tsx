@@ -68,11 +68,32 @@ export default function UniversalCapture({
     setLinkOpen(false);
   };
 
-  const handleFile = (channel: "file" | "photo", f: File) => {
+  // Codex PR #70: 파일 드래그만 가로채기. 일반 텍스트(다른 앱/탭에서 드래그) 드롭은
+  //   브라우저 기본 동작(textarea에 텍스트 삽입) 유지 — 회귀 방지 (ScoreForm PR #37 패턴).
+  const hasFilesInDataTransfer = (dt: DataTransfer): boolean =>
+    Array.from(dt.types || []).includes("Files");
+
+  const handleFile = async (channel: "file" | "photo", f: File) => {
     // 시각 프로토타입: 텍스트 파일이면 직접 읽고, 그 외엔 파일명만 보고 mock 텍스트(OCR/파서 자리).
     const isText = /\.(txt|md)$/i.test(f.name);
     if (isText) {
-      f.text().then((t) => submit(channel, t, { filename: f.name }));
+      // Codex PR #70 (ScoreForm PR #37 패턴): file.text()는 UTF-8 가정 → CP949/EUC-KR 한글
+      //   파일 깨짐. UTF-8 fatal 시도 → 실패 시 EUC-KR fallback.
+      const buffer = await f.arrayBuffer();
+      let text: string;
+      try {
+        text = new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+      } catch {
+        try {
+          text = new TextDecoder("euc-kr").decode(buffer);
+        } catch {
+          window.alert(
+            "파일 인코딩을 알아보지 못했어요. UTF-8로 다시 저장하거나 본문을 직접 붙여넣어 주세요.",
+          );
+          return;
+        }
+      }
+      submit(channel, text, { filename: f.name });
     } else {
       submit(
         channel,
@@ -104,15 +125,21 @@ export default function UniversalCapture({
           dragOver && "ring-accent-mid ring-2",
         )}
         onDragOver={(e) => {
+          // Codex PR #70: 파일 드래그만 가로채기 — 일반 텍스트 드래그는 기본 textarea 삽입 유지.
+          if (!hasFilesInDataTransfer(e.dataTransfer)) return;
           e.preventDefault();
           setDragOver(true);
         }}
         onDragLeave={() => setDragOver(false)}
         onDrop={(e) => {
+          if (!hasFilesInDataTransfer(e.dataTransfer)) {
+            setDragOver(false);
+            return;
+          }
           e.preventDefault();
           setDragOver(false);
           const f = e.dataTransfer.files[0];
-          if (f) handleFile("file", f);
+          if (f) void handleFile("file", f);
         }}
       >
         {/* 상단 스피커·전면 카메라 (노치 느낌) */}
@@ -213,14 +240,21 @@ export default function UniversalCapture({
           type="file"
           accept="image/*"
           capture="environment"
-          onChange={(e) => e.target.files?.[0] && handleFile("photo", e.target.files[0])}
+          onChange={(e) => {
+            if (e.target.files?.[0]) void handleFile("photo", e.target.files[0]);
+            // Codex PR #70: 같은 파일 재선택 시 onChange 재발화 위해 value 비움 (ScoreForm 패턴).
+            e.target.value = "";
+          }}
           className="hidden"
         />
         <input
           ref={fileRef}
           type="file"
           accept=".hwp,.hwpx,.docx,.pdf,.txt,.md,image/*"
-          onChange={(e) => e.target.files?.[0] && handleFile("file", e.target.files[0])}
+          onChange={(e) => {
+            if (e.target.files?.[0]) void handleFile("file", e.target.files[0]);
+            e.target.value = "";
+          }}
           className="hidden"
         />
       </div>
