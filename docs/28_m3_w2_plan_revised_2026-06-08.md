@@ -3,11 +3,11 @@
 > **작성자**: 최선혜
 > **작성일**: 2026-06-08 (월) — 09:30 work contract 후
 > **M3 W2 기간**: 2026-06-09 (화) ~ 2026-06-15 (월, 출시 D-day)
-> **선행 작성**: `docs/21_m3_w2_plan_2026-06-04.md` (대체) · `docs/26_v1v2_integration_inventory.md` · `docs/27_new_ux_flow_phase_plan.md`
+> **선행 작성**: 이전 W1 plan (워크스페이스 로컬, main 부재, 본 docs/28이 대체) · [`docs/26_v1v2_integration_inventory.md`](26_v1v2_integration_inventory.md) · [`docs/27_new_ux_flow_phase_plan.md`](27_new_ux_flow_phase_plan.md)
 
 ## 1. 재작성 이유
 
-`docs/21`은 링크 본문 추출·테스트 커버리지·로깅을 메인 sprint로 잡았으나, 6/5 대표님 보고에서 **새 UX flow 결정 입력**을 받음(안내서 → 분기 → 쓰기/평가). 이게 출시 차별화의 핵심이 됨에 따라 W2 메인 sprint를 새 UX flow로 교체. 기존 W2 항목은 W3 또는 출시 후로 이관.
+이전 W1 plan(워크스페이스 로컬)은 링크 본문 추출·테스트 커버리지·로깅을 메인 sprint로 잡았으나, 6/5 대표님 보고에서 **새 UX flow 결정 입력**을 받음(안내서 → 분기 → 쓰기/평가). 이게 출시 차별화의 핵심이 됨에 따라 W2 메인 sprint를 새 UX flow로 교체. 기존 W2 항목은 W3 또는 출시 후로 이관.
 
 ## 2. W2 메인 sprint — 새 UX flow Phase 1~5
 
@@ -29,11 +29,11 @@
 
 ## 3. 기존 W2 항목 이관 결정
 
-| 항목 (docs/21) | 재배치 | 사유 |
+| 이전 W1 plan 항목 | 재배치 | 사유 |
 |---|---|---|
 | ① 링크 본문 추출 (D 채널) | **W3 또는 출시 후** | UniversalCapture 6채널 중 1개. Phase 1에서 5채널은 이식되지만 링크는 server fetch + readability 별도 작업. 데모는 5채널로 충분 |
 | ② 컴포넌트·E2E 테스트 커버리지 확장 | **Phase 5에 흡수** (회귀 검증으로 일부) | 새 UX flow의 신규 컴포넌트 단위 테스트는 Phase 1~3 PR에 포함. 기존 v1 컴포넌트 커버리지 확장은 W3 |
-| ③ 로깅 | **출시 후 별도 sprint** | Sentry 코드는 instrumentation·error boundary 그대로 유지하되 DSN env(서버·클라 모두) 미설정으로 자동 no-op 출시 (docs/29 §3 결정). breadcrumb·구조화 로그는 운영 데이터 수집 단계에서 도입 |
+| ③ 로깅 | **출시 후 별도 sprint** | Sentry 코드는 instrumentation·error boundary 그대로 유지하되 DSN env(서버·클라 모두) 미설정으로 자동 no-op 출시 (docs/29 §2 출시 형태 + §6 사전 코드 표 결정). breadcrumb·구조화 로그는 운영 데이터 수집 단계에서 도입 |
 | Pro 이관 ①~③ 자력 단계 | **본 sprint 외 병렬** | 6/5 대표님 결정 따라 진행. 본 sprint 완료와 무관 |
 
 ## 4. W2 day별 산출 목표
