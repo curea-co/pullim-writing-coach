@@ -18,7 +18,7 @@ import {
   validateExtractRequest,
 } from "@/app/lib/extract";
 import { ERROR_HTTP, errorEnvelope, parseModelJson } from "@/app/lib/grading";
-import { EXTRACT_MESSAGE, isAuthorized, jsonError, logMetric } from "./helpers";
+import { isAuthorized, jsonError, logMetric } from "./helpers";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic"; // POST는 기본 비캐시이나 명시 (Cache Components OFF)
