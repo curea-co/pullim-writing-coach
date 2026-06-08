@@ -8,7 +8,12 @@
 
 import { useRef, useState } from "react";
 import { cn } from "@/app/lib/utils";
-import { type ExtractChannel } from "@/app/lib/extract";
+import { type ExtractChannel, RAW_MAX } from "@/app/lib/extract";
+
+// Codex PR #70: ScoreForm 패턴 — 파일 크기 가드(메모리 OOM 차단) + 추출 텍스트 길이 가드
+//   (서버 E3 거절 대신 클라에서 즉시 피드백). RAW_MAX는 lib/extract와 단일 source.
+const MAX_FILE_DOCX = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_TEXT = 1 * 1024 * 1024; // 1MB
 
 export type CaptureChannel = ExtractChannel;
 
@@ -81,6 +86,14 @@ export default function UniversalCapture({
     const isText = /\.(txt|md)$/i.test(f.name);
     const isDocx = /\.docx$/i.test(f.name);
 
+    // Codex PR #70: file size 가드 — 메모리 OOM·LS quota 폭주 차단 (ScoreForm 패턴).
+    const sizeLimit = isDocx ? MAX_FILE_DOCX : MAX_FILE_TEXT;
+    if (f.size > sizeLimit) {
+      const limitMb = (sizeLimit / 1024 / 1024).toFixed(0);
+      window.alert(`파일이 너무 커요(${limitMb}MB 이내). 본문만 잘라서 다시 올려 주세요.`);
+      return;
+    }
+
     if (isText) {
       // ScoreForm PR #37 패턴: UTF-8 fatal 시도 → 실패 시 EUC-KR fallback.
       const buffer = await f.arrayBuffer();
@@ -97,6 +110,13 @@ export default function UniversalCapture({
           return;
         }
       }
+      // Codex PR #70: 추출 후 RAW_MAX 초과면 즉시 피드백 (서버 E3 거절 회피).
+      if (text.length > RAW_MAX) {
+        window.alert(
+          `텍스트가 너무 길어요(${text.length}자). 안내서는 ${RAW_MAX}자까지 분석할 수 있어요. 본문만 잘라서 다시 시도해 주세요.`,
+        );
+        return;
+      }
       submit(channel, text, { filename: f.name });
       return;
     }
@@ -110,6 +130,12 @@ export default function UniversalCapture({
         const text = result.value?.trim() ?? "";
         if (!text) {
           window.alert("DOCX에서 본문을 찾지 못했어요. 파일이 비어 있거나 손상됐을 수 있어요.");
+          return;
+        }
+        if (text.length > RAW_MAX) {
+          window.alert(
+            `DOCX에서 추출된 본문이 너무 길어요(${text.length}자). ${RAW_MAX}자 이내로 잘라서 다시 시도해 주세요.`,
+          );
           return;
         }
         submit(channel, text, { filename: f.name });
