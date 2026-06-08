@@ -33,7 +33,7 @@
 |---|---|---|
 | ① 링크 본문 추출 (D 채널) | **W3 또는 출시 후** | UniversalCapture 6채널 중 1개. Phase 1에서 5채널은 이식되지만 링크는 server fetch + readability 별도 작업. 데모는 5채널로 충분 |
 | ② 컴포넌트·E2E 테스트 커버리지 확장 | **Phase 5에 흡수** (회귀 검증으로 일부) | 새 UX flow의 신규 컴포넌트 단위 테스트는 Phase 1~3 PR에 포함. 기존 v1 컴포넌트 커버리지 확장은 W3 |
-| ③ 로깅 | **출시 후 별도 sprint** | Sentry는 이미 활성. breadcrumb·구조화 로그는 운영 데이터 수집 단계에서 도입 |
+| ③ 로깅 | **출시 후 별도 sprint** | Sentry 코드는 instrumentation·error boundary 그대로 유지하되 DSN env(서버·클라 모두) 미설정으로 자동 no-op 출시 (docs/29 §3 결정). breadcrumb·구조화 로그는 운영 데이터 수집 단계에서 도입 |
 | Pro 이관 ①~③ 자력 단계 | **본 sprint 외 병렬** | 6/5 대표님 결정 따라 진행. 본 sprint 완료와 무관 |
 
 ## 4. W2 day별 산출 목표
@@ -63,7 +63,7 @@
 
 ### 6/8 의사결정 반영 (docs/29)
 
-6/5 보고 의사결정 4건 결과 — Sentry 보류·Pro 이관 6/13 재검토·부모 시스템 출시 후 단계적·dogfood 출시 후 수집. **외부 의존 P0 5건 중 4건 보류/별도** → W1 plan(워크스페이스 로컬) 룰 D backup 시나리오 사실상 채택. 출시 형태 = `DEMO_ACCESS_TOKEN` 서버 게이트 + rate limit + Vercel 기본 URL. Sentry는 DSN 미설정 자동 no-op.
+6/5 보고 의사결정 4건 결과 — Sentry 보류·Pro 이관 6/13 재검토·부모 시스템 출시 후 단계적·dogfood 출시 후 수집. **외부 의존 P0 5건 중 4건 보류/별도** → W1 plan(워크스페이스 로컬) 룰 D D-2 조건 사전 경보 — **6/13 (토) 재검토에서 변동 없으면** backup 시나리오 채택 확정. 예상 출시 형태 = `DEMO_ACCESS_TOKEN` 서버 게이트 + rate limit + Vercel 기본 URL. Sentry는 두 DSN env 모두 미설정 시 자동 no-op.
 
 상세: [`docs/29_decisions_intake_2026-06-08.md`](29_decisions_intake_2026-06-08.md)
 
