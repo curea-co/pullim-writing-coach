@@ -95,5 +95,7 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/api/score"],
+  // Codex PR #69: /api/extract도 Anthropic 호출하므로 같은 비용 보호 적용.
+  //   NEXT_PUBLIC_DEMO_TOKEN 노출 환경에서 두 라우트 다 우회 가능 → matcher 확장.
+  matcher: ["/api/score", "/api/extract"],
 };
