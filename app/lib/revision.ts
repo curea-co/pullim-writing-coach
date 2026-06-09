@@ -89,3 +89,36 @@ export function areaToneColorHint(tone: AreaTone): "good" | "neutral" | "warn" {
   if (tone === "flat") return "neutral";
   return "warn";
 }
+
+// ── 성장 막대 매핑 (T1.5, 과정 코치) ─────────────────────────────────
+//   고쳐쓰기 루프 ④의 "성장 막대(전/후)" UX. 결정 락: 원점수는 화면에 숨기고 막대만 보여준다.
+//   ⚠️ DECISION NEEDED(docs/24 §3): 0~20→막대 정확한 매핑식. MVP=선형 비율.
+function clamp01(n: number): number {
+  if (n < 0) return 0;
+  if (n > 1) return 1;
+  return n;
+}
+
+// 점수(0~max) → 막대 fill 비율(0~1). 화면은 이 비율만 쓰고 원점수는 노출하지 않는다.
+export function toBarFill(score: number, max = 20): number {
+  if (max <= 0) return 0;
+  return clamp01(score / max);
+}
+
+// 점수 → 이산 칸 수(▰▰▱▱▱ 스타일, 기본 5칸).
+export function toBarSegments(score: number, max = 20, segments = 5): number {
+  return Math.round(clamp01(score / max) * segments);
+}
+
+// 전/후 성장 막대 — fill만 노출(원점수·delta 숫자 비노출, 수치 숨김 계약).
+export function growthBar(
+  before: number,
+  after: number,
+  max = 20,
+): { beforeFill: number; afterFill: number; improved: boolean } {
+  return {
+    beforeFill: toBarFill(before, max),
+    afterFill: toBarFill(after, max),
+    improved: after > before,
+  };
+}

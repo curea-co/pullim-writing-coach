@@ -1,4 +1,4 @@
-// Edge Middleware — /api/score IP당 분당 N회 rate limit.
+// Edge Middleware — /api/score · /api/coach IP당 분당 N회 rate limit.
 //   목적: NEXT_PUBLIC_DEMO_TOKEN(클라 번들 inline)이 외부에 노출돼도 무한 호출 차단.
 //        Anthropic Haiku 호출당 과금이라 비용 폭주 1차 방어선.
 //   pure 로직(checkRateLimit)은 app/lib/rate-limit.ts — next/server 의존 없이 단위 테스트.
@@ -21,8 +21,26 @@ const BUCKETS = new Map<string, RateLimitBucket>();
 const WINDOW_MS = 60_000;
 // Codex PR #65: 2-tier 제한 — cookie 무시 봇이 매 요청 새 anonId로 user 카운터 reset 시켜도
 //   IP 카운터에 잡힘. 정상 학교 환경(30명 공유 IP)도 IP_LIMIT 60이면 여유.
-const USER_LIMIT = 10; // IP+cookie 단위 — 정상 데모 사용자 분당 호출 cap
-const IP_LIMIT = 60;   // IP 단위(cookie 무시 봇 / 한 IP 다인 환경 모두 커버)
+//
+// EPIC2 T2.4: /api/coach 추가. 코치는 과정 첨삭이라 한 학생이 단락별·재시도로 호출이 잦다
+//   → /api/score보다 여유로운 분당 한도. score 한도는 기존 검증값 그대로 보존.
+//   per-path 한도를 lookup으로 분기, 엔드포인트별 카운터는 path-prefix 키로 분리.
+// Codex PR #71 round 2: /api/extract도 Anthropic 호출 — score와 동일 한도 적용. matcher에는
+//   포함했는데 resolvePath에서 누락되면 matched=null 분기로 빠져 rate limit이 전혀 안 걸림.
+type PathLimits = { user: number; ip: number };
+const SCORE_LIMITS: PathLimits = { user: 10, ip: 60 }; // 기존 /api/score 값 — 변경 금지
+const COACH_LIMITS: PathLimits = { user: 20, ip: 120 }; // 코치는 호출 잦음 → 2배 여유
+const EXTRACT_LIMITS: PathLimits = { user: 10, ip: 60 }; // 안내서 추출 — score와 동일 한도
+
+// 요청 경로 → 적용 한도 + 카운터 키 prefix(엔드포인트별 버킷 격리).
+//   matcher가 세 경로만 통과시키므로 매칭 실패는 정상적으로 발생하지 않음(방어적 null).
+function resolvePath(pathname: string): { prefix: string; limits: PathLimits } | null {
+  if (pathname.startsWith("/api/coach")) return { prefix: "coach", limits: COACH_LIMITS };
+  if (pathname.startsWith("/api/extract")) return { prefix: "extract", limits: EXTRACT_LIMITS };
+  if (pathname.startsWith("/api/score")) return { prefix: "score", limits: SCORE_LIMITS };
+  return null;
+}
+
 const COOKIE_KEY = "pwc-rl-id";
 const COOKIE_MAX_AGE_SEC = 60 * 60 * 24 * 30; // 30일
 
@@ -61,6 +79,10 @@ function getOrIssueAnonId(req: NextRequest): { id: string; isNew: boolean } {
 }
 
 export function middleware(req: NextRequest) {
+  const matched = resolvePath(req.nextUrl.pathname);
+  if (matched === null) return NextResponse.next(); // matcher 외 경로 — bypass(방어적)
+  const { prefix, limits } = matched;
+
   const ip = getClientIp(req);
   if (ip === null) return NextResponse.next(); // 식별 불가 — bypass
   const now = Date.now();
@@ -69,8 +91,9 @@ export function middleware(req: NextRequest) {
 
   // 2-tier 검사. 두 키 모두 카운터 증가 — 봇이 cookie reset해도 IP 카운터는 누적.
   // 둘 중 어느 하나라도 차단이면 429. retry-after는 더 큰 retryAfterSec(보수적).
-  const ipResult = checkRateLimit(BUCKETS, `ip:${ip}`, now, WINDOW_MS, IP_LIMIT);
-  const userResult = checkRateLimit(BUCKETS, `usr:${ip}:${anonId}`, now, WINDOW_MS, USER_LIMIT);
+  // 키에 path prefix 포함 → /api/score 와 /api/coach 카운터가 서로 간섭하지 않음.
+  const ipResult = checkRateLimit(BUCKETS, `ip:${prefix}:${ip}`, now, WINDOW_MS, limits.ip);
+  const userResult = checkRateLimit(BUCKETS, `usr:${prefix}:${ip}:${anonId}`, now, WINDOW_MS, limits.user);
 
   let res: NextResponse;
   if (!ipResult.allowed || !userResult.allowed) {
@@ -95,7 +118,7 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Codex PR #69: /api/extract도 Anthropic 호출하므로 같은 비용 보호 적용.
-  //   NEXT_PUBLIC_DEMO_TOKEN 노출 환경에서 두 라우트 다 우회 가능 → matcher 확장.
-  matcher: ["/api/score", "/api/extract"],
+  // Codex PR #69/#71: Anthropic 호출 모든 라우트에 동일한 인증·rate limit·CORS 적용.
+  //   NEXT_PUBLIC_DEMO_TOKEN 노출 환경에서 어느 라우트도 우회 가능하면 비용 폭주 위험 → 셋 다 포함.
+  matcher: ["/api/score", "/api/extract", "/api/coach"],
 };

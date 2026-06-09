@@ -24,6 +24,19 @@ export default function RootLayout({
           rel="stylesheet"
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css"
         />
+        {/* Pullim 브랜드 폰트(U6) — Bai Jamjuree(브랜드/헤딩) + JetBrains Mono(라벨/모노).
+            Pretendard와 동일하게 CDN <link> 패턴으로 로드(next/font 미사용, additive).
+            preconnect로 핸드셰이크 비용 절감. globals.css @theme의 --font-brand/--font-mono가 사용. */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        />
         {/* 다크/라이트 FOUC 가드 — DOM 페인트 직전에 documentElement.dataset.theme 적용.
             localStorage 우선, 없으면 OS prefers-color-scheme. SSR HTML과 CSS variable
             소스를 같은 timing에 동기화해 깜빡임/SSR mismatch 모두 회피. */}

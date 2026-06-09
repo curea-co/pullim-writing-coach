@@ -3,12 +3,31 @@
 //   ?force=1 로 재진입 가능(/me에서 "다시 둘러보기" 시).
 //   step state는 URL이 아니라 컴포넌트 내부 — 뒤로가기는 step--, 닫기 없음(강제 흐름).
 //
-// 구현 상태: Step1(환영) 완성. Step2/3은 다음 배치에서.
+// EPIC 6 배선(유닛 B): 동의 흐름을 age-policy·consent에 연결.
+//   · Step2 제출 시 서비스 동의 + (만14 미만 트랙) 보호자 동의를 'pwc-consent-v1'에 영속.
+//   · 타임스탬프는 여기서 consentNow()로 주입(consent/consent-store는 시각 직접 생성 금지).
+//   · Step3는 needsGuardianConsent로 분기 — 보호자 트랙이면 보호자 동의 게이트 + 안내,
+//     AI 학습 별도 옵트인(기본 OFF) 제공. canUseService 통과 전엔 시작 CTA 비활성.
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import ConsentNotice from "../components/ConsentNotice";
 import ProfileForm, { type ProfileDraft } from "../components/ProfileForm";
 import ProgressDots from "../components/ProgressDots";
+import { needsGuardianConsent } from "../lib/age-policy";
+import {
+  canUseService,
+  describeRequired,
+  emptyConsent,
+  type ConsentState,
+} from "../lib/consent";
+import {
+  loadConsent,
+  saveConsent,
+  setAiTrainingOptIn,
+  setGuardianConsent,
+  setServiceConsent,
+} from "../lib/consent-store";
 import { consentNow, loadProfile, saveProfile, type Profile } from "../lib/storage";
 
 type Step = 1 | 2 | 3;
@@ -46,11 +65,13 @@ function OnboardingInner() {
   const back = () => setStep((s) => (s > 1 ? ((s - 1) as Step) : s));
 
   // Step2 onSubmit — 검증은 ProfileForm 안에서, 여기는 저장+다음 단계 진행.
-  const handleProfileSubmit = (draft: ProfileDraft, _consent: boolean) => {
+  //   consentAccepted=true(ProfileForm이 서비스 동의 체크 강제) → 서비스 동의 타임스탬프 기록.
+  const handleProfileSubmit = (draft: ProfileDraft, consentAccepted: boolean) => {
     // ProfileForm 검증 통과 = 필수 필드 있음. 그래도 type narrowing 위해 가드.
     if (!draft.school_level || !draft.primary_subject || !draft.nickname?.trim()) return;
     if (draft.primary_subject === "기타" && !draft.primary_subject_other?.trim()) return;
     setSaveError(null);
+    const now = consentNow();
     const profile: Profile = {
       nickname: draft.nickname.trim(),
       school_level: draft.school_level,
@@ -59,10 +80,14 @@ function OnboardingInner() {
         draft.primary_subject === "기타" ? draft.primary_subject_other?.trim() : undefined,
       school_name: draft.school_name?.trim() || undefined,
       frequent_genre: draft.frequent_genre || undefined,
-      consent_at: consentNow(),
+      consent_at: now,
     };
     const result = saveProfile(profile);
     if (result.ok) {
+      // 서비스 동의 영속(타임스탬프 주입). 보호자 동의·AI 학습 옵트인은 Step3에서 분기 처리.
+      //   기존 consent 로드 후 서비스 동의만 갱신(가산적) — AI 옵트인 등 다른 필드 보존.
+      const base = loadConsent();
+      saveConsent(setServiceConsent(base, consentAccepted, now));
       setSavedProfile(profile);
       next();
     } else {
@@ -254,10 +279,18 @@ function Step2({
   );
 }
 
-// ── Step 3: 시작 CTA 2개 ───────────────────────────────────────
+// ── Step 3: 동의 게이트(연령 분기) + 시작 CTA 2개 ─────────────────────
 function Step3({ profile }: { profile: Profile | null }) {
   const router = useRouter();
   const greet = profile?.nickname ? `${profile.nickname}님, ` : "";
+  const schoolLevel = profile?.school_level;
+
+  // 동의 상태 — LS에서 로드(Step2가 서비스 동의를 이미 기록). 보호자 동의·AI 옵트인은 여기서 토글.
+  const [consent, setConsent] = useState<ConsentState>(emptyConsent());
+
+  useEffect(() => {
+    setConsent(loadConsent());
+  }, []);
 
   // 만약 어떤 이유로 step3에 왔는데 profile이 없으면 안전상 step1로 돌아감.
   useEffect(() => {
@@ -265,6 +298,32 @@ function Step3({ profile }: { profile: Profile | null }) {
       router.replace("/onboarding");
     }
   }, [profile, router]);
+
+  const guardianTrack = needsGuardianConsent(schoolLevel);
+  const stillRequired = useMemo(
+    () => describeRequired(consent, schoolLevel),
+    [consent, schoolLevel],
+  );
+  const ready = canUseService(consent, schoolLevel);
+
+  // 보호자 동의 토글 — 타임스탬프 주입 + LS 영속(가산적).
+  const handleGuardianChange = (accepted: boolean) => {
+    const nextState = setGuardianConsent(consent, accepted, consentNow());
+    setConsent(nextState);
+    saveConsent(nextState);
+  };
+
+  // AI 학습 별도 옵트인 토글 — 기본 OFF, 철회 시 null로 되돌림(불변식).
+  const handleAiTrainingChange = (accepted: boolean) => {
+    const nextState = setAiTrainingOptIn(consent, accepted, consentNow());
+    setConsent(nextState);
+    saveConsent(nextState);
+  };
+
+  const go = (path: string) => {
+    if (!ready) return; // 가드: 필수 동의 미완료 시 이동 차단.
+    router.push(path);
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -277,18 +336,53 @@ function Step3({ profile }: { profile: Profile | null }) {
         </p>
       </header>
 
+      {/* ── 보호자 동의(만 14세 미만 트랙) ───────────────────────── */}
+      {guardianTrack && (
+        <label className="border-border bg-surface flex cursor-pointer items-start gap-3 rounded-xl border p-4">
+          <input
+            type="checkbox"
+            checked={!!consent.guardianConsentAt}
+            onChange={(e) => handleGuardianChange(e.target.checked)}
+            aria-required="true"
+            className="mt-0.5 h-4 w-4 shrink-0 accent-[#24D39E]"
+          />
+          <div className="break-keep text-xs leading-relaxed">
+            <span className="text-foreground block text-sm font-semibold">
+              보호자(법정대리인) 동의를 확인했어요
+            </span>
+            <p className="text-muted-foreground mt-2 text-justify">
+              만 14세 미만은 보호자의 동의가 있어야 이용할 수 있어요. 보호자에게 위 안내를 보여
+              드리고, 동의를 받았다면 체크해 주세요.
+            </p>
+          </div>
+        </label>
+      )}
+
+      {/* ── AI 학습 별도 옵트인(기본 OFF) + 아직 필요한 동의 안내 ──────── */}
+      <ConsentNotice
+        checked={!!consent.serviceConsentAt}
+        onChange={() => {
+          /* 서비스 동의는 Step2에서 이미 확정 — Step3에서는 표시·재확인용으로만 두고 토글 비활성 */
+        }}
+        aiTrainingChecked={!!consent.aiTrainingOptInAt}
+        onAiTrainingChange={handleAiTrainingChange}
+        stillRequired={stillRequired}
+      />
+
       <div className="flex flex-col gap-3">
         <button
           type="button"
-          onClick={() => router.push("/samples/e")}
-          className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#24D39E] text-sm font-semibold text-white hover:bg-[#1FBE8C]"
+          onClick={() => go("/samples/e")}
+          disabled={!ready}
+          className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#24D39E] text-sm font-semibold text-white hover:bg-[#1FBE8C] disabled:cursor-not-allowed disabled:opacity-50"
         >
           샘플 e부터 볼래요
         </button>
         <button
           type="button"
-          onClick={() => router.push("/try")}
-          className="border-border bg-surface text-foreground hover:bg-muted inline-flex h-12 w-full items-center justify-center rounded-xl border text-sm font-semibold"
+          onClick={() => go("/try")}
+          disabled={!ready}
+          className="border-border bg-surface text-foreground hover:bg-muted inline-flex h-12 w-full items-center justify-center rounded-xl border text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
         >
           내 글 바로 채점받을래요
         </button>
