@@ -101,6 +101,9 @@ type State = {
   focusBefore: number; // 코칭 시작 시 점수(성장막대 '전')
   focusAfter: number; // 재점검 후 점수(성장막대 '후')
   revisions: number; // 고쳐쓰기 횟수(과정 로그)
+  // Codex PR #71 round 2: 직전 CHECK/RECHECK 응답 nudges 캐시. growth → [다음] 시 같은 응답 안의
+  //   다음 우선순위 nudge로 이어가 (서버 재호출 없이) UX 약속 충족.
+  lastNudges: CoachNudge[];
   error: ErrorState;
 };
 
@@ -109,7 +112,9 @@ type Action =
   | { type: "CHECK_START" }
   | { type: "CHECK_OK"; scores: Record<AreaName, number>; nudges: CoachNudge[] }
   | { type: "RECHECK_START" }
-  | { type: "RECHECK_OK"; scores: Record<AreaName, number> }
+  // Codex PR #71 round 2: wasRevised=true 일 때만 revisions++. API 실패/본문 미변경 카운트 부풀림 방지.
+  | { type: "RECHECK_OK"; scores: Record<AreaName, number>; nudges: CoachNudge[]; wasRevised: boolean }
+  | { type: "REVISION_TRACKED" } // runCheck에서 본문 변경 감지 시 state.revisions 동기화(process log와 일치)
   | { type: "NEXT" }
   | { type: "FINISH" }
   | { type: "ERROR"; message: string; retryable: boolean }
@@ -157,6 +162,7 @@ const initial: State = {
   focusBefore: 0,
   focusAfter: 0,
   revisions: 0,
+  lastNudges: [],
   error: null,
 };
 
@@ -170,7 +176,7 @@ function reducer(state: State, action: Action): State {
       const baseline = state.baseline ?? action.scores;
       const focus = pickFocus(action.scores, action.nudges);
       if (!focus) {
-        return { ...state, phase: "done", scores: action.scores, baseline };
+        return { ...state, phase: "done", scores: action.scores, baseline, lastNudges: action.nudges };
       }
       return {
         ...state,
@@ -179,22 +185,44 @@ function reducer(state: State, action: Action): State {
         baseline,
         focusArea: focus.area,
         focusBefore: action.scores[focus.area] ?? 0,
-        // nudge 전체를 다시 들고 있을 필요 없음 — focus만 보여주고, 다음은 RECHECK가 재계산.
-        // (focus.nudge는 currentNudge로 컴포넌트가 별도 보관)
+        lastNudges: action.nudges, // growth → [다음] 시 직전 응답에서 next focus 추출
       };
     }
     case "RECHECK_START":
-      return { ...state, phase: "rechecking", revisions: state.revisions + 1, error: null };
+      // Codex PR #71 round 2: revisions++는 RECHECK_OK 시점(wasRevised=true) 에만. 여기서 ++ 하면
+      //   API 실패·401·본문 미변경 케이스에서도 학생 화면 카운트가 부풀려져 교사 로그와 어긋남.
+      return { ...state, phase: "rechecking", error: null };
     case "RECHECK_OK": {
       const area = state.focusArea;
       const after = area ? (action.scores[area] ?? 0) : 0;
-      return { ...state, phase: "growth", scores: action.scores, focusAfter: after };
+      return {
+        ...state,
+        phase: "growth",
+        scores: action.scores,
+        focusAfter: after,
+        lastNudges: action.nudges,
+        revisions: state.revisions + (action.wasRevised ? 1 : 0),
+      };
     }
+    case "REVISION_TRACKED":
+      // Codex PR #71 round 2: runCheck 경로(본문 변경 후 [봐줘])에서 process log는 ++ 됐는데 학생
+      //   화면 카운트는 안 올라가는 불일치 fix. recordRevision 호출과 1:1 동기화.
+      return { ...state, revisions: state.revisions + 1 };
     case "NEXT": {
-      // growth에서 [다음] — 현재 scores로 다음 focus를 다시 고른다(서버 nudges는 NEXT 시 재호출하지 않고
-      // 직전 CHECK/RECHECK 응답을 재활용하지 않으므로, 다음 점검은 사용자가 고치고 다시 [봐줘]로).
-      // MVP: growth → 바로 write로 돌려보내 다음 [봐줘] 유도(서버 1콜=1nudge 사이클 단순화).
-      return { ...state, phase: "write", focusArea: null };
+      // Codex PR #71 round 2: growth에서 [다음] — 직전 lastNudges + 현재 scores로 다음 focus 추출.
+      //   남은 PASS 미만 nudgeable 영역이 있으면 추가 서버 호출 없이 nudge phase로 직접 진입.
+      //   없으면 runNext가 FINISH로 분기(reducer는 NEXT만 받음).
+      const scores = state.scores ?? emptyScores();
+      const focus = pickFocus(scores, state.lastNudges);
+      if (!focus) {
+        return { ...state, phase: "write", focusArea: null };
+      }
+      return {
+        ...state,
+        phase: "nudge",
+        focusArea: focus.area,
+        focusBefore: scores[focus.area] ?? 0,
+      };
     }
     case "FINISH":
       return { ...state, phase: "done" };
@@ -485,6 +513,7 @@ export default function CoachClient({ onAuthExpired }: { onAuthExpired?: () => v
     //   바뀌지 않았으면 점수만 최신화(같은 draft 재점검) — 세션을 새 객체로 교체하되 draftHistory는 보존.
     const areaScores = toAreaScores(scores);
     const sess = sessionRef.current;
+    let revisionTracked = false;
     if (!sess) {
       sessionRef.current = createSession(sessionAssignment(), state.body, areaScores, rubricRef.current);
     } else {
@@ -495,6 +524,7 @@ export default function CoachClient({ onAuthExpired }: { onAuthExpired?: () => v
         const before = sess.areaScores.find((s) => s.area === area)?.score ?? 0;
         const after = scores[area] ?? 0;
         sessionRef.current = recordRevision(sess, state.body, areaScores, area, before, after);
+        revisionTracked = true;
       } else {
         // 같은 본문 재점검 — draftHistory는 그대로 두고 최신 areaScores만 갱신(불변 교체).
         sessionRef.current = { ...sess, areaScores };
@@ -503,10 +533,17 @@ export default function CoachClient({ onAuthExpired }: { onAuthExpired?: () => v
     persist(sessionRef.current);
 
     dispatch({ type: "CHECK_OK", scores, nudges: r.output.nudges });
+    // Codex PR #71 round 2: process log에 revision 기록 시 학생 화면 카운트도 동기화.
+    if (revisionTracked) dispatch({ type: "REVISION_TRACKED" });
   };
 
   // ── 재점검 (고쳤어 ✓) ──
   const runRecheck = async () => {
+    // Codex PR #71 round 2: 본문이 직전 draft에서 실제로 변경됐는지 먼저 확인.
+    //   안 바뀐 채 [고쳤어 ✓] = 새 회차 기록 X. 학생이 안 고치고 클릭만 했는데 교사 로그에
+    //   '직접 고쳐 쓴 과정'이 부풀려지는 회귀 차단.
+    const lastBody = sessionRef.current?.draftHistory[sessionRef.current.draftHistory.length - 1]?.body ?? "";
+    const wasRevised = sessionRef.current ? state.body !== lastBody : true;
     dispatch({ type: "RECHECK_START" });
     const r = await callCoach(state.body, rubricRef.current);
     if (!r.ok) {
@@ -521,35 +558,41 @@ export default function CoachClient({ onAuthExpired }: { onAuthExpired?: () => v
     const scores = toScoreMap(r.output);
     setSheetExpanded(true);
 
-    // ── 세션 배선: 고쳐쓰기 1회 기록(손본 영역=focusArea, before=focusBefore, after=새 점수) ──
+    // ── 세션 배선: 본문이 실제로 바뀌었을 때만 recordRevision(과정 로그 부풀림 방지) ──
     const area = state.focusArea ?? AREAS[0];
     const before = state.focusBefore;
     const after = scores[area] ?? 0;
     const areaScores = toAreaScores(scores);
-    // 세션이 없으면(이론상 RECHECK 전 CHECK 필수라 발생 불가) 방어적으로 생성.
-    sessionRef.current = sessionRef.current
-      ? recordRevision(sessionRef.current, state.body, areaScores, area, before, after)
-      : createSession(sessionAssignment(), state.body, areaScores, rubricRef.current);
+    if (!sessionRef.current) {
+      // 이론상 RECHECK 전 CHECK 필수라 발생 불가지만 방어적으로 세션 생성.
+      sessionRef.current = createSession(sessionAssignment(), state.body, areaScores, rubricRef.current);
+    } else if (wasRevised) {
+      sessionRef.current = recordRevision(sessionRef.current, state.body, areaScores, area, before, after);
+    } else {
+      // 본문 미변경 — areaScores만 갱신(같은 draft 재점검).
+      sessionRef.current = { ...sessionRef.current, areaScores };
+    }
     persist(sessionRef.current);
 
-    dispatch({ type: "RECHECK_OK", scores });
+    dispatch({ type: "RECHECK_OK", scores, nudges: r.output.nudges, wasRevised });
   };
 
   // ── 다음 (성장막대 → 다음 nudge 또는 완료) ──
+  // Codex PR #71 round 2: 직전 lastNudges + 현재 scores로 next focus 추출 — 남은 약점이 있으면
+  //   추가 서버 호출 없이 nudge phase로 직접 진입(UX 약속). 없으면 FINISH.
   const runNext = () => {
     const scores = state.scores ?? emptyScores();
-    // 아직 통과 못한 nudgeable 영역이 남았는지로 완료 판정(서버 재호출은 다음 [봐줘]에서).
-    const remaining = NUDGEABLE.some((a) => (scores[a] ?? 0) < PASS);
-    setCurrentNudge(null);
-    if (!remaining) {
+    const nextFocus = pickFocus(scores, state.lastNudges);
+    if (!nextFocus) {
       // 완료 시점 과정 로그를 한 번 더 확정 저장(교사 /teacher/log).
+      setCurrentNudge(null);
       if (sessionRef.current) persist(sessionRef.current);
       dispatch({ type: "FINISH" });
     } else {
+      // 같은 응답 안의 다음 우선순위 nudge로 이어가기.
+      setCurrentNudge(nextFocus.nudge);
+      setSheetExpanded(true);
       dispatch({ type: "NEXT" });
-      setSheetExpanded(false);
-      // 캔버스로 포커스 복귀.
-      requestAnimationFrame(() => textareaRef.current?.focus());
     }
   };
 

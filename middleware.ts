@@ -24,15 +24,19 @@ const WINDOW_MS = 60_000;
 //
 // EPIC2 T2.4: /api/coach 추가. 코치는 과정 첨삭이라 한 학생이 단락별·재시도로 호출이 잦다
 //   → /api/score보다 여유로운 분당 한도. score 한도는 기존 검증값 그대로 보존.
-//   per-path 한도를 lookup으로 분기, 두 엔드포인트의 카운터는 path-prefix 키로 분리.
+//   per-path 한도를 lookup으로 분기, 엔드포인트별 카운터는 path-prefix 키로 분리.
+// Codex PR #71 round 2: /api/extract도 Anthropic 호출 — score와 동일 한도 적용. matcher에는
+//   포함했는데 resolvePath에서 누락되면 matched=null 분기로 빠져 rate limit이 전혀 안 걸림.
 type PathLimits = { user: number; ip: number };
 const SCORE_LIMITS: PathLimits = { user: 10, ip: 60 }; // 기존 /api/score 값 — 변경 금지
 const COACH_LIMITS: PathLimits = { user: 20, ip: 120 }; // 코치는 호출 잦음 → 2배 여유
+const EXTRACT_LIMITS: PathLimits = { user: 10, ip: 60 }; // 안내서 추출 — score와 동일 한도
 
 // 요청 경로 → 적용 한도 + 카운터 키 prefix(엔드포인트별 버킷 격리).
-//   matcher가 두 경로만 통과시키므로 매칭 실패는 정상적으로 발생하지 않음(방어적 null).
+//   matcher가 세 경로만 통과시키므로 매칭 실패는 정상적으로 발생하지 않음(방어적 null).
 function resolvePath(pathname: string): { prefix: string; limits: PathLimits } | null {
   if (pathname.startsWith("/api/coach")) return { prefix: "coach", limits: COACH_LIMITS };
+  if (pathname.startsWith("/api/extract")) return { prefix: "extract", limits: EXTRACT_LIMITS };
   if (pathname.startsWith("/api/score")) return { prefix: "score", limits: SCORE_LIMITS };
   return null;
 }
