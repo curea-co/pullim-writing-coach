@@ -91,6 +91,18 @@ const FORBIDDEN_GENERATED = [
 function canvas(page: Page) {
   return page.getByTestId("coach-canvas");
 }
+
+// React controlled textarea에 값 주입 + onChange 트리거.
+//   WebKit에서 Playwright의 `fill()`/`evaluate`+input dispatch가 React 19 onChange를 트리거하지
+//   못해 controlled state(state.body)가 빈 채로 남는 회귀 관측(2026-06-09). 가장 native에 가까운
+//   `keyboard.insertText` 경로로 모든 브라우저에서 동일하게 동작 보장.
+//   (selectText로 기존 내용 선택 → insertText가 선택 영역을 대체. 한글 IME 회피.)
+async function fillCanvas(page: Page, text: string) {
+  const cv = canvas(page);
+  await cv.click();
+  await cv.selectText();
+  await page.keyboard.insertText(text);
+}
 function askButton(page: Page) {
   // testid 우선, 폴백: "봐" 또는 prototype의 "봐달라"가 포함된 클릭 요소.
   return page
@@ -141,7 +153,7 @@ test.describe("/coach 과정 코치 happy path (COACH_MOCK)", () => {
     // 캔버스 노출 + 시드 입력(학생이 직접 쓴 글).
     const cv = canvas(page);
     await expect(cv).toBeVisible();
-    await cv.fill(SEED_BODY);
+    await fillCanvas(page, SEED_BODY);
 
     // "봐줘" — 코치 1차 점검 요청.
     await askButton(page).click();
@@ -162,11 +174,13 @@ test.describe("/coach 과정 코치 happy path (COACH_MOCK)", () => {
     expect(nudgeText).toMatch(/[?？]/);
 
     // ── 학생이 직접 고침(코치는 손대지 않음) → "고쳤어 ✓" ──
-    await cv.fill(REVISED_BODY);
+    await fillCanvas(page, REVISED_BODY);
     await fixedButton(page).click();
 
     // ── 성장막대 표시: 기존(블루) + 새로 자란(레몬) 칸 ──
-    const growth = page.getByTestId("coach-growth");
+    //   CompletionView가 항상 마운트되어 있어 coach-growth가 SheetBody 1 + 완료 5 = 6개 매칭.
+    //   이 단계에선 SheetBody 안의 첫 GrowthRow(현재 focus 영역)만 검증 — first()로 좁힌다.
+    const growth = page.getByTestId("coach-growth").first();
     await expect(growth).toBeVisible({ timeout: 10_000 });
     // "새로 자란 칸"(레몬 gain) 최소 1개 — 점수 7 → 16 상승분.
     await expect(growth.getByTestId("coach-growth-gain").first()).toBeVisible();

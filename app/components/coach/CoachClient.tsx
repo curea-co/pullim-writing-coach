@@ -60,7 +60,6 @@ const ASSIGNMENT = {
     "화산의 형성 과정과 그것이 우리 삶에 미치는 영향을 설명하는 글을 쓰시오.",
 };
 const ASSIGNMENT_TITLE = "화산의 형성과 영향";
-const SEED = "화산은 마그마가 분출하여 만들어진 지형이다. 화산은 위험하다. 그래서 조심해야 한다.";
 
 // nudge 대상 4영역(성장 가능성 제외) — 루브릭 칩 "약점" 표시용.
 const NUDGEABLE: readonly AreaName[] = ["과제 이해", "내용 충실도", "구조·논리", "표현·문장"];
@@ -151,7 +150,7 @@ function pickFocus(
 
 const initial: State = {
   phase: "write",
-  body: SEED,
+  body: "",
   scores: null,
   baseline: null,
   focusArea: null,
@@ -330,8 +329,8 @@ function loadRubricText(): string | undefined {
 }
 
 // ── 초기 상태 ─────────────────────────────────────────────────────────
-// 첫 페인트는 항상 initial(SEED) — SSR과 클라 hydration이 동일해야 깜빡임/불일치가 없다.
-//   저장 세션 복원(이어쓰기)은 hydration 이후 useEffect에서 RESTORE 액션으로 수행한다.
+// 첫 페인트는 항상 빈 캔버스 — 학생이 직접 쓰는 게 핵심 불변식. SSR/클라 hydration이 동일해야
+//   깜빡임/불일치가 없다. 저장 세션 복원(이어쓰기)은 hydration 이후 useEffect에서 RESTORE 액션으로.
 function initState(): State {
   return initial;
 }
@@ -439,7 +438,7 @@ export default function CoachClient({ onAuthExpired }: { onAuthExpired?: () => v
   const busy = state.phase === "checking" || state.phase === "rechecking";
 
   // ── 마운트: 루브릭 읽기 + 저장된 세션 복원(이어쓰기) ──
-  // hydration 불일치를 피하려고 복원은 첫 페인트 이후(useEffect)로 미룬다(초기는 항상 SEED).
+  // hydration 불일치를 피하려고 복원은 첫 페인트 이후(useEffect)로 미룬다(초기는 항상 빈 캔버스).
   useEffect(() => {
     rubricRef.current = loadRubricText();
 
@@ -461,7 +460,9 @@ export default function CoachClient({ onAuthExpired }: { onAuthExpired?: () => v
 
   // ── 첫 점검 (봐줘) ──
   // 매 렌더 새 클로저 — 호출 시점의 최신 state.body를 캡처(stale 방지). 의존성 추적 불필요.
+  // Codex/E2E 가드: 빈 캔버스에서 [봐줘] 클릭 시 코치 호출 안 함 (write 상태 유지, nudge 미생성).
   const runCheck = async () => {
+    if (!state.body.trim()) return;
     dispatch({ type: "CHECK_START" });
     const r = await callCoach(state.body, rubricRef.current);
     if (!r.ok) {
@@ -741,6 +742,7 @@ function SheetBody({
     return (
       <button
         type="button"
+        data-testid="coach-ask"
         onClick={onAsk}
         className={`${styles.brandFont} flex w-full cursor-pointer items-center justify-center gap-[9px] py-3 text-[14px] font-semibold text-[var(--pullim-blue)]`}
       >
@@ -785,6 +787,7 @@ function SheetBody({
         <div className="mt-3.5 flex gap-2">
           <button
             type="button"
+            data-testid="coach-next"
             onClick={onNext}
             className={`${styles.brandFont} inline-flex flex-1 items-center justify-center rounded-xl bg-[var(--pullim-blue)] px-4 py-3 text-[14px] font-semibold text-white shadow-[0_4px_14px_rgba(3,98,218,0.24)] transition hover:-translate-y-px active:scale-[0.98]`}
           >
@@ -810,6 +813,7 @@ function CompletionView({ state, onRestart }: { state: State; onRestart: () => v
 
   return (
     <div
+      data-testid="coach-done"
       className={`${styles.done} ${on ? styles.doneOn : ""} absolute inset-0 overflow-auto px-5 pb-[30px] pt-6`}
       aria-hidden={!on}
       role={on ? "region" : undefined}

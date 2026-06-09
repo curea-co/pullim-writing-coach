@@ -42,6 +42,7 @@ export default function Canvas({
       <textarea
         id={id}
         ref={textareaRef}
+        data-testid="coach-canvas"
         className={`${styles.canvas} h-full w-full resize-none border-0 bg-transparent px-[18px] pb-[130px] pt-[18px] text-[16px] outline-none`}
         spellCheck={false}
         value={value}

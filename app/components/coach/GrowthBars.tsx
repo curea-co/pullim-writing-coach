@@ -32,6 +32,7 @@ function BarRow({
       <span className={`${styles.monoFont} w-[18px] text-[10px] text-[var(--ink-4)]`}>{label}</span>
       {Array.from({ length: SEGMENTS }, (_, i) => {
         let cls = styles.seg; // 빈 칸
+        let isGain = false;
         if (i < filled) {
           if (kind === "before") {
             cls = `${styles.seg} ${styles.segWas}`;
@@ -42,9 +43,16 @@ function BarRow({
             cls = animateGain
               ? `${styles.seg} ${styles.segGain}`
               : `${styles.seg} ${styles.segGainStatic}`;
+            isGain = true;
           }
         }
-        return <i key={i} className={cls} />;
+        return (
+          <i
+            key={i}
+            className={cls}
+            {...(isGain ? { "data-testid": "coach-growth-gain" } : {})}
+          />
+        );
       })}
     </div>
   );
@@ -69,7 +77,7 @@ export function GrowthRow({
   const afterSeg = toBarSegments(after, max, SEGMENTS);
 
   return (
-    <div className="my-[11px]">
+    <div data-testid="coach-growth" data-area={area} className="my-[11px]">
       <div className="flex items-center justify-between text-[12.5px] font-semibold">
         <span>{area}</span>
         <span
