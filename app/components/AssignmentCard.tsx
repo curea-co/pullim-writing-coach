@@ -11,7 +11,14 @@
 import { useEffect, useState } from "react";
 import ConfidenceChip from "./ConfidenceChip";
 import { type ExtractedAssignment } from "@/app/lib/extract";
-import { capTargetToWritable, GENRES, TARGET_MAX, TARGET_MIN } from "@/app/lib/grading";
+import {
+  capTargetToWritable,
+  GENRES,
+  PROMPT_MAX,
+  PROMPT_MIN,
+  TARGET_MAX,
+  TARGET_MIN,
+} from "@/app/lib/grading";
 
 // Codex PR #70: sessionStorage 저장/복원은 부모(/coach 페이지, Phase 2 PR D)의 책임.
 //   본 컴포넌트는 onChange 콜백으로만 알림 — 저장만 하고 hydrate 없으면 새로고침 시 복원 X.
@@ -131,6 +138,15 @@ export default function AssignmentCard({
   const savePrompt = (value: string) => {
     const v = value.trim();
     if (!v) return setEditing(null);
+    // Codex PR #70 round 12: 채점 API는 PROMPT_MIN~PROMPT_MAX 강제(grading.ts). 카드에서 저장만
+    //   성공한 척 보이고 채점 시 E1으로 늦게 실패하는 회귀 차단 — 입력 시점에 즉시 안내.
+    const len = Array.from(v).length;
+    if (len < PROMPT_MIN || len > PROMPT_MAX) {
+      window.alert(
+        `과제문은 ${PROMPT_MIN}~${PROMPT_MAX}자로 입력해 주세요. (현재 ${len}자)`,
+      );
+      return; // 편집 모드 유지
+    }
     persist({ ...a, prompt_text: { value: v, confidence: "confirmed" } });
   };
 

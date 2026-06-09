@@ -111,6 +111,22 @@ export default function UniversalCapture({
     const isText = /\.(txt|md)$/i.test(f.name);
     const isDocx = /\.docx$/i.test(f.name);
 
+    // Codex PR #70 round 12: 미지원 형식(photo·hwp·pdf·이미지)은 size 가드보다 앞서 분기.
+    //   사진 채널의 일반 카메라 이미지(1MB+)나 드래그된 PDF/HWP가 size 가드에 먼저 걸리면
+    //   "준비 중" 안내 대신 "파일이 너무 커요" 잘못된 원인 알림이 나가던 회귀 차단.
+    if (!isText && !isDocx) {
+      const guidance =
+        channel === "photo"
+          ? "사진/스캔 OCR은 준비중입니다. 본문을 직접 타이핑하거나 텍스트로 붙여넣어 주세요."
+          : /\.hwp/i.test(f.name)
+            ? "HWP 파싱은 준비중입니다. PDF나 텍스트로 변환해 다시 올리거나 본문을 직접 붙여넣어 주세요."
+            : /\.pdf/i.test(f.name)
+              ? "PDF 파싱은 준비중입니다. 본문을 복사해 붙여넣거나 텍스트 파일로 변환해 주세요."
+              : "이미지 파일 OCR은 준비중입니다. 본문을 직접 타이핑하거나 텍스트로 붙여넣어 주세요.";
+      window.alert(guidance);
+      return;
+    }
+
     // Codex PR #70: file size 가드 — 메모리 OOM·LS quota 폭주 차단 (ScoreForm 패턴).
     const sizeLimit = isDocx ? MAX_FILE_DOCX : MAX_FILE_TEXT;
     if (f.size > sizeLimit) {
@@ -135,7 +151,13 @@ export default function UniversalCapture({
           return;
         }
       }
-      // Codex PR #70: 추출 후 maxChars 초과면 즉시 피드백 (서버 거절 회피, variant별 다른 한계).
+      // Codex PR #70 round 12: 빈 텍스트 파일(공백/줄바꿈만)도 즉시 안내 — DOCX 분기와 일관.
+      //   서버까지 보내고 E2로 늦게 실패하는 회귀 차단.
+      if (!text.trim()) {
+        window.alert("텍스트 파일이 비어 있어요. 본문이 있는 파일로 다시 올려 주세요.");
+        return;
+      }
+      // 추출 후 maxChars 초과면 즉시 피드백 (서버 거절 회피, variant별 다른 한계).
       submit(channel, text, { filename: f.name });
       return;
     }
@@ -160,19 +182,7 @@ export default function UniversalCapture({
       }
       return;
     }
-
-    // HWP·PDF·이미지 — 파싱·OCR 미구현. mock 본문 절대 넘기지 않음, 사용자에게 안내만.
-    //   사진 채널(photo)은 image/*만 받으므로 isPhoto 분기로 명확 메시지. 파일 채널은
-    //   파일명 확장자로 분기.
-    const guidance =
-      channel === "photo"
-        ? "사진/스캔 OCR은 준비중입니다. 본문을 직접 타이핑하거나 텍스트로 붙여넣어 주세요."
-        : /\.hwp/i.test(f.name)
-          ? "HWP 파싱은 준비중입니다. PDF나 텍스트로 변환해 다시 올리거나 본문을 직접 붙여넣어 주세요."
-          : /\.pdf/i.test(f.name)
-            ? "PDF 파싱은 준비중입니다. 본문을 복사해 붙여넣거나 텍스트 파일로 변환해 주세요."
-            : "이미지 파일 OCR은 준비중입니다. 본문을 직접 타이핑하거나 텍스트로 붙여넣어 주세요.";
-    window.alert(guidance);
+    // 미지원 형식(photo·hwp·pdf·이미지)은 위 size 가드 앞에서 이미 분기 + return — 여기 도달 X.
   };
 
   return (
