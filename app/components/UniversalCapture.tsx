@@ -245,8 +245,8 @@ export default function UniversalCapture({
       </div>
 
       {/* 채널 버튼 — 카메라·파일·링크·말·붙여넣기 (큰 영역과 별개의 한 줄)
-          Codex PR #70: 미구현 채널(photo OCR · link fetch · voice STT)은 disabled + "준비 중"
-          뱃지. 사진 채널의 "추천" 강조는 실제 OCR 미구현이라 misleading — 제거. */}
+          Codex PR #70: 미구현 채널(photo OCR · link fetch · voice STT)도 사용자가 의도를 표현할 수
+          있도록 버튼을 enabled로 두되, 클릭 시 "준비중입니다." alert로 명시 (mock 본문 절대 X). */}
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
         {CHANNELS.map((c) => {
           const isPhoto = c.id === "photo";
@@ -254,20 +254,22 @@ export default function UniversalCapture({
           const isVoice = c.id === "voice";
           const isLink = c.id === "link";
           const isPaste = c.id === "paste";
-          // photo는 enabled — 카메라 진입점 살아 있어야 모바일 핵심 동선. OCR 미구현은
-          //   handleFile("photo")가 "준비중입니다." alert로 명시 (mock 본문 X).
-          //   link·voice는 별도 흐름 없어 disabled 유지.
-          const isDisabled = isLink || isVoice;
+          // 모든 채널 enabled — 사용자가 채널을 선택하고 시도할 수 있어야 의도가 표현됨.
+          //   미구현 채널은 click 시 "준비중입니다." alert만 띄우고 종료 (handleFile + onClick).
+          const isPreparing = isLink || isVoice;
           return (
             <button
               key={c.id}
               type="button"
               title={c.help}
-              disabled={isDisabled}
               onClick={() => {
                 if (isPhoto) photoRef.current?.click();
                 else if (isFile) fileRef.current?.click();
-                else if (isPaste) {
+                else if (isLink || isVoice) {
+                  window.alert(
+                    `${c.label} 채널은 준비중입니다. 큰 입력창에 직접 붙여넣어(Ctrl/⌘+V) 주세요.`,
+                  );
+                } else if (isPaste) {
                   // Codex PR #70 (ScoreForm 패턴): clipboard API 없는 환경 가드.
                   if (!navigator.clipboard?.readText) {
                     window.alert(
@@ -292,16 +294,15 @@ export default function UniversalCapture({
                 }
               }}
               className={cn(
-                "border-border bg-surface text-foreground flex flex-col items-center gap-1 rounded-xl border px-2 py-3 transition",
-                !isDisabled && "hover:bg-muted",
-                isDisabled && "cursor-not-allowed opacity-50",
+                "border-border bg-surface text-foreground flex flex-col items-center gap-1 rounded-xl border px-2 py-3 transition hover:bg-muted",
+                isPreparing && "opacity-70",
               )}
             >
               <span className="text-xl" aria-hidden>
                 {c.icon}
               </span>
               <span className="text-xs font-medium leading-tight text-center">{c.label}</span>
-              {isDisabled && (
+              {isPreparing && (
                 <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[9px] font-semibold">
                   준비 중
                 </span>

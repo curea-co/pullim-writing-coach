@@ -11,7 +11,7 @@
 import { useEffect, useState } from "react";
 import ConfidenceChip from "./ConfidenceChip";
 import { type ExtractedAssignment } from "@/app/lib/extract";
-import { capTargetToWritable, TARGET_MAX, TARGET_MIN } from "@/app/lib/grading";
+import { capTargetToWritable, GENRES, TARGET_MAX, TARGET_MIN } from "@/app/lib/grading";
 
 // Codex PR #70: sessionStorage 저장/복원은 부모(/coach 페이지, Phase 2 PR D)의 책임.
 //   본 컴포넌트는 onChange 콜백으로만 알림 — 저장만 하고 hydrate 없으면 새로고침 시 복원 X.
@@ -137,6 +137,14 @@ export default function AssignmentCard({
   const saveGenre = (value: string) => {
     const v = value.trim();
     if (!v) return setEditing(null);
+    // Codex PR #70 round 11: 채점 API는 GENRES enum 외 값을 거절(grading.ts §3.2). 자유 입력으로
+    //   임의 문자열이 들어가면 /api/score가 E1으로 실패. 허용 목록 외엔 저장하지 않고 안내.
+    if (!(GENRES as readonly string[]).includes(v)) {
+      window.alert(
+        `장르는 다음 중 하나로 입력해 주세요:\n${GENRES.join(" · ")}`,
+      );
+      return; // 편집 모드 유지 — 사용자가 정정할 때까지
+    }
     persist({ ...a, genre: { value: v, confidence: "confirmed" } });
   };
 
