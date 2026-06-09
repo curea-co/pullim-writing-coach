@@ -29,10 +29,14 @@ type Confidence = "confirmed" | "inferred";
 export type ExtractedAssignment = {
   prompt_text: { value: string; confidence: Confidence };
   genre: { value: string; confidence: Confidence };
-  // value: 안내서에 적힌 교사 의도값 그대로 (5000자도 5000으로). 채점 cap(50~2000)은 score-client 책임.
+  // value: 채점 가능 범위(50~2,000)로 캡된 실효 목표 또는 안내서 교사 의도값 그대로.
+  //   추출(extract.ts finalizeExtraction): raw value 보존 (교사 의도 그대로).
+  //   사용자 수동 수정(AssignmentCard saveTarget): capTargetToWritable로 채점 가능 범위 적용
+  //     + 원본은 requested에 보존 (안내 표시용).
   target_char_count: {
     value: number | null;
     confidence: Confidence;
+    requested?: number;
   };
   conditions: string[]; // 유의 조건 (근거 2개·개요·출처 등)
   teacher_rubric_present: boolean; // 선생님 루브릭 추출 여부 (CEO doc §3-2 게임체인저)
