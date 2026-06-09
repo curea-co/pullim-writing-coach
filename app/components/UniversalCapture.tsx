@@ -161,12 +161,17 @@ export default function UniversalCapture({
       return;
     }
 
-    // HWP·PDF·이미지 — 파싱·OCR 미구현. 사용자에게 직접 입력 안내, mock 본문은 넘기지 않음.
-    const guidance = /\.hwp/i.test(f.name)
-      ? "HWP 파싱은 아직 준비 중이에요. PDF나 텍스트로 변환해 다시 올리거나 본문을 직접 붙여넣어 주세요."
-      : /\.pdf/i.test(f.name)
-        ? "PDF 파싱은 아직 준비 중이에요. 본문을 복사해 붙여넣거나 텍스트 파일로 변환해 주세요."
-        : "사진/이미지 OCR은 아직 준비 중이에요. 본문을 직접 타이핑하거나 텍스트로 붙여넣어 주세요.";
+    // HWP·PDF·이미지 — 파싱·OCR 미구현. mock 본문 절대 넘기지 않음, 사용자에게 안내만.
+    //   사진 채널(photo)은 image/*만 받으므로 isPhoto 분기로 명확 메시지. 파일 채널은
+    //   파일명 확장자로 분기.
+    const guidance =
+      channel === "photo"
+        ? "사진/스캔 OCR은 준비중입니다. 본문을 직접 타이핑하거나 텍스트로 붙여넣어 주세요."
+        : /\.hwp/i.test(f.name)
+          ? "HWP 파싱은 준비중입니다. PDF나 텍스트로 변환해 다시 올리거나 본문을 직접 붙여넣어 주세요."
+          : /\.pdf/i.test(f.name)
+            ? "PDF 파싱은 준비중입니다. 본문을 복사해 붙여넣거나 텍스트 파일로 변환해 주세요."
+            : "이미지 파일 OCR은 준비중입니다. 본문을 직접 타이핑하거나 텍스트로 붙여넣어 주세요.";
     window.alert(guidance);
   };
 
@@ -249,9 +254,10 @@ export default function UniversalCapture({
           const isVoice = c.id === "voice";
           const isLink = c.id === "link";
           const isPaste = c.id === "paste";
-          // 미구현 채널 disabled — UX dead-end 차단. file은 .txt/.md/.docx만 실제 처리되지만
-          // 그건 UI에서 미리 알 수 없으므로 enabled 유지 (handleFile이 미지원 형식 alert).
-          const isDisabled = isPhoto || isLink || isVoice;
+          // photo는 enabled — 카메라 진입점 살아 있어야 모바일 핵심 동선. OCR 미구현은
+          //   handleFile("photo")가 "준비중입니다." alert로 명시 (mock 본문 X).
+          //   link·voice는 별도 흐름 없어 disabled 유지.
+          const isDisabled = isLink || isVoice;
           return (
             <button
               key={c.id}
@@ -259,7 +265,8 @@ export default function UniversalCapture({
               title={c.help}
               disabled={isDisabled}
               onClick={() => {
-                if (isFile) fileRef.current?.click();
+                if (isPhoto) photoRef.current?.click();
+                else if (isFile) fileRef.current?.click();
                 else if (isPaste) {
                   // Codex PR #70 (ScoreForm 패턴): clipboard API 없는 환경 가드.
                   if (!navigator.clipboard?.readText) {
