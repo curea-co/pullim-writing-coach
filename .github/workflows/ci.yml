@@ -1,0 +1,103 @@
+name: CI
+
+# 단위 테스트 + 타입체크. GitHub-hosted ubuntu-latest에서 Node 24를 깔아 실행한다.
+# 이유: codex-review.yml은 self-hosted 러너(Node 20)라 scripts/normalize.test.mjs가
+#   app/lib/grading.ts를 네이티브 TS strip으로 직접 import하지 못해(register-ts.mjs 훅 + Node ≥22.6 필요)
+#   테스트를 재실행하지 못한다. 그 공백을 본 워크플로가 메운다. (EPO 2026-05-27)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Typecheck & Unit tests (Node 24)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        # npm ci 대신 npm install — 커밋된 package-lock.json이 크로스플랫폼 네이티브 optional 의존
+        # (@emnapi/*·@next/swc-linux 등)을 완전히 담지 못해(Windows에서 생성) Linux 러너의 엄격한
+        # npm ci가 EUSAGE로 실패. install은 현재 플랫폼 기준으로 reconcile해 통과한다.
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests (normalizeBody·validate·guards)
+        run: npm run test:unit
+
+  components:
+    name: Component tests (Vitest + RTL)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Component tests (MetaForm·TextPreviewCard·Stepper·WhyScoreToggle)
+        run: npm run test:components
+
+  e2e:
+    name: E2E tests (Playwright /try wizard)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      # Playwright 브라우저 binary는 별도 캐시 — package.json 변경 없어도 재사용.
+      - name: Get installed Playwright version
+        id: playwright-version
+        # Codex PR #54: nested double-quote bash parsing 회피 — block scalar로 분리.
+        run: |
+          VERSION=$(node -p "require('@playwright/test/package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          # cfw = chromium + firefox + webkit. 브라우저 종류 변경 시 캐시 무효화.
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}-cfw
+
+      - name: Install Playwright browsers (chromium·firefox·webkit)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Install OS deps (cache hit case)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium firefox webkit
+
+      # webServer로 next dev 자동 기동 (config의 reuseExistingServer는 CI에선 false).
+      - name: E2E tests (/try wizard happy path + 채널·복원·resubmit)
+        run: npm run test:e2e
+        env:
+          CI: "true"

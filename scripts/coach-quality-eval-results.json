@@ -1,0 +1,624 @@
+{
+  "coachModel": "claude-haiku-4-5",
+  "judgeModel": "claude-opus-4-8",
+  "generatedAt": "2026-06-08T18:57:34.064Z",
+  "results": [
+    {
+      "id": "c1-mid1-sci-explain-weak",
+      "skill": "저",
+      "assignment": {
+        "school_level": "중1",
+        "subject": "과학",
+        "genre": "설명문",
+        "prompt_text": "물의 순환 과정을 단계별로 설명하는 글을 쓰시오. 증발·응결·강수·모임의 네 단계가 모두 드러나야 한다. (400자 내외)"
+      },
+      "hasRubric": false,
+      "errored": false,
+      "nudgeCount": 3,
+      "guardViolations": [],
+      "guardFired": false,
+      "judge": {
+        "scores": {
+          "socratic_questioning": 4,
+          "no_ghostwriting": 5,
+          "assignment_alignment": 4,
+          "difficulty_tone_fit": 4,
+          "diagnosis_accuracy": 3
+        },
+        "rationale": "넛지 질문은 네 단계 누락을 스스로 찾게 잘 유도하고 대필도 없으나, 매우 빈약한 초안에 표현 9·성장 10 등 과도하게 높은 점수를 줘 진단 정합성이 떨어진다.",
+        "would_a_teacher_endorse": true,
+        "ghostwritten_sentence_found": false
+      },
+      "judgeAvg": 4,
+      "coachOutput": {
+        "area_scores": [
+          {
+            "area": "과제 이해",
+            "score": 8
+          },
+          {
+            "area": "내용 충실도",
+            "score": 6
+          },
+          {
+            "area": "구조·논리",
+            "score": 7
+          },
+          {
+            "area": "표현·문장",
+            "score": 9
+          },
+          {
+            "area": "성장 가능성",
+            "score": 10
+          }
+        ],
+        "nudges": [
+          {
+            "paragraph_index": 0,
+            "rubric_area": "과제 이해",
+            "diagnosis": "물의 순환 과정 네 단계(증발·응결·강수·모임)를 모두 드러내야 하는데, 지금 글에는 그 중 일부만 이름이 붙어 있거나 빠져 있어요. 어떤 단계들이 명확하게 드러났고, 어떤 단계가 더 필요할까요?",
+            "guiding_question": "해가 뜨면 물이 올라가는 것, 구름이 되는 것, 비가 오는 것 — 이 세 가지가 과학 시간에 배운 네 단계 이름과 어떻게 연결되는지 생각해 볼래?",
+            "quick_win_rank": 1
+          },
+          {
+            "paragraph_index": 0,
+            "rubric_area": "내용 충실도",
+            "diagnosis": "각 단계가 '무엇인지' 설명이 너무 짧아요. 예를 들어 '물이 하늘로 올라간다'는 어떤 모습이고, 왜 그런 일이 일어나는지 더 구체적으로 보여 줄 수 있을까요?",
+            "guiding_question": "물이 '올라간다'는 게 정확히 어떤 상태 변화일까? 그리고 그게 일어나는 이유가 뭐라고 배웠어?",
+            "quick_win_rank": 2
+          },
+          {
+            "paragraph_index": 0,
+            "rubric_area": "구조·논리",
+            "diagnosis": "마지막 문장 '물은 중요하다'가 앞의 순환 과정 설명과 연결이 느슨해요. 이 문장이 물의 순환 설명과 어떤 관계가 있는지 명확하지 않네요.",
+            "guiding_question": "물의 순환 과정을 설명한 다음, '물은 중요하다'라는 말이 왜 필요할까? 아니면 다른 마무리가 더 어울릴까?",
+            "quick_win_rank": 3
+          }
+        ]
+      }
+    },
+    {
+      "id": "c2-mid2-kor-argue-mid",
+      "skill": "중",
+      "assignment": {
+        "school_level": "중2",
+        "subject": "국어",
+        "genre": "논설문·주장하는 글",
+        "prompt_text": "교실에서 휴대전화 사용을 제한해야 하는가에 대해 자신의 입장을 정하고, 근거 두 가지를 들어 주장하는 글을 쓰시오."
+      },
+      "hasRubric": false,
+      "errored": false,
+      "nudgeCount": 2,
+      "guardViolations": [],
+      "guardFired": false,
+      "judge": {
+        "scores": {
+          "socratic_questioning": 4,
+          "no_ghostwriting": 4,
+          "assignment_alignment": 4,
+          "difficulty_tone_fit": 4,
+          "diagnosis_accuracy": 3
+        },
+        "rationale": "구체 사례와 마무리 문장 진단은 적절하나, 핵심 약점인 '근거 두 가지가 사실상 동일'을 직접 짚지 못해 진단이 다소 빗나갔다.",
+        "would_a_teacher_endorse": true,
+        "ghostwritten_sentence_found": false
+      },
+      "judgeAvg": 3.8,
+      "coachOutput": {
+        "area_scores": [
+          {
+            "area": "과제 이해",
+            "score": 14
+          },
+          {
+            "area": "내용 충실도",
+            "score": 6
+          },
+          {
+            "area": "구조·논리",
+            "score": 10
+          },
+          {
+            "area": "표현·문장",
+            "score": 8
+          },
+          {
+            "area": "성장 가능성",
+            "score": 12
+          }
+        ],
+        "nudges": [
+          {
+            "paragraph_index": 0,
+            "rubric_area": "내용 충실도",
+            "diagnosis": "입장은 명확하지만, 근거 두 가지가 아직 구체적인 예나 설명 없이 일반적인 주장으로만 남아 있어요. '수업에 방해가 된다'와 '집중이 안 된다'는 사실이지만, 독자를 설득하려면 각각을 받쳐 주는 구체적인 상황이나 경험이 필요합니다.",
+            "guiding_question": "교실에서 휴대전화 때문에 실제로 일어난 일이나 본 장면이 있을까? 예를 들어, 누가 언제 어떻게 수업에 방해를 받았는지 떠올려 볼 수 있을까?",
+            "quick_win_rank": 1
+          },
+          {
+            "paragraph_index": 0,
+            "rubric_area": "구조·논리",
+            "diagnosis": "마지막 문장 '휴대전화는 나쁘다'가 앞의 주장과 논리적으로 어떻게 연결되는지 명확하지 않아요. 이 문장이 전체 주장을 정리하는 역할을 하는지, 아니면 새로운 주장을 덧붙이는 건지 불분명합니다.",
+            "guiding_question": "마지막 문장이 꼭 필요할까? 아니면 앞의 근거들을 정리하는 다른 방식으로 마무리하는 게 더 자연스러울까?",
+            "quick_win_rank": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "c3-mid3-soc-review-strong",
+      "skill": "고",
+      "assignment": {
+        "school_level": "중3",
+        "subject": "사회",
+        "genre": "감상문·독후감",
+        "prompt_text": "지역 사회의 다문화 가정을 다룬 다큐멘터리를 보고, 인상 깊었던 장면과 그로 인해 달라진 자신의 생각을 쓰는 감상문을 쓰시오."
+      },
+      "hasRubric": false,
+      "errored": false,
+      "nudgeCount": 3,
+      "guardViolations": [],
+      "guardFired": false,
+      "judge": {
+        "scores": {
+          "socratic_questioning": 4,
+          "no_ghostwriting": 5,
+          "assignment_alignment": 4,
+          "difficulty_tone_fit": 2,
+          "diagnosis_accuracy": 2
+        },
+        "rationale": "질문 자체는 답을 주지 않고 잘 끌어내지만, 이미 충실한 글에 3개 nudge를 쏟아 과도 넛지이며 강점 인정이 부족하다.",
+        "would_a_teacher_endorse": false,
+        "ghostwritten_sentence_found": false
+      },
+      "judgeAvg": 3.4,
+      "coachOutput": {
+        "area_scores": [
+          {
+            "area": "과제 이해",
+            "score": 18
+          },
+          {
+            "area": "내용 충실도",
+            "score": 14
+          },
+          {
+            "area": "구조·논리",
+            "score": 17
+          },
+          {
+            "area": "표현·문장",
+            "score": 16
+          },
+          {
+            "area": "성장 가능성",
+            "score": 15
+          }
+        ],
+        "nudges": [
+          {
+            "paragraph_index": 0,
+            "rubric_area": "내용 충실도",
+            "diagnosis": "인상 깊었던 장면을 잘 골랐고 깨달음도 있지만, 그 어머니의 표정이나 말투에서 구체적으로 무엇을 봤는지가 아직 선명하지 않아요. 독자가 그 장면을 함께 느낄 수 있을 정도의 세부 묘사가 있으면 더 강해질 거예요.",
+            "guiding_question": "그 어머니가 상담할 때 어떤 표정이었어? 목소리는 어땠어? 그 순간 주변 사람들의 반응이나 분위기는 어떻게 보였어?",
+            "quick_win_rank": 1
+          },
+          {
+            "paragraph_index": 1,
+            "rubric_area": "내용 충실도",
+            "diagnosis": "P1에서 '분류는 이해의 반대말'이라는 통찰은 좋지만, 옆 반 친구와의 구체적인 상황이나 그때의 자신의 마음이 어떻게 변했는지가 구체적으로 드러나지 않아요.",
+            "guiding_question": "그 친구를 '조금 다른 아이'로만 봤을 때, 실제로 어떤 행동을 했거나 하지 않았어? 다큐를 본 후 그 친구를 대할 때 달라진 구체적인 순간이 있을까?",
+            "quick_win_rank": 2
+          },
+          {
+            "paragraph_index": 2,
+            "rubric_area": "구조·논리",
+            "diagnosis": "P2는 변화된 다짐을 잘 정리했지만, P1의 깨달음('분류는 이해의 반대말')과 P2의 실천('하루를 상상해 보기')이 어떻게 연결되는지 논리적 다리가 약해요.",
+            "guiding_question": "누군가의 하루를 상상해 본다는 게, 앞에서 말한 '분류하지 않기'와 어떤 관계가 있을까? 그 둘이 어떻게 이어지는지 네 생각을 더 명확히 할 수 있을까?",
+            "quick_win_rank": 3
+          }
+        ]
+      }
+    },
+    {
+      "id": "c4-high1-his-explain-mid",
+      "skill": "중",
+      "assignment": {
+        "school_level": "고1",
+        "subject": "역사",
+        "genre": "설명문",
+        "prompt_text": "조선 후기 실학이 등장하게 된 배경을 사회·경제적 측면에서 설명하는 글을 쓰시오."
+      },
+      "hasRubric": false,
+      "errored": false,
+      "nudgeCount": 3,
+      "guardViolations": [
+        "[1] 완성문장 인용(대필) 감지"
+      ],
+      "guardFired": true,
+      "judge": {
+        "scores": {
+          "socratic_questioning": 5,
+          "no_ghostwriting": 5,
+          "assignment_alignment": 5,
+          "difficulty_tone_fit": 4,
+          "diagnosis_accuracy": 5
+        },
+        "rationale": "나열→인과 약점을 정확히 짚고 사회·경제 구분과 연결을 학생이 직접 잇도록 답을 주지 않고 질문으로 유도함.",
+        "would_a_teacher_endorse": true,
+        "ghostwritten_sentence_found": false
+      },
+      "judgeAvg": 4.8,
+      "coachOutput": {
+        "area_scores": [
+          {
+            "area": "과제 이해",
+            "score": 8
+          },
+          {
+            "area": "내용 충실도",
+            "score": 6
+          },
+          {
+            "area": "구조·논리",
+            "score": 7
+          },
+          {
+            "area": "표현·문장",
+            "score": 9
+          },
+          {
+            "area": "성장 가능성",
+            "score": 7
+          }
+        ],
+        "nudges": [
+          {
+            "paragraph_index": 0,
+            "rubric_area": "과제 이해",
+            "diagnosis": "과제는 '사회·경제적 측면에서' 실학 등장의 배경을 설명하라고 했는데, 지금 글은 여러 사건과 현상을 나열만 했어요. 사회·경제적 측면이 무엇을 의미하는지, 그리고 그것이 어떻게 실학 등장과 연결되는지 아직 명확하지 않습니다.",
+            "guiding_question": "사회·경제적 측면이라는 게 어떤 변화나 문제를 말하는 거라고 생각해? 임진왜란과 병자호란 이후 조선 사회와 경제에서 구체적으로 무엇이 달라졌을까?",
+            "quick_win_rank": 1
+          },
+          {
+            "paragraph_index": 0,
+            "rubric_area": "내용 충실도",
+            "diagnosis": "각 문장이 독립적으로 떠 있어요. 예를 들어 '농업 기술이 발달했다'와 '성리학은 현실 문제를 해결하지 못했다'가 왜 함께 나오는지, 그것이 실학 등장과 어떤 관계가 있는지 설명이 없습니다.",
+            "guiding_question": "농업 기술이 발달했다는 것이 당시 사람들의 생활이나 생각에 어떤 변화를 가져왔을까? 그리고 그 변화가 기존의 성리학과 어떻게 맞지 않았을까?",
+            "quick_win_rank": 2
+          },
+          {
+            "paragraph_index": 0,
+            "rubric_area": "구조·논리",
+            "diagnosis": "문단이 하나이고, 문장들이 인과관계 없이 나열되어 있어요. 배경 → 문제 → 해결책 같은 논리적 흐름이 필요합니다.",
+            "guiding_question": "지금 문장들을 다시 읽어 보면, 어떤 순서로 배열하면 '왜 실학이 필요했는가'라는 이야기가 더 자연스럽게 들릴까?",
+            "quick_win_rank": 3
+          }
+        ]
+      }
+    },
+    {
+      "id": "c5-high2-eth-argue-weak",
+      "skill": "저",
+      "assignment": {
+        "school_level": "고2",
+        "subject": "도덕·윤리",
+        "genre": "논설문·주장하는 글",
+        "prompt_text": "인공지능의 판단에 인간의 생명에 관한 결정을 맡겨도 되는가에 대해 자신의 윤리적 입장을 밝히고 논증하시오."
+      },
+      "hasRubric": false,
+      "errored": false,
+      "nudgeCount": 3,
+      "guardViolations": [
+        "[2] 완성문장 인용(대필) 감지"
+      ],
+      "guardFired": true,
+      "judge": {
+        "scores": {
+          "socratic_questioning": 5,
+          "no_ghostwriting": 5,
+          "assignment_alignment": 5,
+          "difficulty_tone_fit": 4,
+          "diagnosis_accuracy": 4
+        },
+        "rationale": "양비론·동어반복과 근거 부재를 정확히 짚고 답을 주지 않는 질문으로 입장 설정을 유도했으나, area_scores가 척도를 벗어나고 '과제 이해' 4점은 다소 관대함.",
+        "would_a_teacher_endorse": true,
+        "ghostwritten_sentence_found": false
+      },
+      "judgeAvg": 4.6,
+      "coachOutput": {
+        "area_scores": [
+          {
+            "area": "과제 이해",
+            "score": 4
+          },
+          {
+            "area": "내용 충실도",
+            "score": 3
+          },
+          {
+            "area": "구조·논리",
+            "score": 5
+          },
+          {
+            "area": "표현·문장",
+            "score": 6
+          },
+          {
+            "area": "성장 가능성",
+            "score": 7
+          }
+        ],
+        "nudges": [
+          {
+            "paragraph_index": 0,
+            "rubric_area": "과제 이해",
+            "diagnosis": "과제는 '인공지능의 판단에 인간의 생명에 관한 결정을 맡겨도 되는가'에 대해 자신의 윤리적 입장을 밝히고 논증하라고 했어요. 지금 글은 '잘 판단해야 한다'는 결론만 있고, 찬성인지 반대인지 명확한 입장이 보이지 않아요.",
+            "guiding_question": "너는 인공지능에게 생명에 관한 결정을 맡겨도 된다고 생각해? 아니면 맡기면 안 된다고 생각해? 먼저 그 입장을 명확히 정해 볼래?",
+            "quick_win_rank": 1
+          },
+          {
+            "paragraph_index": 0,
+            "rubric_area": "내용 충실도",
+            "diagnosis": "주장을 받쳐 줄 구체적인 근거나 예시가 없어요. '편리하다', '위험할 수 있다'는 말만 있고, 실제로 어떤 상황에서 그런지, 왜 그렇게 생각하는지가 드러나지 않아요.",
+            "guiding_question": "인공지능이 생명에 관한 결정을 내리는 구체적인 상황을 하나 떠올려 볼 수 있을까? 예를 들어 의료, 자동차, 범죄 수사 같은 분야에서 말이야. 그 상황에서 인공지능이 판단하면 어떤 문제가 생길 수 있을까?",
+            "quick_win_rank": 2
+          },
+          {
+            "paragraph_index": 0,
+            "rubric_area": "구조·논리",
+            "diagnosis": "문장들이 서로 연결되지 않고 따로 떨어져 있어요. '인공지능은 좋은 점도 있고 나쁜 점도 있다'에서 시작해서 '생명은 소중하다'로 넘어가는데, 이 둘이 어떻게 연결되는지 알 수 없어요.",
+            "guiding_question": "인공지능의 장단점과 생명의 소중함이 이 문제와 어떤 관계가 있는지 설명해 줄 수 있을까? 왜 생명이 소중하다는 게 인공지능 판단 문제와 연결되는지 말이야.",
+            "quick_win_rank": 3
+          }
+        ]
+      }
+    },
+    {
+      "id": "c6-high3-kor-review-mid",
+      "skill": "중",
+      "assignment": {
+        "school_level": "고3",
+        "subject": "국어",
+        "genre": "감상문·독후감",
+        "prompt_text": "문학 작품 한 편을 골라, 작품이 던지는 질문과 그에 대한 자신의 응답을 중심으로 감상문을 쓰시오."
+      },
+      "hasRubric": false,
+      "errored": false,
+      "nudgeCount": 3,
+      "guardViolations": [
+        "[0] 완성문장 인용(대필) 감지",
+        "[2] 완성문장 인용(대필) 감지"
+      ],
+      "guardFired": true,
+      "judge": {
+        "scores": {
+          "socratic_questioning": 4,
+          "no_ghostwriting": 3,
+          "assignment_alignment": 5,
+          "difficulty_tone_fit": 4,
+          "diagnosis_accuracy": 4
+        },
+        "rationale": "줄거리 요약뿐 '작품의 질문·자기응답' 부재를 정확히 짚고 끌어내는 질문도 적절하나, 예시 질문·연결문구('나는 이런 점이 궁금했다')가 다소 떠먹이기에 가까워 대필 위험이 미묘하게 있음.",
+        "would_a_teacher_endorse": true,
+        "ghostwritten_sentence_found": false
+      },
+      "judgeAvg": 4,
+      "coachOutput": {
+        "area_scores": [
+          {
+            "area": "과제 이해",
+            "score": 6
+          },
+          {
+            "area": "내용 충실도",
+            "score": 5
+          },
+          {
+            "area": "구조·논리",
+            "score": 7
+          },
+          {
+            "area": "표현·문장",
+            "score": 8
+          },
+          {
+            "area": "성장 가능성",
+            "score": 6
+          }
+        ],
+        "nudges": [
+          {
+            "paragraph_index": 0,
+            "rubric_area": "과제 이해",
+            "diagnosis": "과제는 '작품이 던지는 질문'과 '그에 대한 자신의 응답'을 중심으로 쓰도록 했는데, 지금 글에는 줄거리 요약만 있고 작품이 제시하는 질문이 무엇인지, 그리고 그 질문에 대해 너는 어떻게 생각하는지가 명확하지 않아요.",
+            "guiding_question": "이 작품을 읽으면서 '아, 이게 작가가 던지는 핵심 질문이구나' 싶은 게 있었어? 예를 들어 '가난한 사람은 도시에서 살 수 없는 건가?', '고향을 떠나는 게 맞는 선택인가?' 같은 식으로, 작품이 너에게 물어본 것 같은 질문이 뭐였을까?",
+            "quick_win_rank": 1
+          },
+          {
+            "paragraph_index": 0,
+            "rubric_area": "내용 충실도",
+            "diagnosis": "'슬프다'고 했지만, 어느 장면이 특히 슬펐는지, 또는 '나도 비슷한 감정을 느꼈다'고 했을 때 너의 경험이나 생각이 구체적으로 무엇인지 아직 드러나지 않았어요.",
+            "guiding_question": "작품을 읽으면서 가장 마음에 남거나 가슴이 철렁했던 장면이 있었어? 그리고 그 장면이 너에게 왜 그렇게 느껴졌는지, 혹은 너의 어떤 경험이나 생각과 닿아 있었는지 떠올려 볼래?",
+            "quick_win_rank": 2
+          },
+          {
+            "paragraph_index": 0,
+            "rubric_area": "구조·논리",
+            "diagnosis": "줄거리 → 감정 평가 → 일반적 칭찬으로 끝나는데, 그 사이에 '왜 이 작품이 슬픈가'에서 '그래서 나는 어떻게 생각하는가'로 자연스럽게 이어지는 논리적 발판이 없어요.",
+            "guiding_question": "줄거리를 말한 다음, 너의 응답(생각·질문·의문)으로 넘어가려면 어떤 다리가 필요할 것 같아? 예를 들어 '그런데 이 이야기를 보면서 나는 이런 점이 궁금했다' 같은 식으로 자연스럽게 연결할 수 있을까?",
+            "quick_win_rank": 3
+          }
+        ]
+      }
+    },
+    {
+      "id": "c7-mid3-sci-argue-rubric",
+      "skill": "중",
+      "assignment": {
+        "school_level": "중3",
+        "subject": "과학",
+        "genre": "논설문·주장하는 글",
+        "prompt_text": "일회용 플라스틱 사용을 법으로 강하게 규제해야 하는가에 대해 입장을 정하고 주장하는 글을 쓰시오."
+      },
+      "hasRubric": true,
+      "errored": false,
+      "nudgeCount": 3,
+      "guardViolations": [
+        "[1] 완성문장 인용(대필) 감지"
+      ],
+      "guardFired": true,
+      "judge": {
+        "scores": {
+          "socratic_questioning": 5,
+          "no_ghostwriting": 4,
+          "assignment_alignment": 5,
+          "difficulty_tone_fit": 4,
+          "diagnosis_accuracy": 5
+        },
+        "rationale": "루브릭 3기준을 정확히 짚고 답을 주지 않는 질문으로 끌어냈으나, 두 번째 nudge가 분해시간·플라스틱양 등 예시 방향을 약간 떠먹임.",
+        "would_a_teacher_endorse": true,
+        "ghostwritten_sentence_found": false
+      },
+      "judgeAvg": 4.6,
+      "coachOutput": {
+        "area_scores": [
+          {
+            "area": "과제 이해",
+            "score": 12
+          },
+          {
+            "area": "내용 충실도",
+            "score": 8
+          },
+          {
+            "area": "구조·논리",
+            "score": 6
+          },
+          {
+            "area": "표현·문장",
+            "score": 10
+          },
+          {
+            "area": "성장 가능성",
+            "score": 9
+          }
+        ],
+        "nudges": [
+          {
+            "paragraph_index": 0,
+            "rubric_area": "과제 이해",
+            "diagnosis": "과제는 '입장을 정하고 주장하는 글'을 요구했는데, 지금 글은 한 문단으로 끝나 있어요. 논설문은 보통 주장을 펼치려면 여러 문단이 필요합니다. 특히 교사 루브릭에서 '반대 입장을 고려'하고 '주장-근거-반론수용-재반박' 구조를 기대했으니, 지금은 그 구조가 아직 보이지 않아요.",
+            "guiding_question": "지금 쓴 글을 읽어 보니, 네 주장이 명확하지만 반대쪽 사람들의 생각은 어떨까? 예를 들어, '일회용 플라스틱을 규제하면 안 된다'고 생각하는 사람들의 이유가 뭐라고 생각해?",
+            "quick_win_rank": 1
+          },
+          {
+            "paragraph_index": 0,
+            "rubric_area": "내용 충실도",
+            "diagnosis": "근거로 '바다 거북이 플라스틱을 먹고 죽는다'는 이야기를 들었다고 했는데, 이건 구체적인 데이터나 통계가 아니라 일반적인 이야기예요. 교사 루브릭에서 '과학적 사실(데이터·실험·통계 중 1개 이상)'을 요구했으니, 좀 더 구체적인 수치나 사실이 필요해요.",
+            "guiding_question": "플라스틱이 환경에 미치는 영향에 대해 알고 있는 구체적인 숫자나 사실이 있을까? 예를 들어 바다에 떠다니는 플라스틱의 양, 또는 플라스틱이 분해되는 데 걸리는 시간 같은 것 말이야.",
+            "quick_win_rank": 2
+          },
+          {
+            "paragraph_index": 0,
+            "rubric_area": "구조·논리",
+            "diagnosis": "지금 글은 주장과 간단한 근거만 있고, 반대 입장을 진지하게 다루거나 그에 대해 다시 반박하는 부분이 없어요. '사람들이 불편할 수도 있지만'이라는 표현이 반대 입장을 살짝 언급하긴 하지만, 그것을 충분히 풀어내거나 재반박하지 않았어요.",
+            "guiding_question": "규제를 반대하는 사람들의 입장을 조금 더 자세히 생각해 본다면, 그들이 가장 걱정하는 게 뭘까? 그리고 그 걱정에 대해 넌 어떻게 대답할 수 있을까?",
+            "quick_win_rank": 3
+          }
+        ]
+      }
+    },
+    {
+      "id": "c8-mid1-soc-explain-strong",
+      "skill": "고",
+      "assignment": {
+        "school_level": "중1",
+        "subject": "사회",
+        "genre": "설명문",
+        "prompt_text": "우리 동네에서 볼 수 있는 공공기관 한 곳을 골라, 그곳이 하는 일과 우리 생활에 주는 도움을 설명하시오."
+      },
+      "hasRubric": false,
+      "errored": false,
+      "nudgeCount": 2,
+      "guardViolations": [],
+      "guardFired": false,
+      "judge": {
+        "scores": {
+          "socratic_questioning": 5,
+          "no_ghostwriting": 5,
+          "assignment_alignment": 5,
+          "difficulty_tone_fit": 4,
+          "diagnosis_accuracy": 4
+        },
+        "rationale": "대필 없이 사고를 끌어내는 질문이 우수하고 과제 정렬도 좋으나, 강한 글에 nudge 2개는 약간 많다.",
+        "would_a_teacher_endorse": true,
+        "ghostwritten_sentence_found": false
+      },
+      "judgeAvg": 4.6,
+      "coachOutput": {
+        "area_scores": [
+          {
+            "area": "과제 이해",
+            "score": 18
+          },
+          {
+            "area": "내용 충실도",
+            "score": 13
+          },
+          {
+            "area": "구조·논리",
+            "score": 16
+          },
+          {
+            "area": "표현·문장",
+            "score": 15
+          },
+          {
+            "area": "성장 가능성",
+            "score": 14
+          }
+        ],
+        "nudges": [
+          {
+            "paragraph_index": 1,
+            "rubric_area": "내용 충실도",
+            "diagnosis": "도서관의 두 가지 역할을 설명했지만, 각각이 실제로 '우리 생활에 어떤 도움을 주는지'가 아직 구체적이지 않아요. 특히 첫 번째 역할(무료 자료 제공)이 누구에게, 어떤 상황에서 도움이 되는지 더 자세히 보여줄 필요가 있어요.",
+            "guiding_question": "책을 사기 어려운 사람 말고, 네 주변에서 도서관의 무료 자료 때문에 실제로 도움을 받은 사람이나 상황이 있을까? 또는 네가 직접 경험한 게 있다면?",
+            "quick_win_rank": 1
+          },
+          {
+            "paragraph_index": 2,
+            "rubric_area": "구조·논리",
+            "diagnosis": "결론 문단이 짧고, P1에서 설명한 두 가지 역할이 어떻게 '함께 배우는 공간'이라는 하나의 개념으로 연결되는지 논리가 명확하지 않아요.",
+            "guiding_question": "도서관이 제공하는 무료 자료와 공부 공간이, 왜 '함께 배우는 공간'이라는 표현으로 묶일 수 있을까? 그 둘의 공통점이 뭐라고 생각해?",
+            "quick_win_rank": 2
+          }
+        ]
+      }
+    }
+  ],
+  "aggregate": {
+    "fieldAvgs": {
+      "socratic_questioning": 4.5,
+      "no_ghostwriting": 4.5,
+      "assignment_alignment": 4.625,
+      "difficulty_tone_fit": 3.75,
+      "diagnosis_accuracy": 3.75
+    },
+    "overallAvg": 4.2250000000000005,
+    "endorseCount": 7,
+    "guardCount": 4,
+    "ghostCount": 0,
+    "total": 8,
+    "ok": 8
+  },
+  "failures": [
+    "c3-mid3-soc-review-strong",
+    "c4-high1-his-explain-mid",
+    "c5-high2-eth-argue-weak",
+    "c6-high3-kor-review-mid",
+    "c7-mid3-sci-argue-rubric"
+  ]
+}

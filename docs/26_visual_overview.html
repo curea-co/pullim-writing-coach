@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>풀림 라이팅 코치 · 우리가 만드는 것</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+<style>
+  :root{
+    --pullim-blue:#0362DA; --pullim-ink:#0D1A1F; --pullim-paper:#F0F6FB; --pullim-lemon:#E6FF4C;
+    --pb-1:#F4FAFF; --pb-2:#D1E8FF; --pb-3:#9FC8FF; --pb-8:#00389E;
+    --ink-2:#1F2C32; --ink-3:#45555C; --ink-4:#5E6B72; --ink-5:#B0BCC3;
+    --line:#D6E2EE; --line-2:#E8EFF6; --ok:#10B987; --danger:#E5484D;
+    --r-xs:6px; --r-sm:10px; --r-md:14px; --r-lg:20px; --r-xl:28px; --r-pill:999px;
+    --sh-1:0 1px 2px rgba(13,26,31,.04),0 1px 3px rgba(13,26,31,.06);
+    --sh-2:0 2px 8px rgba(13,26,31,.06),0 8px 24px rgba(13,26,31,.05);
+    --sh-3:0 12px 40px rgba(3,98,218,.12),0 4px 12px rgba(13,26,31,.06);
+    --f-kr:'Pretendard Variable','Pretendard',system-ui,sans-serif;
+    --f-brand:'Bai Jamjuree','Pretendard Variable',system-ui,sans-serif;
+    --f-mono:'JetBrains Mono',ui-monospace,monospace;
+    --container:1180px; --ease:cubic-bezier(.32,.72,0,1);
+  }
+  *{box-sizing:border-box} html{scroll-behavior:smooth}
+  body{margin:0; background:var(--pullim-paper); color:var(--pullim-ink); font-family:var(--f-kr); line-height:1.65; -webkit-font-smoothing:antialiased}
+  .mono{font-family:var(--f-mono)} h1,h2,h3,h4{font-family:var(--f-brand); font-weight:700; letter-spacing:-.02em; line-height:1.15}
+  .wrap{max-width:var(--container); margin:0 auto; padding:0 28px}
+  .lemon-pill{display:inline-block; padding:3px 9px; background:var(--pullim-lemon); color:var(--pullim-ink); font-family:var(--f-mono); font-size:11px; letter-spacing:.2em; text-transform:uppercase; border-radius:4px}
+  .eyebrow{display:inline-flex; align-items:center; gap:10px; font-family:var(--f-mono); font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-4)}
+
+  /* topbar */
+  .topbar{position:sticky; top:0; z-index:50; background:rgba(255,255,255,.82); backdrop-filter:saturate(180%) blur(14px); -webkit-backdrop-filter:saturate(180%) blur(14px); border-bottom:1px solid var(--line)}
+  .topbar .in{max-width:var(--container); margin:0 auto; height:60px; display:flex; align-items:center; gap:13px; padding:0 28px}
+  .mast{display:flex; align-items:center; gap:9px}
+  .mast .g{width:30px; height:30px; border-radius:9px; overflow:hidden; box-shadow:inset 0 0 0 2px rgba(255,255,255,.2)}
+  .mast .wm{font-family:var(--f-brand); font-weight:700; font-size:18px}
+  .mast .sub{font-family:var(--f-mono); font-size:11px; color:var(--ink-4); margin-left:-3px}
+  .svc-tab{display:flex; align-items:center; gap:7px; padding:6px 12px; border-radius:var(--r-pill); background:var(--pb-1); color:var(--pullim-blue); font-weight:600; font-size:13px}
+  .svc-tab .ic{width:18px; height:18px} .spacer{flex:1}
+
+  /* hero */
+  .hero{position:relative; overflow:hidden; padding:84px 0 64px; border-bottom:1px solid var(--line)}
+  .hero::before{content:""; position:absolute; inset:0; pointer-events:none;
+    background-image:linear-gradient(to right,rgba(3,98,218,.05) 1px,transparent 1px),linear-gradient(to bottom,rgba(3,98,218,.05) 1px,transparent 1px);
+    background-size:44px 44px; -webkit-mask-image:radial-gradient(900px 460px at 30% 30%,#000,transparent 75%); mask-image:radial-gradient(900px 460px at 30% 30%,#000,transparent 75%)}
+  .hero .in{position:relative}
+  .hero h1{font-size:clamp(38px,6.2vw,68px); margin:20px 0 0}
+  .hero h1 .b{color:var(--pullim-blue)}
+  .hero h1 .hl{background:linear-gradient(transparent 58%,var(--pullim-lemon) 58%); padding:0 4px}
+  .hero .sub{font-size:clamp(16px,1.5vw,20px); color:var(--ink-3); max-width:56ch; margin:24px 0 0}
+  .hero .kick{margin-top:30px; font-family:var(--f-brand); font-weight:700; font-size:clamp(20px,2.6vw,28px)}
+  .chips{display:flex; gap:10px; flex-wrap:wrap; margin-top:32px}
+  .chip{display:inline-flex; align-items:center; gap:7px; font-size:13px; font-weight:600; padding:8px 14px; border-radius:var(--r-pill); background:#fff; border:1px solid var(--line); box-shadow:var(--sh-1)}
+  .chip b{color:var(--pullim-blue)}
+
+  section{padding:70px 0; border-bottom:1px solid var(--line)}
+  .sec-head{display:flex; align-items:baseline; gap:14px; margin-bottom:32px; flex-wrap:wrap}
+  .sec-head .num{font-family:var(--f-mono); font-size:13px; color:var(--pullim-blue)}
+  .sec-head h2{font-size:clamp(26px,3.2vw,38px); margin:0}
+  .sec-head .tag{margin-left:auto; font-family:var(--f-mono); font-size:11px; color:var(--ink-4); border:1px solid var(--line); border-radius:var(--r-pill); padding:5px 11px}
+
+  .card{background:#fff; border:1px solid var(--line); border-radius:var(--r-lg); padding:24px; box-shadow:var(--sh-1)}
+  .card.dim{background:var(--pb-1); box-shadow:none; color:var(--ink-3)}
+  .card.dark{background:var(--pullim-ink); color:#fff; border-color:var(--ink-2)}
+  .card .lab{font-family:var(--f-mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase}
+  .card.dim .lab{color:var(--danger)} .card.bright .lab{color:var(--pullim-blue)}
+  .card h3{font-size:20px; margin:8px 0 6px} .card ul{margin:12px 0 0; padding-left:18px} .card li{margin:7px 0}
+
+  .shift{display:grid; grid-template-columns:1fr auto 1fr; gap:20px; align-items:stretch}
+  .shift .vs{display:flex; align-items:center; font-family:var(--f-brand); font-size:20px; color:var(--ink-4)}
+  @media(max-width:760px){.shift{grid-template-columns:1fr}.shift .vs{display:none}}
+
+  .grid3{display:grid; grid-template-columns:repeat(3,1fr); gap:18px}
+  @media(max-width:760px){.grid3{grid-template-columns:1fr}}
+  .stat .big{font-family:var(--f-brand); font-size:38px; color:var(--pullim-blue); line-height:1}
+  .stat .big.warn{color:var(--danger)}
+  .stat p{margin:12px 0 0; color:var(--ink-3); font-size:14px} .stat .src{font-family:var(--f-mono); font-size:10.5px; color:var(--ink-5); margin-top:10px}
+
+  /* loop */
+  .loop{display:grid; gap:12px}
+  .step{display:grid; grid-template-columns:52px 1fr; gap:18px; align-items:center; background:#fff; border:1px solid var(--line); border-radius:var(--r-lg); padding:18px 20px; position:relative; transition:.2s var(--ease)}
+  .step:hover{transform:translateY(-2px); box-shadow:var(--sh-2); border-color:var(--pb-3)}
+  .step .ic{width:46px; height:46px}
+  .step h3{margin:0 0 3px; font-size:18px} .step p{margin:0; color:var(--ink-3); font-size:14px}
+  .step .kb{position:absolute; top:14px; right:16px; font-family:var(--f-mono); font-size:10px; letter-spacing:.08em; color:var(--pullim-blue); border:1px solid var(--pb-3); border-radius:var(--r-pill); padding:3px 9px}
+  .principle{margin-top:20px; text-align:center; font-family:var(--f-brand); font-weight:700; font-size:clamp(18px,2.3vw,24px)}
+  .principle .x{color:var(--danger)} .principle .o{color:var(--pullim-blue)}
+
+  /* product demo */
+  .demo{display:grid; grid-template-columns:1fr 1fr; gap:32px; align-items:center}
+  @media(max-width:820px){.demo{grid-template-columns:1fr; gap:26px}}
+  .device{width:300px; max-width:100%; margin:0 auto; background:#fff; border:1px solid var(--line); border-radius:var(--r-xl); box-shadow:var(--sh-3); overflow:hidden}
+  .dev-scr{padding:16px 15px 0; height:500px; display:flex; flex-direction:column; position:relative}
+  .dev-h{display:flex; align-items:center; gap:9px}
+  .dev-h .sg{width:34px; height:34px; border-radius:var(--r-md)}
+  .dev-h .t{font-family:var(--f-brand); font-weight:700; font-size:14px} .dev-h .m{font-family:var(--f-mono); font-size:10px; color:var(--ink-4)}
+  .canvas{margin-top:13px; font-size:13.5px; line-height:1.9; flex:1}
+  .canvas .gap{background:var(--pullim-lemon); padding:0 2px; border-radius:3px}
+  .caret{display:inline-block; width:2px; height:1em; background:var(--pullim-blue); vertical-align:-2px; animation:blink 1s steps(2) infinite}
+  @keyframes blink{50%{opacity:0}}
+  .bsheet{position:absolute; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--line); border-radius:var(--r-xl) var(--r-xl) 0 0; box-shadow:0 -14px 34px -20px rgba(13,26,31,.4); padding:13px 15px 16px}
+  .bsheet .grip{width:40px; height:5px; border-radius:3px; background:var(--line); margin:0 auto 11px}
+  .bnrow{display:flex; gap:8px; align-items:center} .bnrow .ic{width:26px;height:26px;flex:0 0 auto}
+  .btag{font-family:var(--f-mono); font-size:10px; color:var(--pullim-blue)}
+  .bdiag{font-family:var(--f-brand); font-weight:700; font-size:14px; margin:5px 0 3px}
+  .bq{color:var(--ink-3); font-size:12.5px; line-height:1.55} .bq b{color:var(--pullim-ink); background:linear-gradient(transparent 58%,var(--pullim-lemon) 58%)}
+  .bacts{display:flex; gap:7px; margin-top:11px}
+  .bp{flex:1; text-align:center; font-family:var(--f-brand); font-weight:600; font-size:12px; padding:9px; border-radius:10px}
+  .bp.ghost{border:1px solid var(--line)} .bp.acc{background:var(--pullim-lemon)}
+
+  .growth{background:#fff; border:1px solid var(--line); border-radius:var(--r-lg); padding:22px; box-shadow:var(--sh-2)}
+  .growth h4{margin:0 0 3px; font-size:17px} .growth .lead{color:var(--ink-4); font-size:12.5px; font-family:var(--f-mono); margin:0 0 16px}
+  .grow-row{margin:13px 0} .grow-row .nm{font-size:13px; font-weight:600; display:flex; justify-content:space-between}
+  .grow-row .up{font-family:var(--f-mono); font-size:11px; color:var(--pullim-blue)}
+  .bar{display:flex; gap:5px; align-items:center; margin-top:7px} .bar .lab{font-family:var(--f-mono); font-size:10px; color:var(--ink-4); width:18px}
+  .seg{flex:1; height:13px; border-radius:var(--r-xs); background:var(--line-2); border:1px solid var(--line)}
+  .reveal.in .seg.was{background:var(--pb-3); border-color:var(--pb-3)}
+  .reveal.in .seg.cur{background:var(--pullim-blue); border-color:var(--pullim-blue)}
+  .reveal.in .seg.gain{background:var(--pullim-lemon); border-color:var(--pullim-lemon); animation:pop .45s var(--ease) both}
+  .reveal.in .seg.gain:nth-child(4){animation-delay:.12s} .reveal.in .seg.gain:nth-child(5){animation-delay:.22s}
+  @keyframes pop{from{transform:scale(.5);opacity:0}}
+  .donebtn{margin-top:16px; text-align:center; font-family:var(--f-brand); font-weight:700; font-size:13px; color:#fff; background:var(--pullim-blue); border-radius:10px; padding:11px; box-shadow:0 4px 14px rgba(3,98,218,.24)}
+
+  .two{display:grid; grid-template-columns:1fr 1fr; gap:18px} @media(max-width:760px){.two{grid-template-columns:1fr}}
+  .panel{background:#fff; border:1px solid var(--line); border-radius:var(--r-lg); padding:22px; box-shadow:var(--sh-1)}
+  .panel .pin{font-family:var(--f-mono); font-size:11px; color:var(--pullim-blue); letter-spacing:.08em; margin-bottom:9px; display:flex; align-items:center; gap:7px}
+  .panel .pin .ic{width:22px;height:22px}
+  .panel h3{margin:0 0 8px; font-size:19px} .panel p{margin:0; color:var(--ink-3); font-size:14px}
+  .panel.moat{background:var(--pullim-ink); color:#fff; border-color:var(--ink-2)} .panel.moat p{color:#aeb9c2} .panel.moat .pin{color:var(--pullim-lemon)}
+
+  .build{background:var(--pullim-ink); border-radius:var(--r-xl); padding:32px; color:#fff; box-shadow:var(--sh-3)}
+  .build h2{color:#fff} .build .ok{color:#7fe3ab}
+  .modgrid{display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-top:18px} @media(max-width:680px){.modgrid{grid-template-columns:1fr}}
+  .mod{background:#16242b; border:1px solid #25323a; border-radius:var(--r-md); padding:14px 16px}
+  .mod .fn{font-family:var(--f-mono); font-size:12.5px; color:var(--pullim-lemon)} .mod .ds{font-size:13px; color:#aeb9c2; margin-top:6px; line-height:1.5}
+  .roadmap{display:flex; gap:9px; flex-wrap:wrap; margin-top:20px}
+  .ph{font-family:var(--f-mono); font-size:12px; padding:8px 13px; border-radius:var(--r-sm); border:1px solid #35434c; color:#aeb9c2}
+  .ph.done{background:var(--ok); border-color:var(--ok); color:#04221a} .ph.now{background:var(--pullim-blue); border-color:var(--pullim-blue); color:#fff}
+
+  footer{padding:42px 0 60px; color:var(--ink-4); font-family:var(--f-mono); font-size:12px; display:flex; justify-content:space-between; gap:14px; flex-wrap:wrap}
+  .disc{font-size:11px; color:var(--ink-5); max-width:560px; line-height:1.6}
+
+  .reveal{opacity:0; transform:translateY(16px); transition:opacity .7s ease, transform .7s var(--ease)}
+  .reveal.in{opacity:1; transform:none}
+  [data-d="1"]{transition-delay:.08s} [data-d="2"]{transition-delay:.16s} [data-d="3"]{transition-delay:.24s} [data-d="4"]{transition-delay:.32s}
+</style>
+</head>
+<body>
+  <header class="topbar"><div class="in">
+    <span class="mast"><span class="g" id="masticon"></span><span class="wm">풀림</span><span class="sub">OS</span></span>
+    <span class="svc-tab"><span class="ic" id="svctabic"></span> 라이팅 코치</span>
+    <span class="spacer"></span><span class="lemon-pill">제품 비전 v2</span>
+  </div></header>
+
+  <div class="wrap">
+    <header class="hero"><div class="in reveal in">
+      <span class="eyebrow"><span class="lemon-pill">PULLIM</span> 중·고 수행평가 · 글쓰기 과정 코치</span>
+      <h1>쓰는 <span class="hl">과정</span>을<br/>함께 가는 <span class="b">글쓰기 코치</span></h1>
+      <p class="sub">글쓰기가 학습의 중심이 되는 시대. 다 쓴 글을 채점하는 도구는 많지만, <b>쓰는 동안 더 잘 쓰게 돕는</b> 코치는 없었습니다. 풀림은 학생의 생각을 끌어내고, 고쳐쓰며 자라게 합니다 — 교사가 인정하고, 학생이 자유롭게.</p>
+      <div class="kick">“대신 안 써주고, <span class="hl">네가 더 잘 쓰게.</span>”</div>
+      <div class="chips">
+        <span class="chip">평가기 <b>→</b> 과정 코치</span>
+        <span class="chip">교사 인정 주도 유통</span>
+        <span class="chip">단품 1등 <b>→</b> OS 허브</span>
+      </div>
+    </div></header>
+
+    <section class="reveal">
+      <div class="sec-head"><span class="num">01</span><h2>무엇을 바꾸나 — 평가기에서 코치로</h2></div>
+      <div class="shift">
+        <div class="card dim"><div class="lab">기존 · 평가기 (KEEwi 등 대다수)</div><h3>다 쓴 글을 채점한다</h3>
+          <ul><li>사후 1회, 전체 글 → 점수·등급</li><li>학생은 <em>심판받는다</em></li><li>교사는 “베끼는 도구 아닌가?” 의심</li><li>ChatGPT가 무료로 더 잘하는 영역</li></ul></div>
+        <div class="vs">vs</div>
+        <div class="card bright"><div class="lab">풀림 · 과정 코치</div><h3>쓰는 과정을 함께 간다</h3>
+          <ul><li>문단별·실시간, 고쳐쓰기 <b>반복</b></li><li>학생은 <b>함께 써내며 자란다</b></li><li>교사는 “가르치는 도구”로 <b>인정</b></li><li>대신 안 써주니 죄책감 없이 <b>자유롭게</b></li></ul></div>
+      </div>
+    </section>
+
+    <section class="reveal">
+      <div class="sec-head"><span class="num">02</span><h2>왜 지금인가 — 진짜 수요</h2></div>
+      <div class="grid3">
+        <div class="card stat reveal" data-d="1"><div class="big">서·논술형 ↑</div><p>2022 개정 교육과정·2028 내신 논·서술형 확대로 변별 무대가 <b>수행평가 글쓰기</b>로 이동.</p><div class="src">출처: 교육부 2028 대입 확정안</div></div>
+        <div class="card stat reveal" data-d="2"><div class="big warn">96.5%</div><p>고교생이 이미 생성형 AI를 쓰지만, 대부분 <b>대신 써주는</b> 용도 → ‘0점 불안’ + “어떻게 고칠지 모름”.</p><div class="src">출처: 진학사 2025 설문</div></div>
+        <div class="card stat reveal" data-d="3"><div class="big warn">회당 4~5만</div><p>강사 첨삭은 비싸고 느리고 일관성이 없다. <b>즉시·일관·반복</b>이 빈자리.</p><div class="src">출처: 논술 첨삭 시세</div></div>
+      </div>
+    </section>
+
+    <section class="reveal">
+      <div class="sec-head"><span class="num">03</span><h2>핵심 — 5단계 코칭 루프</h2></div>
+      <div class="loop" id="loop"></div>
+      <p class="principle reveal">원칙 — 생각·구조·고쳐쓰기는 <span class="o">끌어내되</span>, 문장은 <span class="x">대신 쓰지 않는다.</span></p>
+    </section>
+
+    <section class="reveal">
+      <div class="sec-head"><span class="num">04</span><h2>제품 — 캔버스 + 여백 코치</h2><span class="tag">모바일 우선</span></div>
+      <div class="demo">
+        <div class="device reveal" data-d="1"><div class="dev-scr">
+          <div class="dev-h"><span class="sg" id="demoSg"></span><div><div class="t">화산의 형성과 영향</div><div class="m">수행평가 · 설명문</div></div></div>
+          <div class="canvas">화산은 마그마가 분출하여 만들어진 지형이다. <span class="gap">화산은 위험하다.</span> 그래서 조심해야 한다.<span class="caret"></span></div>
+          <div class="bsheet">
+            <div class="grip"></div>
+            <div class="bnrow"><span class="ic" id="demoIc"></span><div><div class="btag">내용 충실도 · 코칭 ②</div><div class="bdiag">주장만 있고 근거가 없어요.</div></div></div>
+            <div class="bq">왜 위험한지, 네 <b>경험이나 사실</b>을 하나만 떠올려볼까?</div>
+            <div class="bacts"><div class="bp ghost">왜 중요해?</div><div class="bp acc">고쳤어 ✓</div></div>
+          </div>
+        </div></div>
+        <div class="reveal" data-d="2"><div class="growth">
+          <h4>다시 봐줬어 — 이만큼 자랐어</h4>
+          <p class="lead">“고쳤어 ✓” → 전/후를 막대로. 새로 자란 칸은 <span style="color:var(--pullim-ink)">레몬</span>으로 빛나요.</p>
+          <div class="grow-row"><div class="nm"><span>내용 충실도</span><span class="up">▲ 자람</span></div>
+            <div class="bar"><span class="lab">전</span><i class="seg was"></i><i class="seg was"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i></div>
+            <div class="bar"><span class="lab">후</span><i class="seg cur"></i><i class="seg cur"></i><i class="seg gain"></i><i class="seg gain"></i><i class="seg"></i></div></div>
+          <div class="grow-row"><div class="nm"><span>구조·논리</span><span class="up">▲ 자람</span></div>
+            <div class="bar"><span class="lab">전</span><i class="seg was"></i><i class="seg was"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i></div>
+            <div class="bar"><span class="lab">후</span><i class="seg cur"></i><i class="seg cur"></i><i class="seg cur"></i><i class="seg gain"></i><i class="seg"></i></div></div>
+          <div class="donebtn">다 고쳤어 ✓ → 다음 ▸</div>
+        </div></div>
+      </div>
+    </section>
+
+    <section class="reveal">
+      <div class="sec-head"><span class="num">05</span><h2>어떻게 이기나</h2></div>
+      <div class="two">
+        <div class="panel reveal" data-d="1"><div class="pin"><span class="ic" id="p1"></span>유통 — 교사 인정 주도</div><h3>교사가 먼저 인정한다</h3><p>교사에게 루브릭 등록·과정 로그 열람을 무료로. “대신 안 써준다”는 증거가 곧 신뢰 → 학생이 자유롭게 쓰고 → 가계 구독으로. 채점 자동화는 만들지 않는다.</p></div>
+        <div class="panel reveal" data-d="2"><div class="pin"><span class="ic" id="p2"></span>포지션 — 단품 → OS</div><h3>단품 1등으로 시작</h3><p>글쓰기 코치로 카테고리를 잡고, 쌓이는 학습 데이터로 풀림 OS의 다른 서비스(진단·리더)로 확장·교차한다.</p></div>
+        <div class="panel moat reveal" data-d="3"><div class="pin"><span class="ic" id="p3"></span>해자 — 종단 데이터</div><h3>시간이 쌓는 방어선</h3><p>학생별 글→성장 궤적은 자본 10배 경쟁사도 시간으로만 쌓는다. 한 번의 입증이 아니라 매주 쌓이는 데이터가 해자.</p></div>
+        <div class="panel reveal" data-d="4"><div class="pin"><span class="ic" id="p4"></span>신뢰 — 합법·안전</div><h3>들켜도 떳떳하게</h3><p>생성 차단 + 과정 로그로 교육부 2026 가이드(‘AI 무수정 제출=0점’)에 정합. 만 14세·AI 학습 별도 동의 등 한국 기준 준수.</p></div>
+      </div>
+    </section>
+
+    <section class="reveal" style="border-bottom:0">
+      <div class="sec-head"><span class="num">06</span><h2>지금까지 만든 것</h2></div>
+      <div class="build reveal">
+        <h2>엔진 코어 (EPIC 1) — <span class="ok">완료 · TDD</span></h2>
+        <p style="color:#aeb9c2; margin:8px 0 0">평가기→과정 코치 전환의 순수 엔진. 주니어(초등)와 공유 가능하게 설계. 유닛 테스트 <b class="ok">216 그린</b>, 타입체크 통과.</p>
+        <div class="modgrid">
+          <div class="mod"><div class="fn">coach-schema.ts</div><div class="ds">코치 출력 타입·검증 + <b>생성 차단 가드</b> — 대필 출력을 결정적으로 막는 제품 IP</div></div>
+          <div class="mod"><div class="fn">nudge-priority.ts</div><div class="ds">quick-win 우선순위 — 향상 폭 크고 쉬운 nudge부터</div></div>
+          <div class="mod"><div class="fn">paragraphs.ts</div><div class="ds">문단 분리 — 코치가 문단 단위로 진단</div></div>
+          <div class="mod"><div class="fn">revision.ts</div><div class="ds">성장 막대 매핑 — 수치 숨기고 전/후 막대만</div></div>
+        </div>
+        <div style="margin-top:15px; font-family:var(--f-mono); font-size:12px; color:#aeb9c2">🛡️ 생성차단 적대적 eval: 명백 대필 <span class="ok">9/9 차단</span> · 오차단 0 · 미묘 갭 3건 정직 기록(v2 LLM-judge)</div>
+        <div class="roadmap">
+          <span class="ph done">EPIC 1 · 엔진 ✓</span><span class="ph now">EPIC 2 · 코치 프롬프트+API ▸</span>
+          <span class="ph">EPIC 3 · 바텀시트 UI</span><span class="ph">EPIC 4 · 세션·과정로그</span>
+          <span class="ph">EPIC 5 · 교사 도구</span><span class="ph">EPIC 6 · 컴플라이언스</span>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div>풀림 라이팅 코치 · PULLIM OS · 2026.06</div>
+      <div class="disc">제품 비전 시각화. 전략·UX는 CEO grill-me 확정 기준이며, 세부(가격·SAM·중1 트랙)는 추후 확정 항목입니다. 풀림 OS 디자인 시스템 적용.</div>
+    </footer>
+  </div>
+
+<script>
+  const wrap=(inner,r=20)=>`<svg viewBox="0 0 100 100" width="100%" height="100%" aria-hidden="true"><rect x="4" y="4" width="92" height="92" rx="${r}" fill="#0362DA"/>${inner}</svg>`;
+  const ICON={
+    pen:wrap(`<g transform="rotate(45 50 50)"><rect x="45" y="22" width="10" height="40" fill="#fff"/><rect x="45" y="62" width="10" height="10" fill="#E6FF4C"/></g><rect x="26" y="74" width="48" height="6" rx="3" fill="#fff"/>`,9),
+    decode:wrap(`<rect x="30" y="32" width="11" height="11" rx="2" fill="#fff"/><rect x="47" y="35" width="24" height="5" rx="2.5" fill="#fff"/><rect x="30" y="50" width="11" height="11" rx="2" fill="#E6FF4C"/><rect x="47" y="53" width="24" height="5" rx="2.5" fill="#fff"/><rect x="30" y="68" width="11" height="11" rx="2" fill="#fff"/><rect x="47" y="71" width="18" height="5" rx="2.5" fill="#fff"/>`),
+    ask:wrap(`<rect x="24" y="26" width="52" height="36" rx="9" fill="#fff"/><rect x="33" y="62" width="12" height="11" fill="#fff"/><rect x="36" y="42" width="7" height="7" rx="1" fill="#0362DA"/><rect x="47" y="42" width="7" height="7" rx="1" fill="#0362DA"/><rect x="58" y="22" width="11" height="11" rx="2" fill="#E6FF4C"/>`),
+    loop:wrap(`<path d="M70 40 A22 22 0 1 0 73 58" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/><path d="M60 28 L75 33 L66 45 Z" fill="#E6FF4C"/>`),
+    seal:wrap(`<circle cx="50" cy="51" r="23" fill="#fff"/><path d="M40 52 l7 8 14 -17" fill="none" stroke="#0362DA" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><rect x="46" y="14" width="8" height="8" rx="2" fill="#E6FF4C"/>`),
+    grow:wrap(`<rect x="26" y="58" width="13" height="18" rx="2" fill="#fff"/><rect x="44" y="46" width="13" height="30" rx="2" fill="#fff"/><rect x="62" y="32" width="13" height="44" rx="2" fill="#E6FF4C"/>`),
+    teach:wrap(`<rect x="22" y="34" width="56" height="38" rx="6" fill="#fff"/><rect x="30" y="44" width="40" height="5" rx="2.5" fill="#0362DA"/><rect x="30" y="54" width="28" height="5" rx="2.5" fill="#0362DA"/><rect x="44" y="20" width="12" height="12" rx="3" fill="#E6FF4C"/>`),
+    hub:wrap(`<circle cx="50" cy="50" r="9" fill="#E6FF4C"/><circle cx="26" cy="30" r="7" fill="#fff"/><circle cx="74" cy="30" r="7" fill="#fff"/><circle cx="26" cy="70" r="7" fill="#fff"/><circle cx="74" cy="70" r="7" fill="#fff"/><path d="M50 50 L26 30 M50 50 L74 30 M50 50 L26 70 M50 50 L74 70" stroke="#fff" stroke-width="3"/>`),
+    shield:wrap(`<path d="M50 22 L72 30 V52 C72 64 62 72 50 78 C38 72 28 64 28 52 V30 Z" fill="#fff"/><path d="M41 50 l6 7 13 -15" fill="none" stroke="#0362DA" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><rect x="46" y="14" width="8" height="8" rx="2" fill="#E6FF4C"/>`),
+  };
+  const STEPS=[
+    ["decode","①","과제·루브릭 해독","과제 안내문·채점기준표를 찍어 올리면, 점수가 갈리는 지점을 짚어준다. 교사 루브릭에 정렬.",""],
+    ["ask","②","소크라테스식 끌어내기","질문으로 학생 본인의 주장·근거·경험을 끌어낸다. 내용을 주지 않는다 — ChatGPT와 갈리는 자리.","KICK"],
+    ["pen","③","초안 함께쓰기","문단별로 직접 쓰는 동안 여백에서 발판을 준다. “이 문단 근거가 비었어.” (코칭 O / 생성 X)",""],
+    ["loop","④","고쳐쓰기 루프","콕집은 피드백 → 다시 쓰기 → 재점검. 한 번의 수정으로 완성도가 오르는 게 눈에 보인다.","KICK"],
+    ["seal","⑤","성찰 + 과정 증거","무엇을 어떻게 고쳤는지 기록 + 과정 로그 → 교사·학부모가 “직접 썼다”를 확인.",""],
+  ];
+  const loop=document.getElementById("loop");
+  STEPS.forEach(([ic,no,t,p,kb],i)=>{
+    const el=document.createElement("div"); el.className="step reveal"+(kb?" kick":""); el.setAttribute("data-d",String((i%4)+1));
+    el.innerHTML=`<span class="ic">${ICON[ic]}</span><div><h3>${t}</h3><p>${p}</p></div>`+(kb?`<span class="kb">${kb}</span>`:"");
+    loop.appendChild(el);
+  });
+  document.getElementById("masticon").innerHTML=`<svg viewBox="0 0 100 100" width="30" height="30"><rect x="4" y="4" width="92" height="92" rx="20" fill="#0362DA"/><circle cx="50" cy="50" r="26" fill="#fff"/><rect x="42" y="24" width="16" height="16" rx="4" fill="#E6FF4C"/></svg>`;
+  document.getElementById("svctabic").innerHTML=ICON.pen;
+  document.getElementById("demoSg").innerHTML=ICON.pen;
+  document.getElementById("demoIc").innerHTML=ICON.ask;
+  document.getElementById("p1").innerHTML=ICON.teach; document.getElementById("p2").innerHTML=ICON.hub;
+  document.getElementById("p3").innerHTML=ICON.grow; document.getElementById("p4").innerHTML=ICON.shield;
+
+  const io=new IntersectionObserver((es)=>{for(const e of es){if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target);}}},{threshold:.14});
+  document.querySelectorAll(".reveal").forEach(el=>io.observe(el));
+</script>
+</body>
+</html>

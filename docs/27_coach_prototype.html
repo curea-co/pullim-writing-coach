@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>풀림 라이팅 코치 · 인터랙티브 프로토타입</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+<style>
+  :root{
+    /* ── Pullim OS tokens (추출: pullim-web globals.css + os-tokens.css) ── */
+    --pullim-blue:#0362DA; --pullim-ink:#0D1A1F; --pullim-paper:#F0F6FB; --pullim-lemon:#E6FF4C;
+    --pb-1:#F4FAFF; --pb-2:#D1E8FF; --pb-3:#9FC8FF; --pb-5:#1F89F5; --pb-8:#00389E;
+    --ink-2:#1F2C32; --ink-3:#45555C; --ink-4:#5E6B72; --ink-5:#B0BCC3;
+    --line:#D6E2EE; --line-2:#E8EFF6;
+    --ok:#10B987; --ok-bg:#E7F8F1;
+    --r-xs:6px; --r-sm:10px; --r-md:14px; --r-lg:20px; --r-xl:28px; --r-pill:999px;
+    --sh-1:0 1px 2px rgba(13,26,31,.04), 0 1px 3px rgba(13,26,31,.06);
+    --sh-2:0 2px 8px rgba(13,26,31,.06), 0 8px 24px rgba(13,26,31,.05);
+    --sh-3:0 12px 40px rgba(3,98,218,.12), 0 4px 12px rgba(13,26,31,.06);
+    --sh-pop:0 18px 50px rgba(13,26,31,.16);
+    --f-kr:'Pretendard Variable','Pretendard',system-ui,sans-serif;
+    --f-brand:'Bai Jamjuree','Pretendard Variable',system-ui,sans-serif;
+    --f-mono:'JetBrains Mono',ui-monospace,monospace;
+    --ease:cubic-bezier(.32,.72,0,1);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0; min-height:100%}
+  body{
+    background:var(--pullim-paper); color:var(--pullim-ink); font-family:var(--f-kr);
+    -webkit-font-smoothing:antialiased; line-height:1.6;
+    display:flex; flex-direction:column; align-items:center;
+    background-image:
+      linear-gradient(to right, rgba(3,98,218,.045) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(3,98,218,.045) 1px, transparent 1px),
+      radial-gradient(900px 460px at 88% -10%, rgba(3,98,218,.10), transparent 60%);
+    background-size:44px 44px, 44px 44px, 100% 100%;
+  }
+  .mono{font-family:var(--f-mono)} .brandf{font-family:var(--f-brand)}
+
+  /* ── OS topbar (glass) ── */
+  .topbar{position:sticky; top:0; z-index:60; width:100%;
+    background:rgba(255,255,255,.82); backdrop-filter:saturate(180%) blur(14px);
+    -webkit-backdrop-filter:saturate(180%) blur(14px); border-bottom:1px solid var(--line)}
+  .topbar .in{max-width:1280px; margin:0 auto; height:60px; display:flex; align-items:center; gap:14px; padding:0 22px}
+  .mast{display:flex; align-items:center; gap:9px; text-decoration:none; color:inherit}
+  .mast .g{width:30px; height:30px; border-radius:9px; display:grid; place-items:center; background:var(--pullim-blue); box-shadow:inset 0 0 0 2px rgba(255,255,255,.2)}
+  .mast .wm{font-family:var(--f-brand); font-weight:700; font-size:18px; letter-spacing:-.02em}
+  .mast .sub{font-family:var(--f-mono); font-size:11px; color:var(--ink-4); margin-left:-3px}
+  .svc-tab{display:flex; align-items:center; gap:8px; padding:6px 12px; border-radius:var(--r-pill);
+    background:var(--pb-1); color:var(--pullim-blue); font-weight:600; font-size:13px}
+  .svc-tab .ic{width:18px; height:18px}
+  .spacer{flex:1}
+  .lemon-pill{display:inline-block; padding:3px 9px; background:var(--pullim-lemon); color:var(--pullim-ink);
+    font-family:var(--f-mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase; border-radius:4px}
+
+  .stage{width:100%; max-width:1280px; padding:18px 22px 0; display:flex; align-items:center; justify-content:space-between; gap:16px}
+  .stage .lead{color:var(--ink-3); font-size:13.5px; max-width:60ch}
+  .stage .lead b{color:var(--pullim-ink)}
+  @media(max-width:680px){.stage .lead{font-size:12.5px}}
+
+  /* ── device ── */
+  .device{width:100%; max-width:432px; margin:18px auto 26px; background:#fff;
+    border:1px solid var(--line); border-radius:var(--r-xl); box-shadow:var(--sh-3); overflow:hidden; position:relative}
+  .screen{height:min(76vh,690px); min-height:560px; display:flex; flex-direction:column; position:relative; overflow:hidden; background:#fff}
+
+  /* assignment header */
+  .ahead{padding:16px 18px 13px; border-bottom:1px solid var(--line-2); background:linear-gradient(180deg,var(--pb-1),#fff)}
+  .ahead .row{display:flex; align-items:center; gap:11px}
+  .ahead .sg{width:38px; height:38px; border-radius:var(--r-md); flex:0 0 auto; box-shadow:inset 0 0 0 2px rgba(255,255,255,.2)}
+  .ahead .t{font-family:var(--f-brand); font-weight:700; font-size:16px; letter-spacing:-.01em}
+  .ahead .meta{font-family:var(--f-mono); font-size:10.5px; color:var(--ink-4); margin-top:1px}
+  .rubric{margin-top:11px; display:flex; gap:6px; flex-wrap:wrap}
+  .chip{display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:var(--r-pill);
+    font-size:11.5px; font-weight:600; background:var(--pb-1); color:var(--ink-4)}
+  .chip.weak{background:#fff; color:var(--pullim-blue); box-shadow:inset 0 0 0 1.5px var(--pb-3)}
+  .chip .dotw{width:6px; height:6px; border-radius:50%; background:var(--pullim-lemon)}
+
+  /* canvas */
+  .canvas-wrap{flex:1; position:relative; overflow:hidden}
+  textarea.canvas{width:100%; height:100%; border:0; resize:none; padding:18px 18px 130px; background:transparent;
+    font-family:var(--f-kr); font-size:16px; line-height:2; color:var(--pullim-ink); outline:none;
+    background-image:repeating-linear-gradient(transparent 0 calc(2em - 1px), var(--line-2) calc(2em - 1px) 2em);
+    background-position:0 18px}
+  .countbar{position:absolute; top:8px; right:14px; font-family:var(--f-mono); font-size:10.5px; color:var(--ink-5)}
+
+  /* bottom sheet */
+  .sheet{position:absolute; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--line);
+    border-radius:var(--r-xl) var(--r-xl) 0 0; box-shadow:var(--sh-pop);
+    transition:transform .42s var(--ease); will-change:transform}
+  .sheet .grip{width:44px; height:5px; border-radius:3px; background:var(--line); margin:11px auto 2px; cursor:pointer}
+  .sheet .body{padding:6px 18px 20px}
+  .peek-btn{display:flex; align-items:center; justify-content:center; gap:9px; width:100%; font-family:var(--f-brand);
+    font-weight:600; font-size:14px; padding:13px; cursor:pointer; color:var(--pullim-blue)}
+  .peek-btn .arrow{animation:bob 1.5s ease-in-out infinite}
+  @keyframes bob{50%{transform:translateY(-4px)}}
+
+  .nrow{display:flex; align-items:center; gap:9px}
+  .nrow .ic{width:30px; height:30px; flex:0 0 auto}
+  .area-tag{font-family:var(--f-mono); font-size:10.5px; letter-spacing:.06em; color:var(--pullim-blue)}
+  .area-tag .step{color:var(--ink-4)}
+  .diag{font-family:var(--f-brand); font-weight:700; font-size:17px; margin:9px 0 6px; letter-spacing:-.01em}
+  .q{color:var(--ink-3); font-size:14px; line-height:1.65}
+  .q b{color:var(--pullim-ink); background:linear-gradient(transparent 58%, var(--pullim-lemon) 58%); padding:0 1px}
+  .why{margin-top:10px; font-size:12.5px; color:var(--ink-3); background:var(--pb-1); border-radius:var(--r-sm); padding:10px 12px; display:none}
+  .why.on{display:block}
+  .acts{display:flex; gap:8px; margin-top:14px}
+  .btn{display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:12px 16px; border-radius:12px;
+    font-family:var(--f-brand); font-weight:600; font-size:14px; letter-spacing:-.01em; cursor:pointer; border:0;
+    transition:.16s var(--ease); white-space:nowrap}
+  .btn:active{transform:scale(.98)}
+  .btn-primary{background:var(--pullim-blue); color:#fff; box-shadow:0 4px 14px rgba(3,98,218,.24); flex:1}
+  .btn-primary:hover{filter:brightness(1.05); transform:translateY(-1px)}
+  .btn-accent{background:var(--pullim-lemon); color:var(--pullim-ink); box-shadow:0 4px 14px rgba(230,255,76,.5); flex:1}
+  .btn-accent:hover{filter:brightness(1.02); transform:translateY(-1px)}
+  .btn-ghost{background:#fff; color:var(--ink-2); border:1px solid var(--line)}
+  .btn-ghost:hover{border-color:var(--ink-4); background:var(--pb-1)}
+
+  /* growth bars (blue + lemon gain) */
+  .grow h4{font-family:var(--f-brand); margin:2px 0 1px; font-size:16px}
+  .grow .sub{color:var(--ink-4); font-size:12px; margin:0 0 12px; font-family:var(--f-mono)}
+  .grow-row{margin:11px 0}
+  .grow-row .nm{font-size:12.5px; font-weight:600; display:flex; justify-content:space-between; align-items:center}
+  .grow-row .up{font-family:var(--f-mono); font-size:11px; color:var(--pullim-blue)}
+  .grow-row .same{font-family:var(--f-mono); font-size:11px; color:var(--ink-5)}
+  .bar{display:flex; gap:5px; align-items:center; margin-top:6px}
+  .bar .lab{font-family:var(--f-mono); font-size:10px; color:var(--ink-4); width:18px}
+  .seg{flex:1; height:12px; border-radius:var(--r-xs); background:var(--line-2); border:1px solid var(--line)}
+  .seg.was{background:var(--pb-3); border-color:var(--pb-3)}
+  .seg.cur{background:var(--pullim-blue); border-color:var(--pullim-blue)}
+  .seg.gain{background:var(--pullim-lemon); border-color:var(--pullim-lemon); animation:pop .4s var(--ease) both}
+  @keyframes pop{from{transform:scale(.5); opacity:0}}
+  .seg.gain:nth-child(2){animation-delay:.05s} .seg.gain:nth-child(3){animation-delay:.12s}
+  .seg.gain:nth-child(4){animation-delay:.19s} .seg.gain:nth-child(5){animation-delay:.26s}
+
+  /* completion */
+  .done{position:absolute; inset:0; background:var(--pullim-paper); overflow:auto; padding:24px 20px 30px; transform:translateY(101%); transition:transform .5s var(--ease)}
+  .done.on{transform:none}
+  .crown{font-family:var(--f-mono); font-size:11px; letter-spacing:.16em; color:var(--pullim-blue); display:flex; align-items:center; gap:8px}
+  .done h2{font-family:var(--f-brand); font-size:25px; margin:9px 0 4px; letter-spacing:-.02em}
+  .done .p{color:var(--ink-3); font-size:14px; margin:0 0 16px}
+  .card{background:#fff; border:1px solid var(--line); border-radius:var(--r-lg); padding:18px; box-shadow:var(--sh-1)}
+  .card .lt{font-family:var(--f-mono); font-size:11px; letter-spacing:.08em; color:var(--pullim-blue); margin-bottom:10px; display:flex; align-items:center; gap:7px}
+  .lrow{display:flex; justify-content:space-between; align-items:center; font-size:13px; padding:7px 0; border-bottom:1px dashed var(--line)}
+  .lrow:last-child{border:0} .lrow b{font-family:var(--f-brand)}
+  .seal{display:inline-flex; align-items:center; gap:8px; margin-top:14px; font-size:12.5px; font-weight:700;
+    background:var(--pullim-lemon); color:var(--pullim-ink); border-radius:var(--r-pill); padding:8px 14px}
+  .wedge{margin-top:16px; background:#fff; border:1px solid var(--line); border-radius:var(--r-lg); overflow:hidden}
+  .wedge .h{display:flex; justify-content:space-between; align-items:center; padding:13px 16px; cursor:pointer; font-weight:600; font-size:13.5px}
+  .wedge .c{display:none; padding:0 16px 16px; font-size:13px; color:var(--ink-3); line-height:1.6}
+  .wedge.open .c{display:block}
+  .wedge .bad{color:#E5484D} .wedge .good{color:var(--ok); font-weight:600}
+  .restart{margin-top:16px; width:100%}
+
+  .foot{max-width:432px; padding:0 26px 40px; font-family:var(--f-mono); font-size:10px; color:var(--ink-5); text-align:center; line-height:1.7}
+  .thinking{font-family:var(--f-mono); font-size:12px; color:var(--pullim-blue); padding:18px; text-align:center; display:flex; align-items:center; justify-content:center; gap:8px}
+  .thinking .ic{width:22px;height:22px} .thinking .d{animation:pulse 1s infinite}
+  @keyframes pulse{50%{opacity:.3}}
+</style>
+</head>
+<body>
+  <!-- OS topbar -->
+  <header class="topbar"><div class="in">
+    <a class="mast" href="#">
+      <span class="g" id="masticon"></span>
+      <span class="wm">풀림</span><span class="sub">OS</span>
+    </a>
+    <span class="svc-tab"><span class="ic" id="svctabic"></span> 라이팅 코치</span>
+    <span class="spacer"></span>
+    <span class="lemon-pill">체험</span>
+  </div></header>
+
+  <div class="stage">
+    <p class="lead">직접 고쳐보세요. 코치는 답을 <b>주지 않고</b> 질문으로 끌어냅니다 — 고칠수록 막대가 <b>블루</b>로 차고, 새로 자란 칸은 <b>레몬</b>으로 빛납니다.</p>
+  </div>
+
+  <div class="device"><div class="screen">
+    <div class="ahead">
+      <div class="row">
+        <span class="sg" id="sg"></span>
+        <div><div class="t">화산의 형성과 영향</div><div class="meta">수행평가 · 설명문 · 채점 5영역</div></div>
+      </div>
+      <div class="rubric" id="rubric"></div>
+    </div>
+
+    <div class="canvas-wrap">
+      <span class="countbar" id="count">0자</span>
+      <textarea class="canvas" id="canvas" spellcheck="false"></textarea>
+    </div>
+
+    <div class="sheet" id="sheet"><div class="grip" id="grip"></div><div class="body" id="sheetBody"></div></div>
+    <div class="done" id="done"></div>
+  </div></div>
+
+  <div class="foot">
+    ⚙️ 결정적 데모 — 코치 판단은 규칙 기반 시뮬레이션입니다(실서비스 = 풀림 엔진 + Claude).<br/>
+    코치는 설계상 문장을 생성하지 않습니다 · 풀림 OS 디자인 시스템 적용 · 2026.06.08
+  </div>
+
+<script>
+(() => {
+  /* ── Pullim 블록형 아이콘 (blue bg · white shapes · lemon accent) ── */
+  const wrap = (inner,r=20) => `<svg viewBox="0 0 100 100" width="100%" height="100%" aria-hidden="true"><rect x="4" y="4" width="92" height="92" rx="${r}" fill="#0362DA"/>${inner}</svg>`;
+  const ICON = {
+    pen: wrap(`<g transform="rotate(45 50 50)"><rect x="45" y="22" width="10" height="40" fill="#fff"/><rect x="45" y="62" width="10" height="10" fill="#E6FF4C"/></g><rect x="26" y="74" width="48" height="6" rx="3" fill="#fff"/>`,9),
+    decode: wrap(`<rect x="30" y="32" width="11" height="11" rx="2" fill="#fff"/><rect x="47" y="35" width="24" height="5" rx="2.5" fill="#fff"/><rect x="30" y="50" width="11" height="11" rx="2" fill="#E6FF4C"/><rect x="47" y="53" width="24" height="5" rx="2.5" fill="#fff"/><rect x="30" y="68" width="11" height="11" rx="2" fill="#fff"/><rect x="47" y="71" width="18" height="5" rx="2.5" fill="#fff"/>`),
+    ask: wrap(`<rect x="24" y="26" width="52" height="36" rx="9" fill="#fff"/><rect x="33" y="62" width="12" height="11" fill="#fff"/><rect x="36" y="42" width="7" height="7" rx="1" fill="#0362DA"/><rect x="47" y="42" width="7" height="7" rx="1" fill="#0362DA"/><rect x="58" y="22" width="11" height="11" rx="2" fill="#E6FF4C"/>`),
+    loop: wrap(`<path d="M70 40 A22 22 0 1 0 73 58" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/><path d="M60 28 L75 33 L66 45 Z" fill="#E6FF4C"/>`),
+    seal: wrap(`<circle cx="50" cy="51" r="23" fill="#fff"/><path d="M40 52 l7 8 14 -17" fill="none" stroke="#0362DA" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><rect x="46" y="14" width="8" height="8" rx="2" fill="#E6FF4C"/>`),
+    grow: wrap(`<rect x="26" y="58" width="13" height="18" rx="2" fill="#fff"/><rect x="44" y="46" width="13" height="30" rx="2" fill="#fff"/><rect x="62" y="32" width="13" height="44" rx="2" fill="#E6FF4C"/>`),
+    mark: wrap(`<rect x="28" y="28" width="44" height="30" rx="8" fill="#fff"/><rect x="38" y="58" width="10" height="9" fill="#fff"/><rect x="40" y="40" width="20" height="5" rx="2.5" fill="#0362DA"/><rect x="64" y="24" width="9" height="9" rx="2" fill="#E6FF4C"/>`,9),
+  };
+  const AREA_ICON = {"과제 이해":ICON.decode,"내용 충실도":ICON.ask,"구조·논리":ICON.loop,"표현·문장":ICON.pen,"성장 가능성":ICON.grow};
+
+  const AREAS = ["과제 이해","내용 충실도","구조·논리","표현·문장","성장 가능성"];
+  const NUDGEABLE = ["과제 이해","내용 충실도","구조·논리","표현·문장"];
+  const PASS = 14;
+  const SEED = "화산은 마그마가 분출하여 만들어진 지형이다. 화산은 위험하다. 그래서 조심해야 한다.";
+
+  const NUDGES = {
+    "내용 충실도":{diag:"주장은 있는데 근거가 없어요.",q:"왜 그런지, 네가 아는 <b>사실이나 예</b>를 하나만 떠올려 볼까?",why:"설명문은 ‘그렇다’가 아니라 ‘왜 그런지’를 보여줄 때 점수가 올라요. 근거 한 줄이 글을 바꿔요."},
+    "구조·논리":{diag:"문장이 뚝뚝 끊겨 이어지지 않아요.",q:"‘먼저 ~, 그래서 ~, 따라서 ~’ 처럼 <b>이어주는 말</b>을 넣어 볼까?",why:"읽는 사람이 길을 잃지 않으려면 문장과 문장을 잇는 다리가 필요해요."},
+    "과제 이해":{diag:"과제는 ‘형성 과정’과 ‘우리 삶에 미치는 영향’ 둘 다를 물어요.",q:"지금 약한 쪽(<b>영향</b>)을 한 문장이라도 더 넣어 볼까?",why:"과제가 요구한 걸 빠짐없이 다뤘는지가 가장 먼저 보는 채점 포인트예요."},
+    "표현·문장":{diag:"비슷하게 짧은 문장만 반복돼요.",q:"한 문장은 길게, 한 문장은 짧게 — <b>호흡</b>을 바꿔 볼까?",why:"문장 길이에 변화를 주면 글이 단조롭지 않고 잘 읽혀요."},
+  };
+  const STEP_NO = {"과제 이해":"①","내용 충실도":"②","구조·논리":"③","표현·문장":"④"};
+
+  const clamp=x=>Math.max(0,Math.min(20,Math.round(x))); const cc=s=>[...s].length;
+
+  function analyze(text){
+    const t=text.trim(), len=cc(t);
+    const paras=t.split(/\n{2,}/).map(s=>s.trim()).filter(Boolean);
+    const sents=t.split(/[.!?。…\n]+/).map(s=>s.trim()).filter(s=>cc(s)>1);
+    const cnt=re=>(t.match(re)||[]).length;
+    const evidence=cnt(/예를 들어|예컨대|실제로|왜냐하면|때문|통계|첫째|둘째|가령|[0-9]{2,}/g);
+    const connect=cnt(/그러나|하지만|따라서|그래서|먼저|또한|결론적으로|반면|마지막으로|예를 들어/g);
+    const hasProcess=/형성|만들어|분출|생겨|마그마|쌓여/.test(t);
+    const hasImpact=/영향|피해|도움|이로움|혜택|삶|생활|이용|관광|온천|농사|토양|에너지|재산|인명/.test(t);
+    const lens=sents.map(cc);
+    const variety=lens.length>=3&&(Math.max(...lens)-Math.min(...lens))>=12?7:(lens.length>=3?3:1);
+    return {
+      "과제 이해":clamp(6+(hasProcess?4:0)+(hasImpact?6:0)+(len>150?4:0)),
+      "내용 충실도":clamp(5+Math.min(evidence*4,11)+(len>170?4:0)),
+      "구조·논리":clamp(5+Math.min(paras.length*3,6)+Math.min(connect*2,9)),
+      "표현·문장":clamp(8+variety+(sents.length>=4?2:0)),
+      "성장 가능성":clamp(8+Math.min(state.revisions*3,9)+(len>200?3:0)),
+    };
+  }
+  const queue=s=>NUDGEABLE.filter(a=>s[a]<PASS).sort((a,b)=>s[a]-s[b]);
+
+  const state={scores:{},baseline:null,current:null,before:0,revisions:0};
+  const $=id=>document.getElementById(id);
+  const sheet=$("sheet"), sheetBody=$("sheetBody"), canvas=$("canvas"), doneEl=$("done");
+
+  function renderRubric(){
+    const box=$("rubric"); box.innerHTML="";
+    AREAS.forEach(a=>{
+      const weak=state.scores[a]!==undefined&&state.scores[a]<PASS&&NUDGEABLE.includes(a);
+      const el=document.createElement("span");
+      el.className="chip"+(weak?" weak":"");
+      el.innerHTML=(weak?'<span class="dotw"></span>':'')+a;
+      box.appendChild(el);
+    });
+  }
+  function bars(before,after){
+    const bf=Math.round(before/20*5), af=Math.round(after/20*5);
+    const seg=cls=>`<i class="seg ${cls}"></i>`;
+    let top='<div class="bar"><span class="lab">전</span>';
+    for(let i=0;i<5;i++) top+=seg(i<bf?"was":"");
+    top+='</div>';
+    let bot='<div class="bar"><span class="lab">후</span>';
+    for(let i=0;i<5;i++) bot+=seg(i<bf?"cur":(i<af?"gain":""));
+    bot+='</div>';
+    return top+bot;
+  }
+  function setSheet(html,full=true){
+    sheetBody.innerHTML=html;
+    requestAnimationFrame(()=>{ const h=sheet.offsetHeight; sheet.style.transform=full?"translateY(0)":`translateY(${h-56}px)`; });
+  }
+  function thinking(then){ setSheet(`<div class="thinking"><span class="ic">${ICON.mark}</span>코치가 글을 읽는 중<span class="d">…</span></div>`,true); setTimeout(then,640); }
+
+  function showStart(){ setSheet(`<div class="peek-btn" id="askBtn">✍️ 다 썼으면 코치에게 봐달라고 해봐 <span class="arrow">↑</span></div>`,false); $("askBtn").onclick=runCheck; }
+
+  function runCheck(){
+    state.scores=analyze(canvas.value); if(!state.baseline) state.baseline={...state.scores}; renderRubric();
+    thinking(()=>{ const q=queue(state.scores); if(!q.length) return finish(); state.current=q[0]; state.before=state.scores[q[0]]; showNudge(q[0]); });
+  }
+  function showNudge(area){
+    const n=NUDGES[area];
+    setSheet(`
+      <div class="nrow"><span class="ic">${AREA_ICON[area]}</span>
+        <div><div class="area-tag">${area} <span class="step">· 코칭 ${STEP_NO[area]||"•"}</span></div>
+        <div class="diag">${n.diag}</div></div></div>
+      <div class="q">${n.q}</div>
+      <div class="why" id="why">${n.why}</div>
+      <div class="acts">
+        <button class="btn btn-ghost" id="whyBtn">왜 중요해?</button>
+        <button class="btn btn-accent" id="doneBtn">고쳤어 ✓</button>
+      </div>`,true);
+    $("whyBtn").onclick=()=>$("why").classList.toggle("on"); $("doneBtn").onclick=onFixed; canvas.focus();
+  }
+  function onFixed(){
+    state.revisions++; const worked=state.current, before=state.before;
+    state.scores=analyze(canvas.value); const after=state.scores[worked]; renderRubric();
+    thinking(()=>{
+      const improved=after>before, resolved=after>=PASS;
+      const head=resolved?"좋아졌어 — 통과!":(improved?"거의 왔어, 한 걸음 더!":"아직 더 끌어낼 수 있어");
+      setSheet(`
+        <div class="grow">
+          <div class="nrow"><span class="ic">${ICON.grow}</span><div><h4>${head}</h4><p class="sub">${worked}</p></div></div>
+          <div class="grow-row">
+            <div class="nm"><span>${worked}</span><span class="${improved?'up':'same'}">${improved?'▲ 자람':'= 그대로'}</span></div>
+            ${bars(before,after)}
+          </div>
+          <div class="acts"><button class="btn btn-primary" id="nextBtn">다음 ▸</button></div>
+        </div>`,true);
+      $("nextBtn").onclick=()=>{ const q=queue(state.scores); if(!q.length) return finish(); state.current=q[0]; state.before=state.scores[q[0]]; showNudge(q[0]); };
+    });
+  }
+  function finish(){
+    sheet.style.transform="translateY(101%)";
+    const rows=AREAS.map(a=>{
+      const b=state.baseline[a], cur=state.scores[a], up=cur>b;
+      return `<div class="grow-row"><div class="nm"><span>${a}</span><span class="${up?'up':'same'}">${up?'▲ 자람':'= 유지'}</span></div>${bars(b,cur)}</div>`;
+    }).join("");
+    doneEl.innerHTML=`
+      <div class="crown"><span style="width:16px;height:16px;display:inline-block">${ICON.seal}</span>RECHECK COMPLETE · 통과</div>
+      <h2>네 손으로 더 잘 썼어.</h2>
+      <p class="p">코치는 질문만 했고, 문장은 전부 네가 썼어. 그 ‘과정’이 그대로 남았어.</p>
+      ${rows}
+      <div class="card" style="margin-top:18px">
+        <div class="lt"><span style="width:15px;height:15px;display:inline-block">${ICON.seal}</span>과정 로그 — 교사·부모가 확인하는 증거</div>
+        <div class="lrow"><span>고쳐쓰기</span><b>${state.revisions}회</b></div>
+        <div class="lrow"><span>최종 분량</span><b>${cc(canvas.value.trim())}자</b></div>
+        <div class="lrow"><span>코치가 준 문장</span><b style="color:var(--ok)">0개</b></div>
+        <div class="lrow"><span>작성 주체</span><b>학생 본인</b></div>
+      </div>
+      <span class="seal">🔒 직접 쓴 글 — 들켜도 떳떳해요</span>
+      <div class="wedge" id="wedge">
+        <div class="h" id="wedgeH"><span>다른 AI였다면?</span><span>＋</span></div>
+        <div class="c">
+          <p class="bad">❌ 베끼는 AI: “화산은 마그마가 분출하여 만들어진 지형으로, 폭발 시 인명·재산 피해를 주지만 온천·비옥한 토양 등 이로움도 준다.” — 붙여넣기 끝. 들키면 0점.</p>
+          <p class="good">✓ 풀림: 같은 결론도 ‘네가’ 끌어내 썼고, 과정 로그가 그걸 증명해요.</p>
+        </div>
+      </div>
+      <button class="btn btn-ghost restart" id="restart">다시 해보기 ↺</button>`;
+    doneEl.classList.add("on");
+    $("wedgeH").onclick=()=>$("wedge").classList.toggle("open"); $("restart").onclick=reset;
+  }
+  function reset(){ doneEl.classList.remove("on"); state.scores={};state.baseline=null;state.current=null;state.before=0;state.revisions=0; canvas.value=SEED; count(); renderRubric(); showStart(); }
+  function count(){ $("count").textContent=cc(canvas.value.trim())+"자"; }
+
+  $("grip").onclick=()=>{ const h=sheet.offsetHeight; const peeked=sheet.style.transform.includes("Y(")&&!sheet.style.transform.includes("Y(0"); sheet.style.transform=peeked?"translateY(0)":`translateY(${h-56}px)`; };
+  canvas.addEventListener("input",count);
+
+  // mount icons
+  $("masticon").innerHTML=`<svg viewBox="0 0 100 100" width="20" height="20"><circle cx="50" cy="50" r="30" fill="#fff"/><rect x="42" y="22" width="16" height="16" rx="4" fill="#E6FF4C"/></svg>`;
+  $("svctabic").innerHTML=ICON.pen; $("sg").innerHTML=ICON.pen;
+
+  canvas.value=SEED; count(); renderRubric(); showStart();
+})();
+</script>
+</body>
+</html>
