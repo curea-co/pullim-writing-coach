@@ -386,6 +386,14 @@ function Step3({ profile }: { profile: Profile | null }) {
         >
           내 글 바로 채점받을래요
         </button>
+        <button
+          type="button"
+          onClick={() => go("/coach")}
+          disabled={!ready}
+          className="border-border bg-surface text-foreground hover:bg-muted inline-flex h-12 w-full items-center justify-center rounded-xl border text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          과정 코치로 직접 고쳐 써볼래요
+        </button>
       </div>
 
       <p className="text-subtle-foreground break-keep text-center text-[11px]">
