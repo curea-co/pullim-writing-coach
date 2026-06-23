@@ -129,7 +129,9 @@
   --fg-subtle: oklch(0.7 0.014 285.9);
   --border: oklch(0.92 0.004 286.3);
   --muted: oklch(0.967 0.001 286.4);
-  --primary: oklch(0.27 0.012 285.9);
+  /* 색 의미 확정(스펙 §6): primary=행동(blue). 구 green CTA에서 blue로 재매핑.
+     단일 출처 유지 위해 브랜드 락 --pullim-blue 참조. 흰 텍스트가 파랑 위에 읽힘. */
+  --primary: var(--pullim-blue);
   --primary-fg: oklch(0.985 0 0);
 
   --band-good: oklch(0.7 0.15 162);
@@ -157,8 +159,10 @@
   --fg-subtle: oklch(0.55 0.012 265);     /* tertiary 텍스트 */
   --border: oklch(0.33 0.014 260);        /* 카드 경계 */
   --muted: oklch(0.27 0.014 260);         /* 약한 강조 배경 */
-  --primary: oklch(0.96 0.005 270);       /* 다크에서 primary는 화이트 (역전) */
-  --primary-fg: oklch(0.18 0.018 260);
+  /* 색 의미 확정(스펙 §6): primary=행동(blue). 다크 navy 배경에서 #0362da는 대비가 약해
+     밝은 블루(--pb-5 #1f89f5)로 올리고 흰 텍스트로 AA 확보(역전 화이트 폐기). */
+  --primary: var(--pb-5);
+  --primary-fg: oklch(0.99 0 0);
 
   /* 점수 밴드 — 다크 배경에서 가독성 위해 chroma↑, lightness 유지 */
   --band-good: oklch(0.74 0.18 162);

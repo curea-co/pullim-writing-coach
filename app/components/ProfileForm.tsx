@@ -106,7 +106,7 @@ export default function ProfileForm({
                 className={cn(
                   "inline-flex h-9 items-center rounded-full border px-3 text-xs font-medium",
                   active
-                    ? "border-[#24D39E] bg-[#24D39E]/10 text-[#1FBE8C]"
+                    ? "border-primary bg-primary/10 text-primary"
                     : "border-border bg-surface text-foreground hover:bg-muted",
                 )}
               >
@@ -157,7 +157,7 @@ export default function ProfileForm({
             onChange={(e) =>
               setField("frequent_genre", (e.target.value || undefined) as Genre | undefined)
             }
-            className="bg-surface border-border text-foreground mt-1.5 block h-10 w-full rounded-lg border px-3 text-sm focus:border-[#24D39E] focus:outline-none"
+            className="bg-surface border-border text-foreground mt-1.5 block h-10 w-full rounded-lg border px-3 text-sm focus:border-primary focus:outline-none"
           >
             <option value="">선택 안 함</option>
             {GENRES.map((g) => (
@@ -179,7 +179,7 @@ export default function ProfileForm({
 
       <button
         type="submit"
-        className="mt-2 inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#24D39E] text-sm font-semibold text-white hover:bg-[#1FBE8C]"
+        className="mt-2 inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground hover:opacity-90"
       >
         {submitLabel ?? "다음"}
       </button>
@@ -214,7 +214,7 @@ function SchoolLevelRow({
               className={cn(
                 "h-11 rounded-lg border text-sm font-medium",
                 active
-                  ? "border-[#24D39E] bg-[#24D39E]/10 text-[#1FBE8C]"
+                  ? "border-primary bg-primary/10 text-primary"
                   : "border-border bg-surface text-foreground hover:bg-muted",
               )}
             >
@@ -268,7 +268,7 @@ function TextField({
           aria-invalid={!!error}
           className={cn(
             "bg-surface text-foreground placeholder:text-subtle-foreground block h-10 w-full rounded-lg border px-3 pr-12 text-sm focus:outline-none",
-            error ? "border-band-warn focus:border-band-warn" : "border-border focus:border-[#24D39E]",
+            error ? "border-band-warn focus:border-band-warn" : "border-border focus:border-primary",
           )}
         />
         <span className="text-subtle-foreground absolute right-3 top-1/2 -translate-y-1/2 text-[10px] tabular-nums">

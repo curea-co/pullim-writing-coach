@@ -598,7 +598,7 @@ export default function ScoreForm({
     <button
       type="button"
       onClick={handleResubmit}
-      className="inline-flex items-center justify-center rounded-lg bg-[#24D39E] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1FBE8C]"
+      className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
     >
       {revisionPair ? "한 번 더 고쳐쓰기" : "고쳐쓰기 시작"}
     </button>
@@ -629,7 +629,7 @@ export default function ScoreForm({
             <button
               type="button"
               onClick={applyRestore}
-              className="rounded-lg bg-[#24D39E] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1FBE8C]"
+              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90"
             >
               이어 쓰기
             </button>
@@ -667,7 +667,7 @@ export default function ScoreForm({
             <button
               type="button"
               onClick={applyClipboard}
-              className="rounded-lg bg-[#24D39E] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1FBE8C]"
+              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90"
             >
               붙여넣기
             </button>

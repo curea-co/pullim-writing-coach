@@ -48,7 +48,7 @@ export default function RevisionToggle({
         className={cn(
           "inline-flex h-9 items-center rounded-md px-4 text-xs font-medium transition",
           active === "v2"
-            ? "bg-[#24D39E] text-white shadow-sm"
+            ? "bg-primary text-primary-foreground shadow-sm"
             : "text-muted-foreground hover:text-foreground",
         )}
       >

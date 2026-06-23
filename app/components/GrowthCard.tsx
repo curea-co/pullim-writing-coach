@@ -22,9 +22,9 @@ const TONE_CLASSES = {
 } as const;
 
 const AREA_TONE_BAR = {
-  good: "bg-[#24D39E]",      // 상승 = 브랜드 초록
-  neutral: "bg-primary",     // 동률 = 기본
-  warn: "bg-band-warn",      // 하락 = 부드러운 경고
+  good: "bg-ok",                       // 상승 = green(ok)
+  neutral: "bg-muted-foreground/40",   // 동률 = 중립(primary=blue 충돌 방지)
+  warn: "bg-band-warn",                // 하락 = 부드러운 경고
 } as const;
 
 export default function GrowthCard({

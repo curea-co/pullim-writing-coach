@@ -33,7 +33,7 @@ export default function ConsentNotice({
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
           aria-required="true"
-          className="mt-0.5 h-4 w-4 shrink-0 accent-[#24D39E]"
+          className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
         />
         <div className="break-keep text-xs leading-relaxed">
           <span className="text-foreground block text-sm font-semibold">
@@ -61,7 +61,7 @@ export default function ConsentNotice({
             type="checkbox"
             checked={!!aiTrainingChecked}
             onChange={(e) => onAiTrainingChange?.(e.target.checked)}
-            className="mt-0.5 h-4 w-4 shrink-0 accent-[#24D39E]"
+            className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
           />
           <div className="break-keep text-xs leading-relaxed">
             <span className="text-foreground block text-sm font-semibold">

@@ -61,7 +61,7 @@ export default function Home() {
         <div className="mt-7 flex flex-wrap items-center gap-3">
           <Link
             href="/try"
-            className="inline-flex items-center justify-center rounded-lg bg-[#24D39E] px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1FBE8C]"
+            className="inline-flex items-center justify-center rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90"
           >
             직접 채점받기 →
           </Link>
@@ -143,7 +143,7 @@ export default function Home() {
           <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
             <Link
               href="/try"
-              className="inline-flex items-center justify-center rounded-lg bg-[#24D39E] px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1FBE8C]"
+              className="inline-flex items-center justify-center rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90"
             >
               직접 채점받기 →
             </Link>
