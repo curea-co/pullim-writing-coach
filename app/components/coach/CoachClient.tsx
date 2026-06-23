@@ -464,10 +464,12 @@ export default function CoachClient({
   assignment: assignmentProp,
   mode = "free",
   onAuthExpired,
+  onNewAssignment,
 }: {
   assignment?: CoachAssignment;
   mode?: WritingMode;
   onAuthExpired?: () => void;
+  onNewAssignment?: () => void;
 }) {
   const [state, dispatch] = useReducer(reducer, undefined, initState);
   const [currentNudge, setCurrentNudge] = useState<CoachNudge | null>(null);
@@ -639,6 +641,19 @@ export default function CoachClient({
     dispatch({ type: "RESET" });
   };
 
+  const handleNewAssignment = () => {
+    // 기존 reset()으로 세션·과정 로그·상태 초기화 후, 가이드 메모도 제거하고 onNewAssignment 콜백 호출.
+    reset();
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.removeItem("pwc-guide-memos-v1");
+      } catch {
+        /* swallow — 영속 실패가 흐름을 막지 않는다. */
+      }
+    }
+    onNewAssignment?.();
+  };
+
   return (
     <div className={`${styles.root} ${styles.stageBg} flex w-full flex-col items-center`}>
       {/* OS 토픽바 */}
@@ -747,7 +762,7 @@ export default function CoachClient({
           </BottomSheet>
 
           {/* 완료화면 */}
-          <CompletionView state={state} onRestart={reset} />
+          <CompletionView state={state} onRestart={reset} onNewAssignment={handleNewAssignment} />
         </div>
       </div>
 
@@ -871,7 +886,15 @@ function SheetBody({
 }
 
 // ── 완료화면 ────────────────────────────────────────────────────────
-function CompletionView({ state, onRestart }: { state: State; onRestart: () => void }) {
+function CompletionView({
+  state,
+  onRestart,
+  onNewAssignment,
+}: {
+  state: State;
+  onRestart: () => void;
+  onNewAssignment: () => void;
+}) {
   const [wedgeOpen, setWedgeOpen] = useState(false);
   const on = state.phase === "done";
   const baseline = state.baseline ?? emptyScores();
@@ -940,13 +963,23 @@ function CompletionView({ state, onRestart }: { state: State; onRestart: () => v
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={onRestart}
-        className={`${styles.brandFont} mt-4 inline-flex w-full items-center justify-center rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[14px] font-semibold text-[var(--ink-2)] transition hover:border-[var(--ink-4)] hover:bg-[var(--pb-1)]`}
-      >
-        다시 해보기 ↺
-      </button>
+      <div className="mt-4 flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={onRestart}
+          className={`${styles.brandFont} inline-flex w-full items-center justify-center rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[14px] font-semibold text-[var(--ink-2)] transition hover:border-[var(--ink-4)] hover:bg-[var(--pb-1)]`}
+        >
+          다시 해보기 ↺
+        </button>
+        <button
+          type="button"
+          data-testid="coach-new-assignment"
+          onClick={onNewAssignment}
+          className={`${styles.brandFont} inline-flex w-full items-center justify-center rounded-xl px-4 py-2.5 text-[13px] font-medium text-[var(--ink-4)] transition hover:text-[var(--ink-2)]`}
+        >
+          다른 과제로 쓰기
+        </button>
+      </div>
     </div>
   );
 }

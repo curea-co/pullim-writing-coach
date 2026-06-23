@@ -57,7 +57,25 @@ export default function CoachSetupFlow({ onAuthExpired }: { onAuthExpired?: () =
   if (phase === "loading") return null;
 
   if (phase === "ready" && assignment) {
-    return <CoachClient assignment={assignment} mode={mode} onAuthExpired={onAuthExpired} />;
+    return (
+      <CoachClient
+        assignment={assignment}
+        mode={mode}
+        onAuthExpired={onAuthExpired}
+        onNewAssignment={() => {
+          if (typeof window !== "undefined") {
+            try {
+              window.localStorage.removeItem(SETUP_KEY);
+            } catch {
+              /* swallow */
+            }
+          }
+          setAssignment(null);
+          setMode("free");
+          setPhase("assignment");
+        }}
+      />
+    );
   }
 
   if (phase === "mode" && assignment) {

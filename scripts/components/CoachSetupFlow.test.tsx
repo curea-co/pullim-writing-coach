@@ -4,8 +4,11 @@ import userEvent from "@testing-library/user-event";
 
 // CoachClient는 무거우므로(useReducer+fetch) 마운트 신호만 검증하는 mock로 대체.
 vi.mock("@/app/components/coach/CoachClient", () => ({
-  default: (props: { assignment: { prompt_text: string }; mode: string }) => (
-    <div data-testid="coach-client">{`${props.mode}:${props.assignment.prompt_text}`}</div>
+  default: (props: { assignment: { prompt_text: string }; mode: string; onNewAssignment?: () => void }) => (
+    <div data-testid="coach-client">
+      {`${props.mode}:${props.assignment.prompt_text}`}
+      <button data-testid="stub-new-assignment" onClick={props.onNewAssignment}>new</button>
+    </div>
   ),
 }));
 
@@ -39,5 +42,22 @@ describe("CoachSetupFlow", () => {
     );
     render(<CoachSetupFlow />);
     expect(screen.getByTestId("coach-client")).toHaveTextContent("guide:저장된 과제 설명");
+  });
+
+  it("'다른 과제로' 클릭 시 과제 입력 단계로 돌아가고 setup 키 삭제", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      "pwc-coach-setup-v1",
+      JSON.stringify({ assignment: { school_level: "중2", subject: "과학", genre: "설명문", target_char_count: null, prompt_text: "저장된 과제 설명" }, mode: "free" }),
+    );
+    render(<CoachSetupFlow />);
+    // CoachClient가 마운트됐는지 확인
+    expect(screen.getByTestId("coach-client")).toBeInTheDocument();
+    // stub 버튼 클릭
+    await user.click(screen.getByTestId("stub-new-assignment"));
+    // 과제 입력 단계로 복귀
+    expect(screen.getByText(/어떤 글을 써볼까요/)).toBeInTheDocument();
+    // setup 키가 삭제됐는지 확인
+    expect(window.localStorage.getItem("pwc-coach-setup-v1")).toBeNull();
   });
 });
