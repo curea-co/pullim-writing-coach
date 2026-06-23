@@ -88,6 +88,7 @@ docs/                        # 기획 산출물 01~11
 | 09 | [prompt_verification](docs/09_prompt_verification_2026-05-21.md) | 프롬프트 v0.1 재현 검증 (25건 실호출) |
 | 10 | [freeze_review_request](docs/10_freeze_review_request_2026-05-20.md) | freeze 리뷰 요청 패키지 |
 | 11 | [demo_design_ux_audit](docs/11_demo_design_ux_audit_2026-05-20.md) | 데모 디자인·UX writing audit |
+| 30 | [writing_experience_design](docs/30_writing_experience_design_2026-06-23.md) | 글쓰기 경험 종합 설계 — 4단계·4모드·성취서사 (대필 0 불변식) |
 
 ---
 
