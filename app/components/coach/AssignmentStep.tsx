@@ -11,11 +11,11 @@ import { loadProfile } from "@/app/lib/storage";
 
 export default function AssignmentStep({ onSubmit }: { onSubmit: (a: CoachAssignment) => void }) {
   const profile = useMemo(() => loadProfile(), []);
-  const [schoolLevel, setSchoolLevel] = useState(profile?.school_level ?? "");
-  const [subject, setSubject] = useState(
-    profile?.primary_subject && profile.primary_subject !== "기타" ? profile.primary_subject : "",
+  const [schoolLevel, setSchoolLevel] = useState<string>(profile?.school_level ?? "중2");
+  const [subject, setSubject] = useState<string>(
+    profile?.primary_subject && profile.primary_subject !== "기타" ? profile.primary_subject : "과학",
   );
-  const [genre, setGenre] = useState(profile?.frequent_genre ?? "");
+  const [genre, setGenre] = useState<string>(profile?.frequent_genre ?? "설명문");
   const [targetRaw, setTargetRaw] = useState("");
   const [promptText, setPromptText] = useState("");
 
