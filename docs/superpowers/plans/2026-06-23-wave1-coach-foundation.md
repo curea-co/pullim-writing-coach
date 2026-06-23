@@ -40,7 +40,7 @@
 | `app/**/*.tsx` (수정) | `#24D39E`/`#1FBE8C` → 시맨틱 토큰 | T9 |
 | `scripts/coach-setup.test.mjs` (신규) | coach-setup 유닛 | T2 |
 | `scripts/guide-prompts.test.mjs` (신규) | 불변식 게이트 | T3 |
-| `app/components/coach/*.test.tsx` (신규) | 컴포넌트 테스트 | T4-T7 |
+| `scripts/components/*.test.tsx` (신규) | 컴포넌트 테스트 | T4-T7 |
 | `e2e/coach-foundation.spec.ts` (신규) | C2·자유·가이드 e2e | T7 |
 
 ---
@@ -108,7 +108,7 @@ Create `app/components/coach/CoachGate.tsx`:
 //   T6에서 CoachClient 직접 마운트를 CoachSetupFlow로 교체한다.
 
 import TokenGate from "@/app/components/TokenGate";
-import CoachClient from "./CoachClient";
+import CoachClient from "@/app/components/coach/CoachClient";
 
 export default function CoachGate() {
   return <TokenGate>{(onAuthExpired) => <CoachClient onAuthExpired={onAuthExpired} />}</TokenGate>;
@@ -477,7 +477,7 @@ git commit -m "$(printf 'feat(coach): guide-prompts 정적 질문 풀 + 대필 �
 
 **Files:**
 - Create: `app/components/coach/AssignmentStep.tsx`
-- Test: `app/components/coach/AssignmentStep.test.tsx`
+- Test: `scripts/components/AssignmentStep.test.tsx`
 
 **Interfaces:**
 - Consumes: `CoachAssignment`/`validateAssignment` (T2), `MetaForm` (기존), `loadProfile` (storage), `SUBJECTS`/`GENRES`/`SCHOOL_LEVELS` (grading).
@@ -485,13 +485,13 @@ git commit -m "$(printf 'feat(coach): guide-prompts 정적 질문 풀 + 대필 �
 
 - [ ] **Step 1: 실패 테스트 작성**
 
-Create `app/components/coach/AssignmentStep.test.tsx`:
+Create `scripts/components/AssignmentStep.test.tsx`:
 
 ```tsx
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import AssignmentStep from "./AssignmentStep";
+import AssignmentStep from "@/app/components/coach/AssignmentStep";
 
 describe("AssignmentStep", () => {
   it("미입력 시 다음 버튼 비활성", () => {
@@ -615,7 +615,7 @@ Expected: PASS (2 tests)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/components/coach/AssignmentStep.tsx app/components/coach/AssignmentStep.test.tsx
+git add app/components/coach/AssignmentStep.tsx scripts/components/AssignmentStep.test.tsx
 git commit -m "$(printf 'feat(coach): AssignmentStep — 학생 과제 직접 입력 (C3)\n\nMetaForm 재사용 + validateAssignment. 프로필 prefill, 데모 기본값 유지.\n\nCo-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>')"
 ```
 
@@ -625,7 +625,7 @@ git commit -m "$(printf 'feat(coach): AssignmentStep — 학생 과제 직접 �
 
 **Files:**
 - Create: `app/components/coach/ModeSelectStep.tsx`
-- Test: `app/components/coach/ModeSelectStep.test.tsx`
+- Test: `scripts/components/ModeSelectStep.test.tsx`
 
 **Interfaces:**
 - Consumes: `WritingMode`/`isModeEnabled` (T2).
@@ -633,13 +633,13 @@ git commit -m "$(printf 'feat(coach): AssignmentStep — 학생 과제 직접 �
 
 - [ ] **Step 1: 실패 테스트 작성**
 
-Create `app/components/coach/ModeSelectStep.test.tsx`:
+Create `scripts/components/ModeSelectStep.test.tsx`:
 
 ```tsx
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import ModeSelectStep from "./ModeSelectStep";
+import ModeSelectStep from "@/app/components/coach/ModeSelectStep";
 
 describe("ModeSelectStep", () => {
   it("4개 모드 카드 렌더", () => {
@@ -747,7 +747,7 @@ Expected: PASS (3 tests)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/components/coach/ModeSelectStep.tsx app/components/coach/ModeSelectStep.test.tsx
+git add app/components/coach/ModeSelectStep.tsx scripts/components/ModeSelectStep.test.tsx
 git commit -m "$(printf 'feat(coach): ModeSelectStep — 4모드 선택(자유/가이드 활성, 개요/말하기 준비중)\n\nCo-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>')"
 ```
 
@@ -757,7 +757,7 @@ git commit -m "$(printf 'feat(coach): ModeSelectStep — 4모드 선택(자유/�
 
 **Files:**
 - Create: `app/components/coach/CoachSetupFlow.tsx`
-- Test: `app/components/coach/CoachSetupFlow.test.tsx`
+- Test: `scripts/components/CoachSetupFlow.test.tsx`
 - Modify: `app/components/coach/CoachGate.tsx` (CoachClient 직접 마운트 → CoachSetupFlow)
 
 **Interfaces:**
@@ -767,7 +767,7 @@ git commit -m "$(printf 'feat(coach): ModeSelectStep — 4모드 선택(자유/�
 
 - [ ] **Step 1: 실패 테스트 작성**
 
-Create `app/components/coach/CoachSetupFlow.test.tsx`:
+Create `scripts/components/CoachSetupFlow.test.tsx`:
 
 ```tsx
 import { describe, it, expect, beforeEach, vi } from "vitest";
@@ -775,13 +775,13 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // CoachClient는 무거우므로(useReducer+fetch) 마운트 신호만 검증하는 mock로 대체.
-vi.mock("./CoachClient", () => ({
+vi.mock("@/app/components/coach/CoachClient", () => ({
   default: (props: { assignment: { prompt_text: string }; mode: string }) => (
     <div data-testid="coach-client">{`${props.mode}:${props.assignment.prompt_text}`}</div>
   ),
 }));
 
-import CoachSetupFlow from "./CoachSetupFlow";
+import CoachSetupFlow from "@/app/components/coach/CoachSetupFlow";
 
 beforeEach(() => window.localStorage.clear());
 
@@ -838,9 +838,9 @@ import {
   parseSetup,
   serializeSetup,
 } from "@/app/lib/coach-setup";
-import AssignmentStep from "./AssignmentStep";
-import ModeSelectStep from "./ModeSelectStep";
-import CoachClient from "./CoachClient";
+import AssignmentStep from "@/app/components/coach/AssignmentStep";
+import ModeSelectStep from "@/app/components/coach/ModeSelectStep";
+import CoachClient from "@/app/components/coach/CoachClient";
 
 const SETUP_KEY = "pwc-coach-setup-v1";
 
@@ -919,7 +919,7 @@ export default function CoachSetupFlow({ onAuthExpired }: { onAuthExpired?: () =
 "use client";
 
 import TokenGate from "@/app/components/TokenGate";
-import CoachSetupFlow from "./CoachSetupFlow";
+import CoachSetupFlow from "@/app/components/coach/CoachSetupFlow";
 
 export default function CoachGate() {
   return <TokenGate>{(onAuthExpired) => <CoachSetupFlow onAuthExpired={onAuthExpired} />}</TokenGate>;
@@ -934,7 +934,7 @@ Expected: PASS (3 tests). (실제 CoachClient props는 T7에서 배선)
 - [ ] **Step 6: Commit**
 
 ```bash
-git add app/components/coach/CoachSetupFlow.tsx app/components/coach/CoachSetupFlow.test.tsx app/components/coach/CoachGate.tsx
+git add app/components/coach/CoachSetupFlow.tsx scripts/components/CoachSetupFlow.test.tsx app/components/coach/CoachGate.tsx
 git commit -m "$(printf 'feat(coach): CoachSetupFlow — 과제→모드→코치 진입 오케스트레이션 + 영속\n\npwc-coach-setup-v1에 과제+모드 영속(세션 키와 분리). 새로고침 복원 직행.\n\nCo-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>')"
 ```
 
@@ -945,7 +945,7 @@ git commit -m "$(printf 'feat(coach): CoachSetupFlow — 과제→모드→코�
 **Files:**
 - Modify: `app/components/coach/CoachClient.tsx` (ASSIGNMENT 상수 → prop, mode prop, GuidePanel 렌더)
 - Create: `app/components/coach/GuidePanel.tsx`
-- Test: `app/components/coach/GuidePanel.test.tsx`
+- Test: `scripts/components/GuidePanel.test.tsx`
 - Create: `e2e/coach-foundation.spec.ts`
 
 **Interfaces:**
@@ -954,12 +954,12 @@ git commit -m "$(printf 'feat(coach): CoachSetupFlow — 과제→모드→코�
 
 - [ ] **Step 1: GuidePanel 실패 테스트 작성 (대필 통로 부재 단언)**
 
-Create `app/components/coach/GuidePanel.test.tsx`:
+Create `scripts/components/GuidePanel.test.tsx`:
 
 ```tsx
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import GuidePanel from "./GuidePanel";
+import GuidePanel from "@/app/components/coach/GuidePanel";
 
 beforeEach(() => window.localStorage.clear());
 
@@ -1073,7 +1073,7 @@ Expected: PASS (3 tests)
 
 ```tsx
 import type { CoachAssignment, WritingMode } from "@/app/lib/coach-setup";
-import GuidePanel from "./GuidePanel";
+import GuidePanel from "@/app/components/coach/GuidePanel";
 ```
 
 컴포넌트 시그니처(455행)를 교체:
@@ -1175,7 +1175,7 @@ test.describe("코치 토대 (물결1)", () => {
 - [ ] **Step 10: Commit**
 
 ```bash
-git add app/components/coach/CoachClient.tsx app/components/coach/GuidePanel.tsx app/components/coach/GuidePanel.test.tsx e2e/coach-foundation.spec.ts
+git add app/components/coach/CoachClient.tsx app/components/coach/GuidePanel.tsx scripts/components/GuidePanel.test.tsx e2e/coach-foundation.spec.ts
 git commit -m "$(printf 'feat(coach): 과제 prop 파라미터화(C3) + 가이드 모드 패널\n\nCoachClient 하드코딩 ASSIGNMENT를 prop으로. mode=guide 시 정적 질문 패널\n동반(메모 참조용, 캔버스 자동삽입 0). reducer/phase 로직 무수정.\n\nCo-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>')"
 ```
 
