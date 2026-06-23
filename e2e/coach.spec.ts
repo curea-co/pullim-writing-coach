@@ -123,6 +123,19 @@ function nextButton(page: Page) {
     .first();
 }
 
+// /coach 진입 후 새 셋업 흐름(과제 입력 → 모드 선택) 통과 → 캔버스 도달.
+async function completeSetup(page: Page) {
+  // AssignmentStep: 과제 입력 (학년·과목·장르는 기본값 prefill, 과제 내용만 채우면 됨)
+  await expect(page.getByText("어떤 글을 써볼까요")).toBeVisible();
+  await page.getByLabel(/학교·학년/).selectOption("중2");
+  await page.getByLabel(/과목/).selectOption("과학");
+  await page.getByLabel(/어떤 글/).selectOption("설명문");
+  await page.getByLabel(/과제 내용/).fill("화산의 형성 과정과 영향을 설명하는 글을 쓰시오");
+  await page.getByRole("button", { name: /다음/ }).click();
+  // ModeSelectStep: 자유 쓰기 선택 → 캔버스 진입
+  await page.getByTestId("mode-free").click();
+}
+
 test.describe("/coach 과정 코치 happy path (COACH_MOCK)", () => {
   test.beforeEach(async ({ context, page }) => {
     // ── 1) 토큰 게이트 우회 + COACH_MOCK 플래그(클라 측 mock 단락 동시 활성) ──
@@ -131,6 +144,8 @@ test.describe("/coach 과정 코치 happy path (COACH_MOCK)", () => {
       window.sessionStorage.setItem("COACH_MOCK", "1");
       // 클라이언트에 mock seam이 있으면 잡도록 글로벌 플래그도 노출.
       (window as unknown as { __COACH_MOCK?: boolean }).__COACH_MOCK = true;
+      // 셋업 흐름 저장값 초기화 — 테스트 간 bleeding 방지.
+      window.localStorage.removeItem("pwc-coach-setup-v1");
     });
 
     // ── 2) /api/coach 네트워크 mock — 호출 순서로 weak → resolved 전환 ──
@@ -149,6 +164,7 @@ test.describe("/coach 과정 코치 happy path (COACH_MOCK)", () => {
 
   test("진입 → 글 입력 → 봐줘 → nudge → 고쳤어 → 성장막대 → 완료", async ({ page }) => {
     await page.goto("/coach");
+    await completeSetup(page);
 
     // 캔버스 노출 + 시드 입력(학생이 직접 쓴 글).
     const cv = canvas(page);
@@ -206,6 +222,7 @@ test.describe("/coach 과정 코치 happy path (COACH_MOCK)", () => {
 
   test("코치 응답 전 과정 — 캔버스가 비면 '봐줘'로 점검 불가(가드)", async ({ page }) => {
     await page.goto("/coach");
+    await completeSetup(page);
     const cv = canvas(page);
     await expect(cv).toBeVisible();
 
