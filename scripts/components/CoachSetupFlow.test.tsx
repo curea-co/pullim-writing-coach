@@ -38,17 +38,17 @@ describe("CoachSetupFlow", () => {
   it("저장된 setup 있으면 CoachClient 직행", () => {
     window.localStorage.setItem(
       "pwc-coach-setup-v1",
-      JSON.stringify({ assignment: { school_level: "중2", subject: "과학", genre: "설명문", target_char_count: null, prompt_text: "저장된 과제 설명" }, mode: "guide" }),
+      JSON.stringify({ assignment: { school_level: "중2", subject: "과학", genre: "설명문", target_char_count: null, prompt_text: "저장된 과제 설명입니다" }, mode: "guide" }),
     );
     render(<CoachSetupFlow />);
-    expect(screen.getByTestId("coach-client")).toHaveTextContent("guide:저장된 과제 설명");
+    expect(screen.getByTestId("coach-client")).toHaveTextContent("guide:저장된 과제 설명입니다");
   });
 
   it("'다른 과제로' 클릭 시 과제 입력 단계로 돌아가고 setup 키 삭제", async () => {
     const user = userEvent.setup();
     window.localStorage.setItem(
       "pwc-coach-setup-v1",
-      JSON.stringify({ assignment: { school_level: "중2", subject: "과학", genre: "설명문", target_char_count: null, prompt_text: "저장된 과제 설명" }, mode: "free" }),
+      JSON.stringify({ assignment: { school_level: "중2", subject: "과학", genre: "설명문", target_char_count: null, prompt_text: "저장된 과제 설명입니다" }, mode: "free" }),
     );
     render(<CoachSetupFlow />);
     // CoachClient가 마운트됐는지 확인
@@ -59,5 +59,21 @@ describe("CoachSetupFlow", () => {
     expect(screen.getByText(/어떤 글을 써볼까요/)).toBeInTheDocument();
     // setup 키가 삭제됐는지 확인
     expect(window.localStorage.getItem("pwc-coach-setup-v1")).toBeNull();
+  });
+
+  it("모드 선택에서 '과제 다시 입력'으로 돌아오면 입력한 과제 내용이 복원됨", async () => {
+    const user = userEvent.setup();
+    render(<CoachSetupFlow />);
+    const PROMPT = "교복 자율화에 대한 자신의 주장을 근거 2개 이상으로 쓰시오";
+    await user.selectOptions(screen.getByLabelText(/학년/), "중2");
+    await user.selectOptions(screen.getByLabelText(/과목/), "과학");
+    await user.selectOptions(screen.getByLabelText(/어떤 글/), "설명문");
+    await user.clear(screen.getByLabelText(/과제 내용/));
+    await user.type(screen.getByLabelText(/과제 내용/), PROMPT);
+    await user.click(screen.getByRole("button", { name: /다음/ }));
+    // 모드 선택 단계 → '과제 다시 입력'(onBack)
+    await user.click(screen.getByRole("button", { name: /과제 다시 입력/ }));
+    // 입력했던 과제 내용이 유실되지 않고 복원되어 있어야 함
+    expect(screen.getByLabelText(/과제 내용/)).toHaveValue(PROMPT);
   });
 });

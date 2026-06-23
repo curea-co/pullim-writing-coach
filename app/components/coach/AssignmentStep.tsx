@@ -1,7 +1,8 @@
 "use client";
 
 // 코치 진입 — 과제 입력 단계 (C3). MetaForm을 그대로 재사용하고 검증은 coach-setup.validateAssignment.
-//   프로필 있으면 학년·과목·장르 prefill. 과제 내용은 항상 빈 상태로 시작 — 직접 입력 유도.
+//   initial이 있으면(모드 선택에서 '과제 다시 입력'으로 복귀) 그 값을 복원 — 입력 유실 방지(curea-review-ai 지적).
+//   없으면 프로필 기반 prefill, 과제 내용은 빈 상태로 시작.
 
 import { useMemo, useState } from "react";
 import MetaForm from "@/app/components/MetaForm";
@@ -9,15 +10,26 @@ import { type CoachAssignment, validateAssignment } from "@/app/lib/coach-setup"
 import { TARGET_MIN, TARGET_MAX } from "@/app/lib/grading";
 import { loadProfile } from "@/app/lib/storage";
 
-export default function AssignmentStep({ onSubmit }: { onSubmit: (a: CoachAssignment) => void }) {
+export default function AssignmentStep({
+  initial,
+  onSubmit,
+}: {
+  initial?: CoachAssignment;
+  onSubmit: (a: CoachAssignment) => void;
+}) {
   const profile = useMemo(() => loadProfile(), []);
-  const [schoolLevel, setSchoolLevel] = useState<string>(profile?.school_level ?? "중2");
-  const [subject, setSubject] = useState<string>(
-    profile?.primary_subject && profile.primary_subject !== "기타" ? profile.primary_subject : "과학",
+  const [schoolLevel, setSchoolLevel] = useState<string>(
+    initial?.school_level ?? profile?.school_level ?? "중2",
   );
-  const [genre, setGenre] = useState<string>(profile?.frequent_genre ?? "설명문");
-  const [targetRaw, setTargetRaw] = useState("");
-  const [promptText, setPromptText] = useState("");
+  const [subject, setSubject] = useState<string>(
+    initial?.subject ??
+      (profile?.primary_subject && profile.primary_subject !== "기타" ? profile.primary_subject : "과학"),
+  );
+  const [genre, setGenre] = useState<string>(initial?.genre ?? profile?.frequent_genre ?? "설명문");
+  const [targetRaw, setTargetRaw] = useState(
+    initial?.target_char_count != null ? String(initial.target_char_count) : "",
+  );
+  const [promptText, setPromptText] = useState(initial?.prompt_text ?? "");
 
   const targetTrimmed = targetRaw.trim();
   const targetNum = targetTrimmed === "" ? null : Number(targetTrimmed);

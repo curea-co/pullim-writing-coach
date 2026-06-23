@@ -93,6 +93,7 @@ export default function CoachSetupFlow({ onAuthExpired }: { onAuthExpired?: () =
 
   return (
     <AssignmentStep
+      initial={assignment ?? undefined}
       onSubmit={(a) => {
         setAssignment(a);
         setPhase("mode");

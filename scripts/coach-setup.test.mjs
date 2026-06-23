@@ -74,3 +74,18 @@ test("parseSetup — 정수 아닌 target_char_count는 null", () => {
   const bad = JSON.stringify({ assignment: { school_level: "중2", subject: "과학", genre: "설명문", target_char_count: 3.7, prompt_text: "화산의 형성을 설명하라" }, mode: "free" });
   assert.equal(parseSetup(bad), null);
 });
+
+test("parseSetup — 비활성 모드(outline/voice) 저장값은 null", () => {
+  // 구조는 맞지만 활성 모드가 아니면 UI 가드 우회 방지를 위해 null.
+  const outline = JSON.stringify({ assignment: { school_level: "중2", subject: "과학", genre: "설명문", target_char_count: null, prompt_text: "화산의 형성을 설명하라" }, mode: "outline" });
+  assert.equal(parseSetup(outline), null);
+  const voice = JSON.stringify({ assignment: { school_level: "중2", subject: "과학", genre: "설명문", target_char_count: null, prompt_text: "화산의 형성을 설명하라" }, mode: "voice" });
+  assert.equal(parseSetup(voice), null);
+});
+
+test("parseSetup — validateAssignment 위반 과제(짧은 prompt·enum 밖)는 null", () => {
+  const shortPrompt = JSON.stringify({ assignment: { school_level: "중2", subject: "과학", genre: "설명문", target_char_count: null, prompt_text: "짧음" }, mode: "free" });
+  assert.equal(parseSetup(shortPrompt), null);
+  const badEnum = JSON.stringify({ assignment: { school_level: "대학원", subject: "과학", genre: "설명문", target_char_count: null, prompt_text: "화산의 형성을 설명하라" }, mode: "free" });
+  assert.equal(parseSetup(badEnum), null);
+});
