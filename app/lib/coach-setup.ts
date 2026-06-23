@@ -71,7 +71,7 @@ export function parseSetup(raw: string | null): CoachSetup | null {
     if (typeof a !== "object" || a === null) return null;
     if (typeof a.school_level !== "string" || typeof a.subject !== "string") return null;
     if (typeof a.genre !== "string" || typeof a.prompt_text !== "string") return null;
-    if (!(a.target_char_count === null || typeof a.target_char_count === "number")) return null;
+    if (!(a.target_char_count === null || (typeof a.target_char_count === "number" && Number.isInteger(a.target_char_count)))) return null;
     return o as CoachSetup;
   } catch {
     return null;

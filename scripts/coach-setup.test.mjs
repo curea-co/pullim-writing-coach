@@ -69,3 +69,8 @@ test("parseSetup — null/손상 입력은 null", () => {
   assert.equal(parseSetup(JSON.stringify({ assignment: null, mode: "free" })), null);
   assert.equal(parseSetup(JSON.stringify({ assignment: { school_level: "중2" }, mode: "rap" })), null);
 });
+
+test("parseSetup — 정수 아닌 target_char_count는 null", () => {
+  const bad = JSON.stringify({ assignment: { school_level: "중2", subject: "과학", genre: "설명문", target_char_count: 3.7, prompt_text: "화산의 형성을 설명하라" }, mode: "free" });
+  assert.equal(parseSetup(bad), null);
+});
