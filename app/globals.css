@@ -159,10 +159,12 @@
   --fg-subtle: oklch(0.55 0.012 265);     /* tertiary 텍스트 */
   --border: oklch(0.33 0.014 260);        /* 카드 경계 */
   --muted: oklch(0.27 0.014 260);         /* 약한 강조 배경 */
-  /* 색 의미 확정(스펙 §6): primary=행동(blue). 다크 navy 배경에서 #0362da는 대비가 약해
-     밝은 블루(--pb-5 #1f89f5)로 올리고 흰 텍스트로 AA 확보(역전 화이트 폐기). */
-  --primary: var(--pb-5);
-  --primary-fg: oklch(0.99 0 0);
+  /* 색 의미 확정(스펙 §6): primary=행동(blue). 다크 navy 배경에선 진한 #0362da+흰 텍스트가
+     버튼 가독(3.5:1, AA-large only)·버튼-배경 대비(~2.6:1) 모두 약하다. 라이트 블루(--pb-3
+     #9fc8ff) 면 + 짙은 잉크 텍스트로 역전 → on-primary 텍스트 ~9:1·버튼/navy 대비 ~9:1 (AA).
+     모든 bg-primary 버튼이 text-primary-foreground와 짝이라 안전. */
+  --primary: var(--pb-3);
+  --primary-fg: oklch(0.2 0.02 260);
 
   /* 점수 밴드 — 다크 배경에서 가독성 위해 chroma↑, lightness 유지 */
   --band-good: oklch(0.74 0.18 162);
