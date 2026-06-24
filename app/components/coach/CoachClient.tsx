@@ -26,6 +26,8 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { CoachNudge, CoachOutput } from "@/app/lib/coach-schema";
 import type { AreaName } from "@/app/data/scoring";
+import type { RichEditorHandle } from "@/app/components/editor/RichEditor";
+import { plainToHtml } from "@/app/lib/editor-doc";
 import { validateCoachOutput } from "@/app/lib/coach-schema";
 import { topNudge } from "@/app/lib/nudge-priority";
 import { AREAS } from "@/app/lib/grading";
@@ -79,9 +81,24 @@ const WHY_BY_AREA: Partial<Record<AreaName, string>> = {
 // ── localStorage 키 (공유 계약) ─────────────────────────────────────
 //   세션: 코치 루프 전체 궤적(클라 영속, MVP). 과정로그: 교사 /teacher/log가 읽음.
 //   루브릭: 교사 /teacher/rubric이 씀(EPIC5) — 여기선 읽기만.
+//   body_html: 리치 서식 HTML 별도 영속(캔버스 리치 에디터용, reducer 외부).
 const SESSION_KEY = "pwc-coach-session-v1";
 const PROCESS_LOG_KEY = "pwc-process-log-v1";
 const TEACHER_RUBRIC_KEY = "pwc-teacher-rubric-v1";
+const BODY_HTML_KEY = "pwc-coach-body-html-v1";
+
+function loadBodyHtml(): string {
+  if (typeof window === "undefined") return "";
+  try { return window.localStorage.getItem(BODY_HTML_KEY) ?? ""; } catch { return ""; }
+}
+function saveBodyHtml(h: string): void {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(BODY_HTML_KEY, h); } catch {}
+}
+function clearBodyHtml(): void {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.removeItem(BODY_HTML_KEY); } catch {}
+}
 
 // ── 상태머신 ────────────────────────────────────────────────────────
 type Phase =
@@ -480,7 +497,9 @@ export default function CoachClient({
   const [currentNudge, setCurrentNudge] = useState<CoachNudge | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(false); // nudge/growth open↔peek 토글
   const [outlineCollapsed, setOutlineCollapsed] = useState(false); // outline 패널 접기(로컬 UI state)
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [bodyHtml, setBodyHtml] = useState(""); // 리치 에디터 HTML(reducer 외부 — body는 계속 평문)
+  const [coachSpellcheck, setCoachSpellcheck] = useState(false);
+  const editorRef = useRef<RichEditorHandle>(null);
 
   // 라이브 세션(순수 CoachSession 모델) — 반복 갱신은 항상 새 객체로 교체(불변). 부수효과는 영속 헬퍼.
   const sessionRef = useRef<CoachSession | null>(null);
@@ -518,6 +537,8 @@ export default function CoachClient({
         baseline: fromAreaScores(saved.baseline),
         revisions: Math.max(0, saved.draftHistory.length - 1),
       });
+      // 리치 HTML 복원(reducer 외부): 저장된 HTML이 있으면 우선 사용, 없으면 평문 → HTML 변환.
+      setBodyHtml(loadBodyHtml() || plainToHtml(lastDraft.body));
     } else if (saved) {
       clearSession();
       clearProcessLog();
@@ -653,6 +674,8 @@ export default function CoachClient({
     setCurrentNudge(null);
     setSheetExpanded(false);
     setOutlineCollapsed(false); // 새 라운드는 개요 패널 다시 열림
+    setBodyHtml("");
+    clearBodyHtml();
     // 라이브 세션·과정 로그도 초기화(새 라운드는 깨끗한 궤적에서 시작).
     sessionRef.current = null;
     clearSession();
@@ -752,10 +775,12 @@ export default function CoachClient({
 
           {/* 캔버스 */}
           <Canvas
-            value={state.body}
-            onChange={(b) => dispatch({ type: "EDIT", body: b })}
+            valueHtml={bodyHtml}
+            onChange={({ html, text }) => { setBodyHtml(html); saveBodyHtml(html); dispatch({ type: "EDIT", body: text }); }}
             disabled={busy || state.phase === "done"}
-            textareaRef={textareaRef}
+            spellcheck={coachSpellcheck}
+            onToggleSpellcheck={() => setCoachSpellcheck((v) => !v)}
+            editorRef={editorRef}
           />
 
           {/* 가이드 패널 — mode=guide + write 단계일 때만. 직교 패널(reducer 무수정). */}
@@ -772,7 +797,7 @@ export default function CoachClient({
                 genre={assignment.genre}
                 onStartBody={() => {
                   setOutlineCollapsed(true);
-                  textareaRef.current?.focus();
+                  editorRef.current?.focus();
                 }}
               />
             </div>
