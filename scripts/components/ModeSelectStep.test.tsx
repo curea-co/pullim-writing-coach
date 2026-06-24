@@ -20,13 +20,21 @@ describe("ModeSelectStep", () => {
     expect(onSelect).toHaveBeenCalledWith("free");
   });
 
-  it("개요/말하기 카드는 비활성(클릭해도 onSelect 미호출)", async () => {
+  it("개요 카드는 활성(클릭 시 onSelect('outline') 호출)", async () => {
     const onSelect = vi.fn();
     const user = userEvent.setup();
     render(<ModeSelectStep onSelect={onSelect} onBack={() => {}} />);
-    expect(screen.getByTestId("mode-outline")).toBeDisabled();
-    expect(screen.getByTestId("mode-voice")).toBeDisabled();
+    expect(screen.getByTestId("mode-outline")).not.toBeDisabled();
     await user.click(screen.getByTestId("mode-outline"));
+    expect(onSelect).toHaveBeenCalledWith("outline");
+  });
+
+  it("말하기 카드는 비활성(클릭해도 onSelect 미호출)", async () => {
+    const onSelect = vi.fn();
+    const user = userEvent.setup();
+    render(<ModeSelectStep onSelect={onSelect} onBack={() => {}} />);
+    expect(screen.getByTestId("mode-voice")).toBeDisabled();
+    await user.click(screen.getByTestId("mode-voice"));
     expect(onSelect).not.toHaveBeenCalled();
   });
 });

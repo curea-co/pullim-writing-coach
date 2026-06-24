@@ -25,8 +25,8 @@ export type CoachAssignment = {
 
 export type CoachSetup = { assignment: CoachAssignment; mode: WritingMode };
 
-// 이번 물결에 실제 동작하는 모드 화이트리스트. outline/voice는 카드 '준비 중'(비활성).
-const ENABLED_MODES: readonly WritingMode[] = ["free", "guide"];
+// 이번 물결에 실제 동작하는 모드 화이트리스트. voice는 카드 '준비 중'(비활성).
+const ENABLED_MODES: readonly WritingMode[] = ["free", "guide", "outline"];
 /** 형태 가드용 전체 모드 화이트리스트 — 활성화 여부가 아님(활성화는 isModeEnabled/ENABLED_MODES). */
 export const ALL_MODES: readonly WritingMode[] = ["free", "guide", "outline", "voice"];
 
