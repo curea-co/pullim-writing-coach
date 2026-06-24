@@ -778,6 +778,19 @@ export default function CoachClient({
             </div>
           )}
 
+          {/* 접은 뒤 재오픈 affordance — '개요를 계속 참고하며 쓰기'를 보장(한 번 보고 숨김 회귀 방지). */}
+          {mode === "outline" && state.phase === "write" && outlineCollapsed && (
+            <div className="px-[18px] pb-2">
+              <button
+                type="button"
+                onClick={() => setOutlineCollapsed(false)}
+                className="text-subtle-foreground hover:text-foreground text-xs underline underline-offset-2"
+              >
+                개요 다시 보기
+              </button>
+            </div>
+          )}
+
           {/* 바텀시트 */}
           <BottomSheet
             position={sheetPosition}
