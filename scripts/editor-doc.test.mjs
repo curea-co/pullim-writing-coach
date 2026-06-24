@@ -24,6 +24,14 @@ test("HTML 엔티티 디코드", () => {
   assert.equal(htmlToPlain("<p>&lt;태그&gt; &amp; 기호</p>"), "<태그> & 기호");
 });
 
+test("숫자·16진 엔티티 디코드(클립보드 HTML 대비)", () => {
+  assert.equal(htmlToPlain("<p>it&#x27;s &#39;ok&#39;</p>"), "it's 'ok'");
+  assert.equal(htmlToPlain("<p>A&#66;C</p>"), "ABC"); // &#66; = B
+  assert.equal(htmlToPlain("<p>&#xAC00;</p>"), "가"); // 16진 한글
+  // 알 수 없는 엔티티는 원문 보존
+  assert.equal(htmlToPlain("<p>R&D &bogus;</p>"), "R&D &bogus;");
+});
+
 // plainToHtml 테스트
 test("plainToHtml: 빈 입력 → <p></p>", () => {
   assert.equal(plainToHtml(""), "<p></p>");

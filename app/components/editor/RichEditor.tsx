@@ -41,6 +41,7 @@ export default function RichEditor({
         strike: false,
         italic: false,
         horizontalRule: false,
+        hardBreak: false, // Shift+Enter <br> 비활성 — 평문 왕복(\n↔<p>)에서 br→p 변환 불일치 제거(범위 밖)
       }),
       TextStyle,
       FontSize,

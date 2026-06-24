@@ -9,7 +9,24 @@ export function htmlToPlain(html: string): string {
     .replace(/<\/(p|h[1-6]|div|li)>/gi, "\x00")
     .replace(/<br\s*\/?>/gi, "\x00")
     .replace(/<[^>]+>/g, "");
-  const decoded = withSentinels.replace(/&[a-zA-Z#0-9]+;/g, (m) => ENTITIES[m] ?? m);
+  // 명명 엔티티(ENTITIES) + 숫자(&#NNN;)·16진(&#xHH;) 엔티티까지 디코드.
+  //   브라우저·클립보드 HTML이 &#x27;·&#160; 형태를 자주 내보내므로, 평문 단일 소스가 리터럴로 새지 않게 한다.
+  const decoded = withSentinels.replace(/&(#x[0-9a-fA-F]+|#\d+|[a-zA-Z]+);/g, (m, body: string) => {
+    if (ENTITIES[m] !== undefined) return ENTITIES[m];
+    if (body[0] === "#") {
+      const code =
+        body[1] === "x" || body[1] === "X" ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10);
+      if (Number.isFinite(code) && code >= 0 && code <= 0x10ffff) {
+        try {
+          return String.fromCodePoint(code);
+        } catch {
+          return m;
+        }
+      }
+      return m;
+    }
+    return m; // 알 수 없는 명명 엔티티는 원문 보존
+  });
   // 센티널로 분할 → 마지막 블록 종료 태그 뒤의 빈 아티팩트 요소만 제거 → "\n"으로 조인.
   // 내부·선행·후행 빈 요소(의도적 빈 문단)는 보존한다.
   const parts = decoded.split("\x00");
