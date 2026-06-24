@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Sidebar from "./components/Sidebar";
+import { AppShell } from "./components/app-shell";
 
 export const metadata: Metadata = {
   title: "Pullim Writing Coach — 데모",
@@ -35,11 +35,7 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-background text-foreground min-h-full">
-        {/* 데스크톱: 좌측 사이드바 + 콘텐츠 / 모바일: 상단바(Sidebar 내부) 아래 콘텐츠 */}
-        <div className="md:flex md:min-h-screen">
-          <Sidebar />
-          <div className="min-w-0 flex-1">{children}</div>
-        </div>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );
