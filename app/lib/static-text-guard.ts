@@ -32,13 +32,21 @@ const QUESTION_TAIL_RE = /(까요|을까|ㄹ까|나요|니|냐|래|볼래|볼까
 export function assertNoGeneration(strings: string[], label?: string): void {
   if (strings.length === 0) return;
 
-  const nudges = strings.map((s, i) => ({
-    paragraph_index: 0,
-    rubric_area: AREAS[0],
-    diagnosis: s,
-    guiding_question: "", // 질문칸 평서문 검사(#5)를 우회 — 빈 문자열은 length<10으로 통과
-    quick_win_rank: i + 1,
-  }));
+  // 각 문자열을 diagnosis 슬롯으로 위임 검사(질문칸 평서문 #5는 guiding_question="" length<10으로 우회).
+  //   추가로 물음표를 제거한 사본도 함께 넣는다 — listHandsOverContent(#4)는 문자열에 '?'가 있으면
+  //   통과시키므로, "…써볼까? 1) 화산은 위험하다 2) 대피가 필요하다" 같은 질문+목록 혼합 떠먹임이
+  //   '?' 때문에 빠져나가는 사각을 닫는다(가드 재구현 아님 — 입력만 보강해 동일 휴리스틱에 위임).
+  const nudges = strings.flatMap((s, i) => {
+    const base = {
+      paragraph_index: 0,
+      rubric_area: AREAS[0],
+      guiding_question: "",
+      quick_win_rank: i + 1,
+    };
+    const stripped = s.replace(/[?？]/g, " ");
+    const variants = stripped === s ? [s] : [s, stripped];
+    return variants.map((diagnosis) => ({ ...base, diagnosis }));
+  });
 
   const violations = checkGenerationBlock({ area_scores: [], nudges });
 

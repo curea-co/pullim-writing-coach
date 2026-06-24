@@ -9,20 +9,21 @@ import GuidePanel from "@/app/components/coach/GuidePanel";
 import { assertNoGeneration } from "@/app/lib/static-text-guard";
 
 describe("ModeSelectStep 카드 카피 — assertNoGeneration", () => {
-  it("4개 모드 카드의 렌더된 텍스트가 대필 신호 없음", () => {
-    render(<ModeSelectStep onSelect={() => {}} onBack={() => {}} />);
+  it("모드 카드 전체의 렌더된 텍스트가 대필 신호 없음", () => {
+    const { container } = render(<ModeSelectStep onSelect={() => {}} onBack={() => {}} />);
 
-    // 하드코딩 금지: 실제 렌더된 각 카드 노드의 텍스트(title+body+배지)를 DOM에서 수집한다.
-    //   카피가 나중에 대필성 문구로 바뀌면 이 가드가 자동으로 잡도록(회귀 가드 실효성).
-    const modes = ["free", "guide", "outline", "voice"] as const;
-    const cardTexts = modes.map((m) => screen.getByTestId(`mode-${m}`).textContent ?? "");
+    // 하드코딩 금지: data-testid="mode-*" 카드를 DOM에서 동적으로 전부 수집한다.
+    //   모드 ID를 고정 나열하면 새 카드가 추가돼도 검사 누락 → 회귀 가드가 무력. 접두 셀렉터로 전체 포착.
+    const cards = Array.from(container.querySelectorAll('[data-testid^="mode-"]'));
+    const cardTexts = cards.map((c) => c.textContent ?? "");
 
-    // 각 카드에 텍스트가 실제로 렌더됐는지(빈 노드 아님) 확인
+    // 현재 4개 모드(자유/가이드/개요/말하기) 이상이 렌더되고 각 카드에 텍스트가 있는지 확인
+    expect(cards.length).toBeGreaterThanOrEqual(4);
     for (const text of cardTexts) {
       expect(text.trim().length).toBeGreaterThan(0);
     }
 
-    // 대필 가드 — 실제 렌더된 카드 텍스트
+    // 대필 가드 — 실제 렌더된 카드 텍스트 전체
     assertNoGeneration(cardTexts, "ModeSelectStep 카드 전체(DOM)");
   });
 });
