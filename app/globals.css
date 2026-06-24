@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "./tokens/_base.css";
+@import "./tokens/pullim-os.css";
 
 /* 시맨틱 토큰 — fe-styling 기준(하드코딩 컬러 금지). 값은 데모용 근사치이며,
    apps/web 이관 시 @pullim/design-system 토큰으로 대체한다.
@@ -122,17 +124,15 @@
 /* 라이트(기본) — :root와 [data-theme="light"] 둘 다 적용. */
 :root,
 :root[data-theme="light"] {
-  --bg: oklch(0.985 0 0);
-  --surface: oklch(1 0 0);
-  --fg: oklch(0.21 0.006 285.9);
-  --fg-muted: oklch(0.55 0.014 285.9);
-  --fg-subtle: oklch(0.7 0.014 285.9);
-  --border: oklch(0.92 0.004 286.3);
-  --muted: oklch(0.967 0.001 286.4);
-  /* 색 의미 확정(스펙 §6): primary=행동(blue). 구 green CTA에서 blue로 재매핑.
-     단일 출처 유지 위해 브랜드 락 --pullim-blue 참조. 흰 텍스트가 파랑 위에 읽힘. */
-  --primary: var(--pullim-blue);
-  --primary-fg: oklch(0.985 0 0);
+  --bg: var(--surface-canvas);
+  --surface: var(--surface-raised);
+  --fg: var(--text-primary);
+  --fg-muted: var(--text-secondary);
+  --fg-subtle: var(--text-tertiary);
+  --border: var(--border-default);
+  --muted: var(--surface-sunken);
+  --primary: var(--color-primary-600);
+  --primary-fg: #ffffff;
 
   --band-good: oklch(0.7 0.15 162);
   --band-good-fg: oklch(0.5 0.13 162);

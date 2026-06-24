@@ -1,10 +1,16 @@
 import Link from "next/link";
-import CtaBand from "./components/CtaBand";
 import HomeWelcomeBanner from "./components/HomeWelcomeBanner";
+import { ServiceHero } from "@/components/ui/service-hero";
+import { ServiceIcon } from "@/components/ui/service-icon";
+import { SectionHead } from "@/components/ui/section-head";
+import { ServiceTile } from "@/components/ui/service-tile";
+import { StatCard, Card, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
-// 홈 리뉴얼(2026-06-02) — qanda.ai/ko 톤 참고 medium depth.
-//   Hero(헤드라인 + CTA) → Bento(4-up 기능 시각화) → 통계(4가지 지표) → Closing CTA.
-//   학생 글 샘플 5종 카드는 /samples 인덱스로 분리, 여기는 진입 버튼만.
+// 대시보드 홈(2026-06-24) — OS/classbot 스타일 재편.
+//   ServiceHero → HomeWelcomeBanner → 바로 시작(ServiceTile 4-up)
+//   → 한눈에(StatCard 4-up) → 어떻게 채점하나요(Card+FeatureVisual 4-up) + disclaimer
+//   → 닫는 CTA → CtaBand
 
 // Bento 4-up — 5영역 채점 / 코칭 톤 / 1분 채점 / 점수대 시연.
 const FEATURES = [
@@ -30,7 +36,7 @@ const FEATURES = [
   },
 ] as const;
 
-// 통계 — qanda 그래프 자리 대체. 우리는 데모라서 핵심 지표 4가지.
+// 통계 — 핵심 지표 4가지.
 const STATS = [
   { value: "5", unit: "영역", label: "루브릭 기준" },
   { value: "100", unit: "점 만점", label: "총점 환산" },
@@ -38,108 +44,114 @@ const STATS = [
   { value: "5", unit: "케이스", label: "점수대 샘플" },
 ];
 
+// 바로 시작 타일
+const TILES = [
+  {
+    title: "직접 채점받기",
+    description: "글 붙여넣고 1분 안에 5영역 채점·첨삭",
+    href: "/try",
+    cta: "실시간",
+  },
+  {
+    title: "과정 코치",
+    description: "개요→본문 단계별 코칭",
+    href: "/coach",
+    cta: "베타",
+  },
+  {
+    title: "샘플 채점 결과",
+    description: "점수대 5케이스 미리보기",
+    href: "/samples",
+  },
+  {
+    title: "채점 결과 조회",
+    description: "저장된 채점 결과 다시 보기",
+    href: "/results",
+  },
+];
+
 export default function Home() {
   return (
-    <main className="mx-auto w-full max-w-5xl px-5 py-10 md:py-16">
-      {/* Hero — 큰 헤드라인 + 부제 + 두 CTA(직접 채점 / 샘플 보기). */}
-      <header className="mb-12 md:mb-16">
-        <div className="mb-3 flex items-center gap-2">
-          <span className="bg-accent-mid-surface text-accent-mid inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold">
-            데모 · Week 1 산출물
-          </span>
-          <span className="text-subtle-foreground text-xs">rubric v0.5</span>
-        </div>
-        <h1 className="text-foreground break-keep text-3xl font-bold tracking-tight md:text-5xl md:leading-tight">
-          수행평가 글, AI가 5가지 기준으로
-          <br />
-          <span className="text-accent-mid">첨삭해 드려요.</span>
-        </h1>
-        <p className="text-muted-foreground break-keep mt-5 text-base leading-relaxed md:text-lg">
-          학생이 쓴 글을 1분 안에 5영역으로 채점하고, 잘한 점·고칠 점·수정 가이드를 코칭
-          말투로 보여줘요. PDF·스크린샷으로 저장해 선생님과 공유할 수 있어요.
-        </p>
-        <div className="mt-7 flex flex-wrap items-center gap-3">
+    <main className="mx-auto w-full max-w-5xl px-5 py-10 md:py-12">
+      {/* 1. ServiceHero */}
+      <ServiceHero
+        icon={<ServiceIcon name="writing" size={56} />}
+        title="라이팅 코치"
+        tagline="학생이 쓴 글을 1분 안에 5영역으로 채점하고, 잘한 점·고칠 점·수정 가이드를 코칭 말투로 보여줘요."
+        badges={<Badge intent="primary">데모 · Week 1</Badge>}
+        cta={
           <Link
             href="/try"
             className="inline-flex items-center justify-center rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90"
           >
             직접 채점받기 →
           </Link>
-          <Link
-            href="/samples"
-            className="border-border text-foreground hover:bg-muted inline-flex items-center justify-center rounded-lg border px-5 py-3 text-sm font-semibold transition"
-          >
-            샘플 5종 보기
-          </Link>
-        </div>
-      </header>
+        }
+      />
 
-      {/* 개인화 배너 — hero 직후. CtaBand는 floating fixed라 페이지 맨 끝에서 호출. */}
+      {/* 2. 개인화 배너 — 프로필 인지 기능 보존, storage 로직 무수정 */}
       <HomeWelcomeBanner />
 
-      {/* Bento 4-up — 기능 시각화. qanda 'bento card' 톤. */}
-      <section className="mt-14">
-        <div className="mb-6">
-          <p className="text-accent-mid text-xs font-semibold tracking-wider uppercase">
-            How it works
-          </p>
-          <h2 className="text-foreground break-keep mt-2 text-2xl font-bold md:text-3xl">
-            이 데모가 보여 주는 것
-          </h2>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {FEATURES.map((f, i) => (
-            <article
-              key={f.title}
-              className="border-border bg-surface relative flex flex-col overflow-hidden rounded-2xl border p-6 md:p-7"
-            >
-              <div className="text-subtle-foreground mb-3 text-xs font-semibold tabular-nums">
-                {String(i + 1).padStart(2, "0")}
-              </div>
-              <h3 className="text-foreground break-keep text-base font-semibold md:text-lg">
-                {f.title}
-              </h3>
-              <p className="text-muted-foreground break-keep mt-2 text-sm leading-relaxed">
-                {f.body}
-              </p>
-              <div className="mt-5 flex-1">
-                <FeatureVisual kind={f.visual} />
-              </div>
-            </article>
-          ))}
-        </div>
-        <p className="bg-muted text-muted-foreground mt-5 rounded-md px-3 py-2 text-xs">
-          ※ 이 채점은 AI 자동 채점입니다. 학교 교사의 실제 채점과 다를 수 있습니다.
-        </p>
-      </section>
+      {/* 3. 바로 시작 — ServiceTile 2×2 그리드 */}
+      <SectionHead title="바로 시작" />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {TILES.map((tile) => (
+          <ServiceTile
+            key={tile.href}
+            title={tile.title}
+            description={tile.description}
+            href={tile.href}
+            cta={tile.cta}
+          />
+        ))}
+      </div>
 
-      {/* 통계 — 4가지 핵심 지표. qanda '학습 효과' 자리. */}
-      <section className="mt-14">
-        <div className="border-border bg-surface grid gap-6 rounded-2xl border p-8 sm:grid-cols-4 md:p-10">
-          {STATS.map((s) => (
-            <div key={s.label} className="text-center">
-              <div className="text-foreground text-3xl font-bold tabular-nums md:text-4xl">
+      {/* 4. 한눈에 — StatCard 4-up */}
+      <SectionHead title="한눈에" />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {STATS.map((s) => (
+          <StatCard
+            key={s.label}
+            label={s.label}
+            value={
+              <>
                 {s.value}
-                <span className="text-muted-foreground ml-1 text-base font-medium">
+                <span className="ml-1 text-[length:var(--text-base)] font-medium text-[var(--text-secondary)]">
                   {s.unit}
                 </span>
-              </div>
-              <div className="text-muted-foreground mt-2 text-xs md:text-sm">{s.label}</div>
-            </div>
-          ))}
-        </div>
-      </section>
+              </>
+            }
+          />
+        ))}
+      </div>
 
-      {/* Closing CTA */}
-      <section className="mt-14 mb-4">
-        <div className="border-border bg-surface flex flex-col items-center gap-4 rounded-2xl border p-8 text-center md:p-12">
-          <h2 className="text-foreground break-keep text-xl font-bold md:text-2xl">
+      {/* 5. 어떻게 채점하나요 — Card+FeatureVisual 4-up + disclaimer */}
+      <SectionHead title="어떻게 채점하나요" />
+      <div className="grid gap-4 sm:grid-cols-2">
+        {FEATURES.map((f) => (
+          <Card key={f.title} className="flex flex-col">
+            <CardTitle className="mb-2">{f.title}</CardTitle>
+            <CardDescription className="mb-5">{f.body}</CardDescription>
+            <div className="mt-auto">
+              <FeatureVisual kind={f.visual} />
+            </div>
+          </Card>
+        ))}
+      </div>
+      <p className="bg-muted text-muted-foreground mt-5 rounded-md px-3 py-2 text-xs">
+        ※ 이 채점은 AI 자동 채점입니다. 학교 교사의 실제 채점과 다를 수 있습니다.
+      </p>
+
+      {/* 6. 닫는 CTA */}
+      <div className="mt-8 mb-4">
+        <Card className="flex flex-col items-center gap-4 p-8 text-center md:p-12">
+          <CardTitle className="break-keep text-xl md:text-2xl">
             지금 글을 가지고 있다면, 바로 채점받아 보세요.
-          </h2>
-          <p className="text-muted-foreground break-keep max-w-xl text-sm leading-relaxed">
-            본문을 붙여넣고 학년·과목만 알려주시면 1분 안에 채점·첨삭·수정 가이드까지
-            받아볼 수 있어요. 결과는 PDF로 저장해 선생님과 공유하기 좋아요.
-          </p>
+          </CardTitle>
+          <CardDescription className="max-w-xl text-sm">
+            본문을 붙여넣고 학년·과목만 알려주시면 1분 안에 채점·첨삭·수정 가이드까지 받아볼 수 있어요.
+            결과는 PDF로 저장해 선생님과 공유하기 좋아요.
+          </CardDescription>
           <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
             <Link
               href="/try"
@@ -154,17 +166,17 @@ export default function Home() {
               서비스 소개 더 보기
             </Link>
           </div>
-        </div>
-      </section>
+        </Card>
+      </div>
 
       {/* Floating CTA — 페이지 마지막에 호출해야 spacer가 페이지 끝에 들어가 fixed bar가
           마지막 콘텐츠를 가리지 않음(Codex PR #66 정정). */}
-      <CtaBand />
     </main>
   );
 }
 
 // Bento 카드 안 4종 시각화 — 텍스트만으로 보여주기 부족한 부분을 작은 mini-viz로.
+// 도메인 토큰(--band-*/--accent-*) 유지.
 function FeatureVisual({ kind }: { kind: (typeof FEATURES)[number]["visual"] }) {
   if (kind === "rubric") {
     // 5영역 점수 막대 mini
@@ -237,7 +249,10 @@ function FeatureVisual({ kind }: { kind: (typeof FEATURES)[number]["visual"] }) 
   return (
     <div className="space-y-1.5">
       {cases.map((c) => (
-        <div key={c.label} className={`${c.cls} flex items-center justify-between rounded-md px-3 py-1.5 text-[11px] font-semibold`}>
+        <div
+          key={c.label}
+          className={`${c.cls} flex items-center justify-between rounded-md px-3 py-1.5 text-[11px] font-semibold`}
+        >
           <span>{c.label}</span>
           <span className="tabular-nums">{c.score} / 100</span>
         </div>
