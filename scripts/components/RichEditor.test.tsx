@@ -51,14 +51,14 @@ describe("RichEditor", () => {
   });
 
   it("disabled=true일 때 툴바 버튼들이 disabled 상태이다", () => {
-    render(<RichEditor valueHtml="" onChange={() => {}} disabled={true} />);
+    const toggle = vi.fn();
+    render(<RichEditor valueHtml="" onChange={() => {}} disabled={true} onToggleSpellcheck={toggle} spellcheck={false} />);
     const toolbar = screen.queryByRole("toolbar", { name: "서식 도구" });
     if (!toolbar) {
       // jsdom에서 TipTap 초기화 미완 — mount-only assertion
       return;
     }
     const buttons = screen.getAllByRole("button", { hidden: false });
-    // 맞춤법 표시 버튼은 onToggleSpellcheck prop이 없으면 렌더 안 됨.
     // 서식 버튼(제목1, 제목2, 볼드)은 모두 disabled=true여야 함.
     const formattingButtons = buttons.filter((b) =>
       ["제목1", "제목2", "볼드"].includes(b.textContent ?? "")
@@ -70,6 +70,11 @@ describe("RichEditor", () => {
     const select = screen.queryByRole("combobox", { name: "폰트 크기" });
     if (select) {
       expect(select).toBeDisabled();
+    }
+    // Bug 2 fix: 맞춤법 표시 버튼도 disabled=true여야 함
+    const spellBtn = screen.queryByRole("button", { name: "맞춤법 표시" });
+    if (spellBtn) {
+      expect(spellBtn).toBeDisabled();
     }
   });
 
@@ -101,5 +106,29 @@ describe("RichEditor", () => {
       // eslint-disable-next-line no-console
       console.info("[RichEditor] valueHtml rerender completed without error. Content sync verified by e2e.");
     }
+  });
+
+  it("맞춤법 표시 버튼이 disabled=true일 때 disabled 상태이다 (Bug 2 회귀 방지)", () => {
+    const toggle = vi.fn();
+    render(<RichEditor valueHtml="" onChange={() => {}} disabled={true} onToggleSpellcheck={toggle} spellcheck={false} />);
+    const toolbar = screen.queryByRole("toolbar", { name: "서식 도구" });
+    if (!toolbar) {
+      // jsdom에서 TipTap 초기화 미완 — mount-only assertion
+      return;
+    }
+    const spellBtn = screen.queryByRole("button", { name: "맞춤법 표시" });
+    if (spellBtn) {
+      expect(spellBtn).toBeDisabled();
+    }
+  });
+
+  it("툴바 선택 상태 반응성: useEditorState 구독으로 마운트 시 throw 없음 (Bug 1 회귀 방지)", () => {
+    // jsdom에서는 ProseMirror DOM 이벤트를 실제로 발화해 커서를 이동시키는 것이
+    // 불가능하므로, 실제 selection 변화에 따른 버튼 active 상태 갱신은
+    // e2e (T5 Playwright)에서 검증한다. 여기서는 useEditorState를 사용한 EditorToolbar가
+    // 마운트 시 throw 없이 정상 렌더됨을 보증한다.
+    expect(() =>
+      render(<RichEditor valueHtml="<p>테스트</p>" onChange={() => {}} />)
+    ).not.toThrow();
   });
 });
