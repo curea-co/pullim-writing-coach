@@ -29,11 +29,14 @@ describe("ModeSelectStep 카드 카피 — assertNoGeneration", () => {
 });
 
 describe("GuidePanel placeholder — assertNoGeneration", () => {
-  it("textarea placeholder가 대필 신호 없음", () => {
+  it("모든 메모 textarea placeholder가 대필 신호 없음", () => {
     render(<GuidePanel genre="설명문" />);
-    const placeholders = screen.getAllByPlaceholderText(/네 생각을 한 줄로/).map(
-      (el) => (el as HTMLTextAreaElement).placeholder
-    );
+    // 현재 안전 문구로 필터링하지 않는다: 모든 textarea의 placeholder를 수집해야
+    //   일부 카드 placeholder만 대필성 문구로 바뀌어도 가드가 잡는다(회귀 가드 실효).
+    const placeholders = screen
+      .getAllByRole("textbox")
+      .map((el) => (el as HTMLTextAreaElement).placeholder)
+      .filter((p) => p.trim().length > 0);
     expect(placeholders.length).toBeGreaterThan(0);
     assertNoGeneration(placeholders, "GuidePanel placeholder");
   });
