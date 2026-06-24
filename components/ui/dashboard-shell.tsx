@@ -64,7 +64,8 @@ export function DashboardShell({
             {rail}
           </aside>
         )}
-        <main className="min-w-0 flex-1 px-6 py-8 pb-24 md:pb-8">{children}</main>
+        {/* div, not <main>: consumer pages own their <main> landmark (avoid nested main). */}
+        <div className="min-w-0 flex-1 px-6 py-8 pb-24 md:pb-8">{children}</div>
       </div>
       {tabbarNode}
     </div>

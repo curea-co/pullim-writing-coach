@@ -1,5 +1,4 @@
 import Link from "next/link";
-import CtaBand from "./components/CtaBand";
 import HomeWelcomeBanner from "./components/HomeWelcomeBanner";
 import { ServiceHero } from "@/components/ui/service-hero";
 import { ServiceIcon } from "@/components/ui/service-icon";
@@ -172,7 +171,6 @@ export default function Home() {
 
       {/* Floating CTA — 페이지 마지막에 호출해야 spacer가 페이지 끝에 들어가 fixed bar가
           마지막 콘텐츠를 가리지 않음(Codex PR #66 정정). */}
-      <CtaBand />
     </main>
   );
 }
