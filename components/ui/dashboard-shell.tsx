@@ -1,4 +1,5 @@
 import * as React from "react";
+import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { OsTabbar, type TabbarItem } from "./os-tabbar";
 
@@ -27,7 +28,7 @@ function Brand({ brand }: { brand: BrandProp }) {
   if (!isBrandObject(brand)) return <>{brand}</>;
   const { logo, title, sub, href = "/" } = brand;
   return (
-    <a href={href} className="flex items-center gap-2 text-[var(--text-primary)] no-underline">
+    <Link href={href} className="flex items-center gap-2 text-[var(--text-primary)] no-underline">
       {logo}
       <span className="text-[15px] font-extrabold tracking-[-.02em]">{title}</span>
       {sub && (
@@ -35,7 +36,7 @@ function Brand({ brand }: { brand: BrandProp }) {
           {sub}
         </span>
       )}
-    </a>
+    </Link>
   );
 }
 

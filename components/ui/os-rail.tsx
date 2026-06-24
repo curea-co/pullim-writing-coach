@@ -1,4 +1,5 @@
 import * as React from "react";
+import Link from "next/link";
 import { cn } from "@/lib/cn";
 
 export interface RailItem {
@@ -24,7 +25,7 @@ export function OsRail({ head, items, className }: OsRailProps) {
         {head}
       </div>
       {items.map((item) => (
-        <a
+        <Link
           key={item.href + item.label}
           href={item.href}
           aria-current={item.active ? "page" : undefined}
@@ -38,7 +39,7 @@ export function OsRail({ head, items, className }: OsRailProps) {
         >
           {item.icon}
           {item.label}
-        </a>
+        </Link>
       ))}
     </nav>
   );

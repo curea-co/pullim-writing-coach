@@ -1,4 +1,5 @@
 import * as React from "react";
+import Link from "next/link";
 import { cn } from "@/lib/cn";
 
 export interface ServiceTileProps {
@@ -20,18 +21,16 @@ export function ServiceTile({
   soon = false,
   className,
 }: ServiceTileProps) {
-  return (
-    <a
-      href={soon ? undefined : href}
-      aria-disabled={soon || undefined}
-      className={cn(
-        "group relative flex min-h-[188px] flex-col overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border-default)] bg-[var(--surface-raised)] p-[22px] text-inherit no-underline transition-transform duration-200",
-        soon
-          ? "pointer-events-none bg-[var(--surface-sunken)]"
-          : "hover:-translate-y-1 hover:border-transparent hover:shadow-[var(--shadow-lg)]",
-        className,
-      )}
-    >
+  const sharedClassName = cn(
+    "group relative flex min-h-[188px] flex-col overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border-default)] bg-[var(--surface-raised)] p-[22px] text-inherit no-underline transition-transform duration-200",
+    soon
+      ? "pointer-events-none bg-[var(--surface-sunken)]"
+      : "hover:-translate-y-1 hover:border-transparent hover:shadow-[var(--shadow-lg)]",
+    className,
+  );
+
+  const content = (
+    <>
       <span
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-[.12]"
@@ -67,6 +66,20 @@ export function ServiceTile({
           →
         </span>
       </div>
-    </a>
+    </>
+  );
+
+  if (soon) {
+    return (
+      <div className={sharedClassName} aria-disabled="true">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Link href={href} className={sharedClassName}>
+      {content}
+    </Link>
   );
 }

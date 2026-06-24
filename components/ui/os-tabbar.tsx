@@ -1,4 +1,5 @@
 import * as React from "react";
+import Link from "next/link";
 import { cn } from "@/lib/cn";
 
 export interface TabbarItem {
@@ -23,7 +24,7 @@ export function OsTabbar({ items, className }: OsTabbarProps) {
       )}
     >
       {items.map((item) => (
-        <a
+        <Link
           key={item.href + item.label}
           href={item.href}
           aria-current={item.active ? "page" : undefined}
@@ -35,7 +36,7 @@ export function OsTabbar({ items, className }: OsTabbarProps) {
         >
           {item.icon}
           {item.label}
-        </a>
+        </Link>
       ))}
     </nav>
   );
