@@ -19,7 +19,6 @@ describe("RichEditor", () => {
     // TipTap이 jsdom에서 정상 마운트된 경우 툴바와 텍스트도 확인
     const toolbar = screen.queryByRole("toolbar", { name: "서식 도구" });
     const boldBtn = screen.queryByRole("button", { name: "볼드" });
-    const text = screen.queryByText("안녕");
 
     if (toolbar) {
       // 에디터가 완전히 마운트된 경우 — 전체 검증

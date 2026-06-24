@@ -41,7 +41,7 @@ export default function RichEditor({
     },
   });
 
-  useImperativeHandle(editorRef, () => ({ focus: () => editor?.commands.focus() }), [editor]);
+  useImperativeHandle(editorRef, () => ({ focus: () => editor?.commands.focus() }), [editor, editorRef]);
 
   // disabled prop 변화 반영 — 렌더 중 뮤테이션 방지, useEffect로 처리.
   useEffect(() => {
@@ -50,10 +50,17 @@ export default function RichEditor({
     }
   }, [editor, disabled]);
 
+  // spellcheck prop 변화를 contenteditable DOM에 반영 (초기 속성은 editorProps에서도 설정).
+  useEffect(() => {
+    if (!editor) return;
+    const dom = editor.view?.dom as HTMLElement | undefined;
+    if (dom) dom.setAttribute("spellcheck", spellcheck ? "true" : "false");
+  }, [editor, spellcheck]);
+
   return (
     <div className="border-border bg-background rounded-lg border">
       <EditorToolbar editor={editor} spellcheck={spellcheck} onToggleSpellcheck={onToggleSpellcheck} />
-      <EditorContent editor={editor} aria-label={ariaLabel} />
+      <EditorContent editor={editor} />
       {placeholder && editor?.isEmpty ? (
         <div className="text-subtle-foreground pointer-events-none -mt-9 px-3 text-sm" aria-hidden>{placeholder}</div>
       ) : null}
