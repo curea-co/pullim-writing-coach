@@ -29,7 +29,7 @@ function saveMemos(m: Record<string, string>): void {
   }
 }
 
-export default function OutlinePanel({ genre }: { genre: string }) {
+export default function OutlinePanel({ genre, onStartBody }: { genre: string; onStartBody?: () => void }) {
   const questions = outlinePromptsFor(genre);
   const [memos, setMemos] = useState<Record<string, string>>({});
 
@@ -63,6 +63,15 @@ export default function OutlinePanel({ genre }: { genre: string }) {
           </li>
         ))}
       </ul>
+      {onStartBody && (
+        <button
+          type="button"
+          onClick={onStartBody}
+          className="border-border bg-surface text-foreground hover:bg-muted mt-3 w-full rounded-lg border px-3 py-2 text-sm font-medium"
+        >
+          이제 본문 쓰기 →
+        </button>
+      )}
     </section>
   );
 }
