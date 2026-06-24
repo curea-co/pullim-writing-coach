@@ -493,8 +493,15 @@ export default function CoachClient({
 
     const saved = loadSession();
     // 다른 과제의 세션이 남아 있으면 복원하지 않는다(curea-review-ai 지적): 새 과제 헤더 아래로
-    // 이전 글·점수가 되살아나는 혼선 방지. prompt_text가 다르면 stale로 보고 세션·과정 로그를 정리.
-    if (saved && saved.assignment?.prompt_text === assignment.prompt_text) {
+    // 이전 글·점수가 되살아나는 혼선 방지. 과제 식별 4필드(학년·과목·장르·과제문)가 모두 같아야 동일 과제로 본다.
+    const sa = saved?.assignment;
+    const sameAssignment =
+      !!sa &&
+      sa.school_level === assignment.school_level &&
+      sa.subject === assignment.subject &&
+      sa.genre === assignment.genre &&
+      sa.prompt_text === assignment.prompt_text;
+    if (saved && sameAssignment) {
       sessionRef.current = saved;
       const lastDraft = saved.draftHistory[saved.draftHistory.length - 1];
       // 본문·점수·기준선·회차를 write 단계로 복원(다음 [봐줘]로 라이브 루프 재개).

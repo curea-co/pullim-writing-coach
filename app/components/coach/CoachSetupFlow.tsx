@@ -49,7 +49,9 @@ function loadAssignmentDraft(): CoachAssignment | null {
     if (typeof a !== "object" || a === null) return null;
     if (typeof a.school_level !== "string" || typeof a.subject !== "string") return null;
     if (typeof a.genre !== "string" || typeof a.prompt_text !== "string") return null;
-    return a as CoachAssignment;
+    // 코치는 목표 분량을 쓰지 않고 입력도 숨겼으므로(hideTarget), 손상·구버전 draft에 남은 값이
+    // validateAssignment를 막아 진행 불가가 되지 않도록 항상 null로 강제(curea-review-ai 지적).
+    return { ...(a as CoachAssignment), target_char_count: null };
   } catch {
     return null;
   }
