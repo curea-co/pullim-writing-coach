@@ -17,12 +17,7 @@ import * as Sentry from "@sentry/nextjs";
 import {
   ERROR_HTTP,
   type ErrorCode,
-  GENRES,
-  SCHOOL_LEVELS,
-  SUBJECTS,
-  charCount,
   errorEnvelope,
-  normalizeBody,
   parseModelJson,
 } from "@/app/lib/grading";
 import {
@@ -35,6 +30,7 @@ import { splitParagraphs } from "@/app/lib/paragraphs";
 import { prioritizeNudges } from "@/app/lib/nudge-priority";
 import { COACH_SYSTEM_PROMPT, buildCoachPrompt } from "@/app/lib/coach-prompt";
 import { runCoachMock } from "@/app/lib/coach-mock";
+import { validateCoachRequest } from "./request";
 
 // ── 비기능 요구 (score route 정합) ──────────────────────────────────
 export const runtime = "nodejs";
@@ -49,10 +45,6 @@ const MAX_TOKENS = 3000;
 const TEMPERATURE = 0.3;
 const TOTAL_BUDGET_MS = 55_000;
 const MIN_RETRY_BUDGET_MS = 8_000;
-
-// ── 본문 길이 정책 (코치는 "쓰는 중"이라 채점보다 하한이 낮다) ───────
-const COACH_BODY_MIN = 10; // 막 시작한 초안도 코치 가능. 빈 글만 막는다.
-const COACH_BODY_MAX = 4000; // 채점(2000)보다 여유 — 코치는 더 긴 초안도 본다.
 
 // ── 토큰 게이트 (score route isAuthorized 동일) ──────────────────────
 function timingSafeEqualStr(a: string, b: string): boolean {
@@ -136,78 +128,6 @@ function logMetric(event: string, extra: Record<string, unknown> = {}): void {
   console.warn(`[/api/coach][metric] ${JSON.stringify({ event, ...extra })}`);
 }
 
-// ── 코치 요청 검증 ───────────────────────────────────────────────────
-// 채점과 달리 target_char_count는 없고, rubric(선택)이 있으며, 본문 하한이 낮다(쓰는 중).
-type ValidatedCoachRequest = {
-  assignment: {
-    school_level: string;
-    subject: string;
-    genre: string;
-    target_char_count: null; // 코치는 분량 미사용 — 프롬프트 타입 정합용 null 고정
-    prompt_text: string;
-  };
-  rubricText?: string;
-  draft: string; // 정규화 후 본문
-};
-
-type CoachValidation =
-  | { ok: true; value: ValidatedCoachRequest }
-  | { ok: false; code: ErrorCode; message?: string };
-
-function isObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
-}
-
-function validateCoachRequest(raw: unknown): CoachValidation {
-  if (!isObject(raw)) return { ok: false, code: "E1" };
-  const assignment = raw.assignment;
-  const submission = raw.submission;
-  if (!isObject(assignment)) return { ok: false, code: "E1" };
-  if (!isObject(submission)) return { ok: false, code: "E1" };
-
-  const school = assignment.school_level;
-  const subject = assignment.subject;
-  const genre = assignment.genre;
-  const promptText = assignment.prompt_text;
-
-  if (typeof school !== "string" || !(SCHOOL_LEVELS as readonly string[]).includes(school))
-    return { ok: false, code: "E1", message: "학년을 선택해 주세요." };
-  if (typeof subject !== "string" || !(SUBJECTS as readonly string[]).includes(subject))
-    return { ok: false, code: "E1", message: "과목을 선택해 주세요." };
-  if (typeof genre !== "string" || !(GENRES as readonly string[]).includes(genre))
-    return { ok: false, code: "E1", message: "장르를 선택해 주세요." };
-  if (typeof promptText !== "string" || !promptText.trim())
-    return { ok: false, code: "E1", message: "과제문을 입력해 주세요." };
-
-  // rubric은 선택 — 문자열이 아니면 무시(타입만 좁혀 안전하게).
-  const rubricRaw = raw.rubric;
-  const rubricText =
-    typeof rubricRaw === "string" && rubricRaw.trim().length > 0 ? rubricRaw.trim() : undefined;
-
-  const rawBody = submission.body;
-  if (typeof rawBody !== "string") return { ok: false, code: "E1", message: "본문을 입력해 주세요." };
-
-  const draft = normalizeBody(rawBody);
-  const len = charCount(draft);
-  if (len < COACH_BODY_MIN) return { ok: false, code: "E2", message: "본문을 10자 이상 입력해 주세요." };
-  if (len > COACH_BODY_MAX) return { ok: false, code: "E3", message: "4,000자까지 코치할 수 있어요." };
-
-  return {
-    ok: true,
-    value: {
-      assignment: {
-        school_level: school,
-        subject,
-        genre,
-        target_char_count: null,
-        prompt_text: promptText.trim(),
-      },
-      rubricText,
-      draft,
-    },
-  };
-}
-
 // 가드 통과 출력에 prioritizeNudges 적용 후 200 응답.
 function respondCoach(output: CoachOutput): Response {
   const nudges = prioritizeNudges(output.nudges, output.area_scores);
@@ -233,7 +153,9 @@ export async function POST(req: Request): Promise<Response> {
       status: ERROR_HTTP[validated.code],
     });
   }
-  const { assignment, rubricText, draft } = validated.value;
+  const { assignment, rubricText, draft, mode } = validated.value;
+  // mode는 후속 슬라이스에서 사용(현재 무동작 — Wave2 Slice 1 no-op 배선)
+  void mode;
 
   // 문단 분해 + 연령/톤 프로필
   const paragraphs = splitParagraphs(draft);
