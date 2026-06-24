@@ -87,13 +87,26 @@ const PROCESS_LOG_KEY = "pwc-process-log-v1";
 const TEACHER_RUBRIC_KEY = "pwc-teacher-rubric-v1";
 const BODY_HTML_KEY = "pwc-coach-body-html-v1";
 
-function loadBodyHtml(): string {
-  if (typeof window === "undefined") return "";
-  try { return window.localStorage.getItem(BODY_HTML_KEY) ?? ""; } catch { return ""; }
+// 과제 서명: sameAssignment 4필드(school_level·subject·genre·prompt_text)와 동일 필드.
+// 다른 과제의 body_html이 현재 세션을 덮어쓰는 교차 오염 방지(Codex 리뷰).
+function assignmentSig(a: Pick<CoachAssignment, "school_level" | "subject" | "genre" | "prompt_text">): string {
+  return [a.school_level, a.subject, a.genre, a.prompt_text].join("\0");
 }
-function saveBodyHtml(h: string): void {
+
+function loadBodyHtml(): { sig: string; html: string } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(BODY_HTML_KEY);
+    if (!raw) return null;
+    const o = JSON.parse(raw) as { sig?: unknown; html?: unknown };
+    if (typeof o !== "object" || o === null) return null;
+    if (typeof o.sig !== "string" || typeof o.html !== "string") return null;
+    return { sig: o.sig, html: o.html };
+  } catch { return null; }
+}
+function saveBodyHtml(sig: string, html: string): void {
   if (typeof window === "undefined") return;
-  try { window.localStorage.setItem(BODY_HTML_KEY, h); } catch {}
+  try { window.localStorage.setItem(BODY_HTML_KEY, JSON.stringify({ sig, html })); } catch {}
 }
 function clearBodyHtml(): void {
   if (typeof window === "undefined") return;
@@ -537,14 +550,16 @@ export default function CoachClient({
         baseline: fromAreaScores(saved.baseline),
         revisions: Math.max(0, saved.draftHistory.length - 1),
       });
-      // 리치 HTML 복원(reducer 외부): 저장된 HTML이 있으면 우선 사용하되 state.body도 그 평문으로
-      // 재동기화(editor↔coach 불일치 방지). 없으면 평문 → HTML 변환(state.body는 RESTORE와 이미 동일).
-      const savedHtml = loadBodyHtml();
-      if (savedHtml) {
-        setBodyHtml(savedHtml);
-        dispatch({ type: "EDIT", body: htmlToPlain(savedHtml) }); // re-sync state.body to what the editor shows
+      // 리치 HTML 복원(reducer 외부): sig가 현재 과제와 일치하는 저장 HTML이 있으면 우선 사용하되
+      // state.body도 그 HTML의 평문으로 재동기화(editor↔coach 불일치 방지).
+      // sig 불일치(다른 과제 HTML) 또는 미저장 → 세션 평문에서 HTML 재생성.
+      const savedBody = lastDraft.body;
+      const savedHtmlEntry = loadBodyHtml();
+      if (savedHtmlEntry && savedHtmlEntry.sig === assignmentSig(assignment)) {
+        setBodyHtml(savedHtmlEntry.html);
+        dispatch({ type: "EDIT", body: htmlToPlain(savedHtmlEntry.html) }); // keep state.body in sync with what's shown
       } else {
-        setBodyHtml(plainToHtml(lastDraft.body));
+        setBodyHtml(plainToHtml(savedBody)); // no match / other assignment → reconstruct from session plain; state.body already = savedBody via RESTORE
       }
     } else if (saved) {
       clearSession();
@@ -783,7 +798,7 @@ export default function CoachClient({
           {/* 캔버스 */}
           <Canvas
             valueHtml={bodyHtml}
-            onChange={({ html, text }) => { setBodyHtml(html); saveBodyHtml(html); dispatch({ type: "EDIT", body: text }); }}
+            onChange={({ html, text }) => { setBodyHtml(html); saveBodyHtml(assignmentSig(assignment), html); dispatch({ type: "EDIT", body: text }); }}
             disabled={busy || state.phase === "done"}
             spellcheck={coachSpellcheck}
             onToggleSpellcheck={() => setCoachSpellcheck((v) => !v)}

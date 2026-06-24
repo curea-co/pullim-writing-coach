@@ -72,7 +72,7 @@ export default function RichEditor({
 
   return (
     <div className="border-border bg-background rounded-lg border">
-      <EditorToolbar editor={editor} spellcheck={spellcheck} onToggleSpellcheck={onToggleSpellcheck} />
+      <EditorToolbar editor={editor} spellcheck={spellcheck} onToggleSpellcheck={onToggleSpellcheck} disabled={disabled} />
       <EditorContent editor={editor} />
       {placeholder && editor?.isEmpty ? (
         <div className="text-subtle-foreground pointer-events-none -mt-9 px-3 text-sm" aria-hidden>{placeholder}</div>

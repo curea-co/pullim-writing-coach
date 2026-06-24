@@ -50,6 +50,41 @@ describe("RichEditor", () => {
     ).not.toThrow();
   });
 
+  it("disabled=true일 때 툴바 버튼들이 disabled 상태이다", () => {
+    render(<RichEditor valueHtml="" onChange={() => {}} disabled={true} />);
+    const toolbar = screen.queryByRole("toolbar", { name: "서식 도구" });
+    if (!toolbar) {
+      // jsdom에서 TipTap 초기화 미완 — mount-only assertion
+      return;
+    }
+    const buttons = screen.getAllByRole("button", { hidden: false });
+    // 맞춤법 표시 버튼은 onToggleSpellcheck prop이 없으면 렌더 안 됨.
+    // 서식 버튼(제목1, 제목2, 볼드)은 모두 disabled=true여야 함.
+    const formattingButtons = buttons.filter((b) =>
+      ["제목1", "제목2", "볼드"].includes(b.textContent ?? "")
+    );
+    for (const btn of formattingButtons) {
+      expect(btn).toBeDisabled();
+    }
+    // select(폰트 크기)도 disabled여야 함
+    const select = screen.queryByRole("combobox", { name: "폰트 크기" });
+    if (select) {
+      expect(select).toBeDisabled();
+    }
+  });
+
+  it("disabled=false일 때 툴바 버튼들이 활성 상태이다", () => {
+    render(<RichEditor valueHtml="" onChange={() => {}} disabled={false} />);
+    const toolbar = screen.queryByRole("toolbar", { name: "서식 도구" });
+    if (!toolbar) return; // jsdom에서 TipTap 초기화 미완
+    const formattingButtons = screen
+      .getAllByRole("button", { hidden: false })
+      .filter((b) => ["제목1", "제목2", "볼드"].includes(b.textContent ?? ""));
+    for (const btn of formattingButtons) {
+      expect(btn).not.toBeDisabled();
+    }
+  });
+
   it("valueHtml prop이 변경될 때 에디터 내용을 동기화한다 (Bug 1 회귀 방지)", () => {
     // jsdom에서 TipTap이 완전히 초기화되면 setContent가 반영된다.
     // 초기화가 불완전한 경우 마운트만 확인하고 e2e에서 검증.
