@@ -79,9 +79,22 @@ test("메타테스트: ?종결 질문은 통과", () => {
   );
 });
 
-test("메타테스트: SOFT_TAIL 요청형 꼬리는 통과", () => {
+test("메타테스트: 의문·제안형 꼬리(볼까)는 ?-없이도 통과", () => {
   assert.doesNotThrow(() =>
-    assertQuestionsAreQuestions(["한 줄 더 떠올려 볼까"], "SOFT_TAIL볼까")
+    assertQuestionsAreQuestions(["한 줄 더 떠올려 볼까"], "제안형볼까")
+  );
+});
+
+test("메타테스트: 공손한 평서형 종결(…예요/세요)은 질문칸 평서문이라 throw", () => {
+  // 회귀 가드(리뷰 반영): SOFT_TAIL 재사용으로 평서문이 질문으로 통과하던 문제.
+  assert.throws(
+    () => assertQuestionsAreQuestions(["핵심은 환경 보호예요."], "평서형예요"),
+    Error,
+    "공손한 평서형(…예요.)이 throw 안 함",
+  );
+  assert.throws(
+    () => assertQuestionsAreQuestions(["이건 설명문이에요."], "평서형이에요"),
+    Error,
   );
 });
 

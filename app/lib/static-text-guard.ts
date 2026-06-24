@@ -14,9 +14,11 @@
 import { checkGenerationBlock } from "./coach-schema";
 import { AREAS } from "./grading";
 
-// SOFT_TAIL: coach-schema.ts:118과 동등한 꼬리 패턴.
-//   출처: coach-schema.ts const SOFT_TAIL = /(요|죠|네요|군요|까요|을까|ㄹ까|래|볼래|볼까|보자|해보자|보세요|봐|어때|예요|이에요|세요)[.!?]?$/
-const SOFT_TAIL_RE = /(요|죠|네요|군요|까요|을까|ㄹ까|래|볼래|볼까|보자|해보자|보세요|봐|어때|예요|이에요|세요)[.!?]?$/;
+// 질문다움 종결 꼬리: 물음표 외에 허용하는 의문·제안형 꼬리.
+//   coach-schema.ts SOFT_TAIL과 의도적으로 다르다 — 공손한 평서형 종결(요/죠/네요/군요/예요/이에요/세요)은
+//   질문이 아니라 평서문이므로 **제외**한다(예: "핵심은 환경 보호예요."는 질문칸 평서문이라 throw돼야 함).
+//   순수 의문·제안형(까요/을까/래/볼래/볼까/보자/어때 등)만 ?-없이도 통과시킨다.
+const QUESTION_TAIL_RE = /(까요|을까|ㄹ까|나요|니|냐|래|볼래|볼까|보자|해보자|어때|어떨까)[.!?]?$/;
 
 /**
  * 문자열 배열에 대필 신호가 없음을 단언한다.
@@ -49,9 +51,10 @@ export function assertNoGeneration(strings: string[], label?: string): void {
 }
 
 /**
- * 문자열 배열이 모두 "질문다움"(물음표 종결 또는 SOFT_TAIL 요청형 꼬리)을 단언한다.
+ * 문자열 배열이 모두 "질문다움"(물음표 종결 또는 의문·제안형 꼬리)을 단언한다.
  *
- * 질문칸에 평서문 단정형을 박아넣는 것을 별도로 막는다.
+ * 질문칸에 평서문 단정형을 박아넣는 것을 별도로 막는다. 공손한 평서형 종결(…예요/이에요/세요)도
+ * 평서문이므로 통과시키지 않는다(QUESTION_TAIL_RE가 의문·제안형만 허용).
  * (assertNoGeneration는 diagnosis 슬롯을 쓰므로 heuristic #5를 검사하지 않음 — 이 함수가 보완.)
  *
  * @param strings - 검사할 질문 문자열 배열
@@ -63,7 +66,7 @@ export function assertQuestionsAreQuestions(strings: string[], label?: string): 
   for (const s of strings) {
     const t = s.trim();
     if (t.endsWith("?") || t.endsWith("？")) continue;
-    if (SOFT_TAIL_RE.test(t)) continue;
+    if (QUESTION_TAIL_RE.test(t)) continue;
     declarative.push(s);
   }
 
