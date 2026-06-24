@@ -19,10 +19,11 @@ export interface RichEditorProps {
   ariaLabel?: string;
   onToggleSpellcheck?: () => void;
   dataTestid?: string;
+  editableClassName?: string;  // contenteditable 루트에 추가 클래스(예: styles.canvas 노트 배경)
 }
 
 export default function RichEditor({
-  valueHtml, onChange, spellcheck = false, disabled = false, placeholder, editorRef, ariaLabel, onToggleSpellcheck, dataTestid,
+  valueHtml, onChange, spellcheck = false, disabled = false, placeholder, editorRef, ariaLabel, onToggleSpellcheck, dataTestid, editableClassName,
 }: RichEditorProps) {
   const editor = useEditor({
     immediatelyRender: false, // SSR 안전
@@ -31,7 +32,7 @@ export default function RichEditor({
     content: valueHtml || "",
     editorProps: {
       attributes: {
-        class: "tiptap min-h-40 w-full px-3 py-2 text-sm leading-relaxed focus:outline-none",
+        class: `tiptap min-h-40 w-full px-3 py-2 text-sm leading-relaxed focus:outline-none${editableClassName ? ` ${editableClassName}` : ""}`,
         spellcheck: spellcheck ? "true" : "false",
         ...(ariaLabel ? { "aria-label": ariaLabel } : {}),
         ...(dataTestid ? { "data-testid": dataTestid } : {}),

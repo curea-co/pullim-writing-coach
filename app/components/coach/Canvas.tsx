@@ -51,6 +51,7 @@ export default function Canvas({
           placeholder="여기에 직접 글을 써 보세요."
           ariaLabel="글쓰기 캔버스"
           dataTestid="coach-canvas"
+          editableClassName={styles.canvas}
         />
       </div>
     </div>

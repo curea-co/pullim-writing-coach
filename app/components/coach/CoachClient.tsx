@@ -698,6 +698,7 @@ export default function CoachClient({
     setOutlineCollapsed(false); // 새 라운드는 개요 패널 다시 열림
     setBodyHtml("");
     clearBodyHtml();
+    setCoachSpellcheck(false); // 새 라운드는 맞춤법 토글 OFF로 초기화(기본값)
     // 라이브 세션·과정 로그도 초기화(새 라운드는 깨끗한 궤적에서 시작).
     sessionRef.current = null;
     clearSession();
