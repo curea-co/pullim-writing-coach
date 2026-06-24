@@ -159,6 +159,27 @@ function questionFieldIsDeclarative(q: string): boolean {
   return DECLARATIVE_END.test(t);
 }
 
+// (6) 질문형 covert 대필 — 삽입 지시 동사 집합.
+//   '이 내용을 글에 넣어/추가/포함/붙여넣어'처럼 모델이 후보 문장을 글에 삽입하라고 제안하는 동사.
+//   ('써/쓰/적'은 학생 자기 작성과 모호 + '라고 써/적'은 이미 WRITE_DIRECTIVE가 잡으므로 제외.)
+const INSERT_DIRECTIVE = /(넣|추가|붙여|포함|집어넣)/;
+
+// (6) 질문형 covert 대필: 모델이 '완성 문장다운' 후보를 인용하고 그걸 글에 넣으라고 제안.
+//   "'화산은 위험하다'를 넣어보면 어때?" 류 — 짧은 인용+물음표라 #1~#5를 우회하는 사각을 닫는다.
+//   인용이 '문장다움'(서술 종결/다어절/≥10자)일 때만 — 개념어 단일 인용('예시'/'주장')은 제외(오차단 방지).
+function quotedInsertionSuggestion(text: string): boolean {
+  const quoteRe = new RegExp(`[${QUOTE_CHARS}]([^${QUOTE_CHARS}]{2,})[${QUOTE_CHARS}]`);
+  const qm = quoteRe.exec(text);
+  if (!qm) return false;
+  const quoted = qm[1].trim();
+  // '~' 플레이스홀더가 있는 템플릿 패턴('먼저 ~, 그래서 ~')은 코칭 발판 — 오차단 방지.
+  if (quoted.includes("~")) return false;
+  const sentenceLike = DECLARATIVE_END.test(quoted) || /\s/.test(quoted) || quoted.length >= 10;
+  if (!sentenceLike) return false; // 개념어 단일 인용은 삽입 제안이어도 코칭(예: "'예시'를 넣어볼까?")
+  const afterQuote = text.slice(qm.index + qm[0].length);
+  return INSERT_DIRECTIVE.test(afterQuote);
+}
+
 // 한 nudge(진단+유도질문)에 대필 신호가 있으면 위반. 위반 메시지는 nudge 인덱스를 포함.
 export function checkGenerationBlock(o: CoachOutput): string[] {
   const v: string[] = [];
@@ -199,6 +220,12 @@ export function checkGenerationBlock(o: CoachOutput): string[] {
     // (5) 질문칸에 서술 완성문장(평서문)을 그대로 박아넣음 — 질문칸 한정(진단 평서문은 허용)
     if (questionFieldIsDeclarative(question)) {
       v.push(`[${i}] 질문칸 서술 완성문장(대필) 감지`);
+      return;
+    }
+    // (6) 질문형 covert 대필: '완성 문장다운' 후보를 인용하고 글에 넣으라고 제안
+    //   "'화산은 위험하다'를 넣어보면 어때?" 류 — 짧은 인용+물음표라 #1~#5를 우회하는 사각을 닫는다.
+    if (quotedInsertionSuggestion(text)) {
+      v.push(`[${i}] 인용 문장 삽입 제안(대필) 감지`);
       return;
     }
   });
