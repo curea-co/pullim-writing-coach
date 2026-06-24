@@ -369,12 +369,14 @@ type CoachRequest = {
   assignment: Pick<CoachAssignment, "school_level" | "subject" | "genre" | "target_char_count" | "prompt_text">;
   rubric?: string;
   submission: { body: string };
+  mode?: WritingMode; // Wave2 Slice 1 — 서버가 수신하되 현재 무동작
 };
 
 async function callCoach(
   body: string,
   assignment: CoachAssignment,
   rubricText?: string,
+  mode?: WritingMode,
 ): Promise<
   | { ok: true; output: CoachOutput }
   | { ok: false; auth: true }
@@ -394,6 +396,8 @@ async function callCoach(
     submission: { body },
     // 교사 루브릭이 있으면 rubric 필드로 전송(route.ts 요청 계약). 없으면 미전송.
     ...(rubricText ? { rubric: rubricText } : {}),
+    // mode 배선(Wave2 Slice 1) — 서버는 수신하되 현재 무동작. 미전송 시 서버가 "free" 폴백.
+    ...(mode ? { mode } : {}),
   };
 
   let res: Response;
@@ -525,7 +529,7 @@ export default function CoachClient({
   const runCheck = async () => {
     if (!state.body.trim()) return;
     dispatch({ type: "CHECK_START" });
-    const r = await callCoach(state.body, assignment, rubricRef.current);
+    const r = await callCoach(state.body, assignment, rubricRef.current, mode);
     if (!r.ok) {
       if (r.auth) {
         dispatch({ type: "AUTH_EXPIRED" }); // 글 보존하고 write 복귀
@@ -578,7 +582,7 @@ export default function CoachClient({
     const lastBody = sessionRef.current?.draftHistory[sessionRef.current.draftHistory.length - 1]?.body ?? "";
     const wasRevised = sessionRef.current ? state.body !== lastBody : true;
     dispatch({ type: "RECHECK_START" });
-    const r = await callCoach(state.body, assignment, rubricRef.current);
+    const r = await callCoach(state.body, assignment, rubricRef.current, mode);
     if (!r.ok) {
       if (r.auth) {
         dispatch({ type: "AUTH_EXPIRED" });
