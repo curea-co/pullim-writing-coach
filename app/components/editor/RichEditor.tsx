@@ -18,10 +18,11 @@ export interface RichEditorProps {
   editorRef?: React.Ref<RichEditorHandle>;
   ariaLabel?: string;
   onToggleSpellcheck?: () => void;
+  dataTestid?: string;
 }
 
 export default function RichEditor({
-  valueHtml, onChange, spellcheck = false, disabled = false, placeholder, editorRef, ariaLabel, onToggleSpellcheck,
+  valueHtml, onChange, spellcheck = false, disabled = false, placeholder, editorRef, ariaLabel, onToggleSpellcheck, dataTestid,
 }: RichEditorProps) {
   const editor = useEditor({
     immediatelyRender: false, // SSR 안전
@@ -33,6 +34,7 @@ export default function RichEditor({
         class: "tiptap min-h-40 w-full px-3 py-2 text-sm leading-relaxed focus:outline-none",
         spellcheck: spellcheck ? "true" : "false",
         ...(ariaLabel ? { "aria-label": ariaLabel } : {}),
+        ...(dataTestid ? { "data-testid": dataTestid } : {}),
       },
     },
     onUpdate: ({ editor }) => {
@@ -42,6 +44,17 @@ export default function RichEditor({
   });
 
   useImperativeHandle(editorRef, () => ({ focus: () => editor?.commands.focus() }), [editor, editorRef]);
+
+  // valueHtml prop 변화를 에디터에 동기화 (복원/리셋 시 반영).
+  // 타이핑 중엔 호스트가 getHTML()을 valueHtml에 저장하므로 값이 같아 setContent 스킵 → 커서 유지.
+  // emitUpdate=false로 onChange를 재발사하지 않음.
+  useEffect(() => {
+    if (!editor) return;
+    const current = editor.getHTML();
+    if (valueHtml !== current) {
+      editor.commands.setContent(valueHtml || "", false);
+    }
+  }, [editor, valueHtml]);
 
   // disabled prop 변화 반영 — 렌더 중 뮤테이션 방지, useEffect로 처리.
   useEffect(() => {

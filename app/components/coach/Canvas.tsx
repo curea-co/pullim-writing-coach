@@ -33,7 +33,7 @@ export default function Canvas({
   const count = cp(htmlToPlain(valueHtml).trim());
 
   return (
-    <div className="relative flex-1 overflow-hidden" data-testid="coach-canvas">
+    <div className="relative flex-1 overflow-hidden">
       <span
         className={`${styles.monoFont} absolute right-3.5 top-2 z-10 text-[10.5px] text-[var(--ink-5)]`}
         aria-hidden="true"
@@ -50,6 +50,7 @@ export default function Canvas({
           editorRef={editorRef}
           placeholder="여기에 직접 글을 써 보세요."
           ariaLabel="글쓰기 캔버스"
+          dataTestid="coach-canvas"
         />
       </div>
     </div>
