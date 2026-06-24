@@ -135,9 +135,10 @@ export default function CoachSetupFlow({ onAuthExpired }: { onAuthExpired?: () =
   return (
     <AssignmentStep
       initial={assignment ?? undefined}
+      onDraftChange={saveAssignmentDraft} // 입력 중에도 디바운스 저장(작성 중 새로고침 보호).
       onSubmit={(a) => {
         setAssignment(a);
-        saveAssignmentDraft(a); // 모드 선택 전 새로고침 대비 임시 저장.
+        saveAssignmentDraft(a); // 모드 선택 전 새로고침 대비 즉시 저장.
         setPhase("mode");
       }}
     />

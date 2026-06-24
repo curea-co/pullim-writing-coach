@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // CoachClient는 무거우므로(useReducer+fetch) 마운트 신호만 검증하는 mock로 대체.
@@ -94,5 +94,17 @@ describe("CoachSetupFlow", () => {
     unmount();
     render(<CoachSetupFlow />);
     expect(screen.getByLabelText(/과제 내용/)).toHaveValue(PROMPT);
+  });
+
+  it("과제 작성 중(미제출)에도 입력이 draft로 디바운스 저장됨", async () => {
+    const user = userEvent.setup();
+    render(<CoachSetupFlow />);
+    await user.type(screen.getByLabelText(/과제 내용/), "작성 중인 과제 내용입니다");
+    // 디바운스(400ms) 후 draft 저장 확인 — 제출하지 않았는데도 보존.
+    await waitFor(() => {
+      const raw = window.localStorage.getItem("pwc-coach-assignment-draft-v1");
+      expect(raw).not.toBeNull();
+      expect(JSON.parse(raw as string).prompt_text).toContain("작성 중인 과제");
+    });
   });
 });

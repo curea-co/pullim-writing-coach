@@ -4,7 +4,7 @@
 //   initial이 있으면(모드 선택에서 '과제 다시 입력'으로 복귀) 그 값을 복원 — 입력 유실 방지(curea-review-ai 지적).
 //   없으면 프로필 기반 prefill, 과제 내용은 빈 상태로 시작.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import MetaForm from "@/app/components/MetaForm";
 import { type CoachAssignment, validateAssignment } from "@/app/lib/coach-setup";
 import { TARGET_MIN, TARGET_MAX } from "@/app/lib/grading";
@@ -13,9 +13,11 @@ import { loadProfile } from "@/app/lib/storage";
 export default function AssignmentStep({
   initial,
   onSubmit,
+  onDraftChange,
 }: {
   initial?: CoachAssignment;
   onSubmit: (a: CoachAssignment) => void;
+  onDraftChange?: (a: CoachAssignment) => void; // 입력 중 draft 영속(디바운스) — 새로고침 보호
 }) {
   const profile = useMemo(() => loadProfile(), []);
   const [schoolLevel, setSchoolLevel] = useState<string>(
@@ -46,6 +48,22 @@ export default function AssignmentStep({
   };
   const errors = validateAssignment(assignment);
   const canSubmit = errors.length === 0;
+
+  // 입력 중에도 과제 draft를 디바운스 저장 — assignment 단계에서 새로고침해도 입력 보존
+  //   (curea-review-ai 지적: 제출 시점에만 저장하면 작성 중 새로고침에 유실).
+  useEffect(() => {
+    if (!onDraftChange) return;
+    const t = setTimeout(() => onDraftChange(assignment), 400);
+    return () => clearTimeout(t);
+    // assignment는 매 렌더 새 객체지만 값 동일 시 같은 draft 저장이라 무해.
+  }, [
+    schoolLevel,
+    subject,
+    genre,
+    targetNum,
+    promptText,
+    onDraftChange,
+  ]);
 
   return (
     <main className="mx-auto w-full max-w-2xl px-5 py-8 md:py-12">

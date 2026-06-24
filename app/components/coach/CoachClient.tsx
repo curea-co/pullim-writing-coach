@@ -492,7 +492,9 @@ export default function CoachClient({
     rubricRef.current = loadRubricText();
 
     const saved = loadSession();
-    if (saved) {
+    // 다른 과제의 세션이 남아 있으면 복원하지 않는다(curea-review-ai 지적): 새 과제 헤더 아래로
+    // 이전 글·점수가 되살아나는 혼선 방지. prompt_text가 다르면 stale로 보고 세션·과정 로그를 정리.
+    if (saved && saved.assignment?.prompt_text === assignment.prompt_text) {
       sessionRef.current = saved;
       const lastDraft = saved.draftHistory[saved.draftHistory.length - 1];
       // 본문·점수·기준선·회차를 write 단계로 복원(다음 [봐줘]로 라이브 루프 재개).
@@ -503,6 +505,9 @@ export default function CoachClient({
         baseline: fromAreaScores(saved.baseline),
         revisions: Math.max(0, saved.draftHistory.length - 1),
       });
+    } else if (saved) {
+      clearSession();
+      clearProcessLog();
     }
     // 마운트 1회(루브릭 읽기 + 세션 복원). dispatch는 안정적이라 deps 불필요.
   }, []);
