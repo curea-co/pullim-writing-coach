@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { AREAS, GENRES } from "../app/lib/grading.ts";
 import { checkGenerationBlock } from "../app/lib/coach-schema.ts";
-import { GUIDE_QUESTIONS, GENRE_QUESTIONS, guideQuestionsFor } from "../app/lib/guide-prompts.ts";
+import { GUIDE_QUESTIONS, GENRE_QUESTIONS, guideQuestionsFor, guideMemoKey } from "../app/lib/guide-prompts.ts";
 import { assertNoGeneration, assertQuestionsAreQuestions } from "../app/lib/static-text-guard.ts";
 
 test("GUIDE_QUESTIONS — 5영역 모두 1문항 이상", () => {
@@ -79,21 +79,33 @@ test("Task1 미지 genre 폴백 — 미지/빈/기타 → throw 없이 AREAS.len
 
 // ─── Task 3: 분기 실동작 회귀 가드 ────────────────────────────────────────────
 
-test("Task3 분기 실동작 — override 선언한 모든 genre가 최소 1영역에서 default와 다른 question 반환", () => {
-  // 한 genre만 확인하면 나머지 override가 전부 default로 회귀해도 통과하므로, GENRE_QUESTIONS에
-  // 선언된 각 genre를 전수로 락(분기가 실제로 동작함을 genre별로 보장).
+test("Task3 분기 실동작 — GENRE_QUESTIONS에 선언한 모든 (genre, area) override가 실제로 적용됨", () => {
+  // "최소 1영역만 다르면 통과"면 한 영역 키가 오타로 빠져 silently default로 회귀해도 게이트가 열린다.
+  // 선언한 각 (genre, area) override가 출력에 정확히 반영되는지 전수 락(typo·누락 즉시 실패).
   const overriddenGenres = Object.keys(GENRE_QUESTIONS);
   assert.ok(overriddenGenres.length >= 1, "GENRE_QUESTIONS가 비어 있음 — 장르 분기 없음");
   for (const g of overriddenGenres) {
-    const genreQs = guideQuestionsFor(g);
-    const diffCount = genreQs.filter(
-      (q, i) => q.question !== GUIDE_QUESTIONS[AREAS[i]][0]
-    ).length;
-    assert.ok(
-      diffCount >= 1,
-      `${g} 분기가 동작하지 않음 — 모든 question이 default와 동일`
-    );
+    const byArea = Object.fromEntries(guideQuestionsFor(g).map((q) => [q.area, q.question]));
+    const declared = GENRE_QUESTIONS[g];
+    for (const area of Object.keys(declared)) {
+      const expected = declared[area][0];
+      assert.equal(byArea[area], expected, `${g}/${area}: 선언한 override가 적용 안 됨(오타로 default 폴백?)`);
+      assert.notEqual(byArea[area], GUIDE_QUESTIONS[area][0], `${g}/${area}: override가 default와 동일`);
+    }
   }
+});
+
+test("guideMemoKey — 문구 무관 안정 키: default 폴백은 default::area 공유, override는 g:genre::area", () => {
+  const area = AREAS[0];
+  // default 폴백 장르(기타·미지)는 같은 default 키를 공유 → 같은 질문이면 메모 공유.
+  assert.equal(guideMemoKey("기타", area), `default::${area}`);
+  assert.equal(guideMemoKey("존재안함", area), `default::${area}`);
+  // override가 선언된 (genre, area)는 분리 키.
+  const overGenre = Object.keys(GENRE_QUESTIONS)[0];
+  const overArea = Object.keys(GENRE_QUESTIONS[overGenre])[0];
+  assert.equal(guideMemoKey(overGenre, overArea), `g:${overGenre}::${overArea}`);
+  // 키는 질문 텍스트와 무관(문구를 다듬어도 동일) — 출처(genre/area)만 반영.
+  assert.equal(guideMemoKey(overGenre, overArea), guideMemoKey(overGenre, overArea));
 });
 
 // ─── Task 4: GENRE_QUESTIONS 전수 대필 가드 (slice-2 헬퍼 재사용) ────────────

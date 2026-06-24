@@ -100,3 +100,15 @@ function pick(genre: string, area: AreaName): string {
 export function guideQuestionsFor(genre: string): { area: AreaName; question: string }[] {
   return AREAS.map((area) => ({ area, question: pick(genre, area) }));
 }
+
+/**
+ * 메모 저장용 안정 키 — 표시 문구(질문 텍스트)가 아니라 '질문 출처'를 키로 삼는다.
+ *   문구를 나중에 다듬어도 메모가 유실되지 않고, default 풀로 폴백되는 장르(설명문/기타/미지)는 같은
+ *   키(`default::<area>`)를 공유하며, 장르 override가 있는 (genre, area)만 `g:<genre>::<area>`로 분리된다.
+ */
+export function guideMemoKey(genre: string, area: AreaName): string {
+  if (isKnownGenre(genre) && GENRE_QUESTIONS[genre]?.[area]?.[0] !== undefined) {
+    return `g:${genre}::${area}`;
+  }
+  return `default::${area}`;
+}
