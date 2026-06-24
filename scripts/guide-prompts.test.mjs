@@ -1,11 +1,13 @@
-// 물결1 — 가이드 모드 정적 질문 풀. 핵심: 대필 불변식 게이트(checkGenerationBlock 위반 0건).
+// 물결1·2 — 가이드 모드 정적 질문 풀. 핵심: 대필 불변식 게이트(checkGenerationBlock 위반 0건).
+// 물결2 Slice 5: 장르별 분기 계약 락 + GENRE_QUESTIONS 대필 가드.
 // 실행: node --import ./scripts/register-ts.mjs --test scripts/guide-prompts.test.mjs
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { AREAS } from "../app/lib/grading.ts";
+import { AREAS, GENRES } from "../app/lib/grading.ts";
 import { checkGenerationBlock } from "../app/lib/coach-schema.ts";
-import { GUIDE_QUESTIONS, guideQuestionsFor } from "../app/lib/guide-prompts.ts";
+import { GUIDE_QUESTIONS, GENRE_QUESTIONS, guideQuestionsFor } from "../app/lib/guide-prompts.ts";
+import { assertNoGeneration, assertQuestionsAreQuestions } from "../app/lib/static-text-guard.ts";
 
 test("GUIDE_QUESTIONS — 5영역 모두 1문항 이상", () => {
   for (const area of AREAS) {
@@ -43,4 +45,55 @@ test("불변식 — 모든 질문은 물음표로 끝남(질문칸 평서문 금
       assert.ok(q.trim().endsWith("?"), `평서문 의심: ${q}`);
     }
   }
+});
+
+// ─── Task 1: 출력 계약 회귀 락 + 미지 genre 폴백 테스트 ──────────────────────
+
+test("Task1 계약 락 — GENRES 전수: 길이=AREAS.length, AREAS 순서, question 비지 않음", () => {
+  for (const genre of GENRES) {
+    const qs = guideQuestionsFor(genre);
+    assert.equal(qs.length, AREAS.length, `${genre}: 길이 불일치`);
+    qs.forEach((q, i) => {
+      assert.equal(q.area, AREAS[i], `${genre}[${i}] area 순서 불일치`);
+      assert.ok(q.question.trim().length > 0, `${genre}[${i}] question 비어 있음`);
+    });
+  }
+});
+
+test("Task1 미지 genre 폴백 — 미지/빈/기타 → throw 없이 AREAS.length, default 풀 동일", () => {
+  for (const unknownGenre of ["존재안함", "", "기타"]) {
+    let qs;
+    assert.doesNotThrow(() => {
+      qs = guideQuestionsFor(unknownGenre);
+    }, `${JSON.stringify(unknownGenre)}: throw 발생`);
+    assert.equal(qs.length, AREAS.length, `${JSON.stringify(unknownGenre)}: 길이 불일치`);
+    qs.forEach((q, i) => {
+      assert.equal(
+        q.question,
+        GUIDE_QUESTIONS[AREAS[i]][0],
+        `${JSON.stringify(unknownGenre)}[${AREAS[i]}]: default 폴백 아님`
+      );
+    });
+  }
+});
+
+// ─── Task 3: 분기 실동작 회귀 가드 ────────────────────────────────────────────
+
+test("Task3 분기 실동작 — 논설문은 최소 1영역에서 default와 다른 question 반환", () => {
+  const genreQs = guideQuestionsFor("논설문·주장하는 글");
+  const diffCount = genreQs.filter(
+    (q, i) => q.question !== GUIDE_QUESTIONS[AREAS[i]][0]
+  ).length;
+  assert.ok(diffCount >= 1, "논설문 분기가 동작하지 않음 — 모든 question이 default와 동일");
+});
+
+// ─── Task 4: GENRE_QUESTIONS 전수 대필 가드 (slice-2 헬퍼 재사용) ────────────
+
+test("Task4 GENRE_QUESTIONS 대필 가드 — assertNoGeneration 위반 0건 + assertQuestionsAreQuestions 통과", () => {
+  const allOverrides = Object.values(GENRE_QUESTIONS).flatMap((areaMap) =>
+    Object.values(areaMap).flatMap((qs) => qs)
+  );
+  // 오버라이드가 없으면 테스트는 패스(빈 배열은 assertNoGeneration에서 early return)
+  assertNoGeneration(allOverrides, "GENRE_QUESTIONS");
+  assertQuestionsAreQuestions(allOverrides, "GENRE_QUESTIONS");
 });
