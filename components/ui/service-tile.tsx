@@ -1,5 +1,4 @@
 import * as React from "react";
-import Link from "next/link";
 import { cn } from "@/lib/cn";
 
 export interface ServiceTileProps {
@@ -9,6 +8,8 @@ export interface ServiceTileProps {
   glyph?: React.ReactNode;
   cta?: string;
   soon?: boolean;
+  /** Link element (e.g. next/link's Link). Defaults to "a". */
+  linkComponent?: React.ElementType;
   className?: string;
 }
 
@@ -19,16 +20,17 @@ export function ServiceTile({
   glyph,
   cta = "바로가기",
   soon = false,
+  linkComponent = "a",
   className,
 }: ServiceTileProps) {
-  const sharedClassName = cn(
+  const Link = linkComponent;
+  const rootClassName = cn(
     "group relative flex min-h-[188px] flex-col overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border-default)] bg-[var(--surface-raised)] p-[22px] text-inherit no-underline transition-transform duration-200",
     soon
       ? "pointer-events-none bg-[var(--surface-sunken)]"
       : "hover:-translate-y-1 hover:border-transparent hover:shadow-[var(--shadow-lg)]",
     className,
   );
-
   const content = (
     <>
       <span
@@ -49,9 +51,7 @@ export function ServiceTile({
           {glyph}
         </span>
       </div>
-      <h3 className="relative mt-4 text-[18px] font-extrabold tracking-[-.03em]">
-        {title}
-      </h3>
+      <h3 className="relative mt-4 text-[18px] font-extrabold tracking-[-.03em]">{title}</h3>
       <p className="relative mt-[7px] flex-1 text-[13px] leading-[1.5] text-[var(--text-secondary)]">
         {description}
       </p>
@@ -68,17 +68,15 @@ export function ServiceTile({
       </div>
     </>
   );
-
   if (soon) {
     return (
-      <div className={sharedClassName} aria-disabled="true">
+      <div className={rootClassName} aria-disabled="true">
         {content}
       </div>
     );
   }
-
   return (
-    <Link href={href} className={sharedClassName}>
+    <Link href={href} className={rootClassName}>
       {content}
     </Link>
   );
