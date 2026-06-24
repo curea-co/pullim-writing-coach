@@ -1,5 +1,4 @@
 import * as React from "react";
-import Link from "next/link";
 import { cn } from "@/lib/cn";
 
 export interface TabbarItem {
@@ -11,10 +10,13 @@ export interface TabbarItem {
 
 export interface OsTabbarProps {
   items: TabbarItem[];
+  /** Link element (e.g. next/link's Link). Defaults to "a". */
+  linkComponent?: React.ElementType;
   className?: string;
 }
 
-export function OsTabbar({ items, className }: OsTabbarProps) {
+export function OsTabbar({ items, linkComponent = "a", className }: OsTabbarProps) {
+  const Link = linkComponent;
   return (
     <nav
       aria-label="모바일 탭 메뉴"
