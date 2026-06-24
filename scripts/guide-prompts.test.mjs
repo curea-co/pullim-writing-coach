@@ -79,12 +79,21 @@ test("Task1 미지 genre 폴백 — 미지/빈/기타 → throw 없이 AREAS.len
 
 // ─── Task 3: 분기 실동작 회귀 가드 ────────────────────────────────────────────
 
-test("Task3 분기 실동작 — 논설문은 최소 1영역에서 default와 다른 question 반환", () => {
-  const genreQs = guideQuestionsFor("논설문·주장하는 글");
-  const diffCount = genreQs.filter(
-    (q, i) => q.question !== GUIDE_QUESTIONS[AREAS[i]][0]
-  ).length;
-  assert.ok(diffCount >= 1, "논설문 분기가 동작하지 않음 — 모든 question이 default와 동일");
+test("Task3 분기 실동작 — override 선언한 모든 genre가 최소 1영역에서 default와 다른 question 반환", () => {
+  // 한 genre만 확인하면 나머지 override가 전부 default로 회귀해도 통과하므로, GENRE_QUESTIONS에
+  // 선언된 각 genre를 전수로 락(분기가 실제로 동작함을 genre별로 보장).
+  const overriddenGenres = Object.keys(GENRE_QUESTIONS);
+  assert.ok(overriddenGenres.length >= 1, "GENRE_QUESTIONS가 비어 있음 — 장르 분기 없음");
+  for (const g of overriddenGenres) {
+    const genreQs = guideQuestionsFor(g);
+    const diffCount = genreQs.filter(
+      (q, i) => q.question !== GUIDE_QUESTIONS[AREAS[i]][0]
+    ).length;
+    assert.ok(
+      diffCount >= 1,
+      `${g} 분기가 동작하지 않음 — 모든 question이 default와 동일`
+    );
+  }
 });
 
 // ─── Task 4: GENRE_QUESTIONS 전수 대필 가드 (slice-2 헬퍼 재사용) ────────────

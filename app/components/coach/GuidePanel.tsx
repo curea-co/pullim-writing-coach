@@ -37,8 +37,12 @@ export default function GuidePanel({ genre }: { genre: string }) {
     setMemos(loadMemos());
   }, []);
 
+  // 메모 키를 (genre, area)로 네임스페이스 — 장르별 질문이 다르므로 같은 area라도 장르가 다르면
+  //   다른 메모로 분리한다(장르를 바꾸면 무관한 메모가 다른 질문 아래 다시 붙는 회귀 방지).
+  const memoKey = (area: string) => `${genre}::${area}`;
+
   function setMemo(area: string, value: string) {
-    const next = { ...memos, [area]: value };
+    const next = { ...memos, [memoKey(area)]: value };
     setMemos(next);
     saveMemos(next);
   }
@@ -54,7 +58,7 @@ export default function GuidePanel({ genre }: { genre: string }) {
             <p className="text-foreground text-sm font-medium">{q.question}</p>
             <textarea
               aria-label={`${q.area} 메모`}
-              value={memos[q.area] ?? ""}
+              value={memos[memoKey(q.area)] ?? ""}
               onChange={(e) => setMemo(q.area, e.target.value)}
               placeholder="네 생각을 한 줄로…"
               rows={2}
