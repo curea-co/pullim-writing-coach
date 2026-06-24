@@ -22,6 +22,7 @@ export type MetaFormProps = {
   promptText: string;
   targetInvalid: boolean;
   locked: boolean;       // 제출 중 잠금
+  hideTarget?: boolean;  // 목표 글자 수 숨김 — 코치(분량 미사용) 등 미지원 경로에서 dead input 방지
   onChangeSchoolLevel: (v: string) => void;
   onChangeSubject: (v: string) => void;
   onChangeGenre: (v: string) => void;
@@ -38,6 +39,7 @@ export default function MetaForm(props: MetaFormProps) {
     promptText,
     targetInvalid,
     locked,
+    hideTarget = false,
     onChangeSchoolLevel,
     onChangeSubject,
     onChangeGenre,
@@ -72,35 +74,37 @@ export default function MetaForm(props: MetaFormProps) {
           onChange={onChangeGenre}
           disabled={locked}
         />
-        <div>
-          <label
-            htmlFor="target"
-            className="text-foreground mb-1.5 block text-sm font-medium"
-          >
-            목표 글자 수{" "}
-            <span className="text-muted-foreground font-normal">(선택)</span>
-          </label>
-          <input
-            id="target"
-            name="target"
-            type="number"
-            inputMode="numeric"
-            value={targetRaw}
-            onChange={(e) => onChangeTargetRaw(e.target.value)}
-            disabled={locked}
-            placeholder="예: 800 — 모르면 비워 두세요"
-            className={cn(
-              "border-border bg-background text-foreground w-full rounded-lg border px-3 py-2 text-sm",
-              targetInvalid && "border-band-warn",
-              locked && "cursor-not-allowed opacity-60",
+        {!hideTarget && (
+          <div>
+            <label
+              htmlFor="target"
+              className="text-foreground mb-1.5 block text-sm font-medium"
+            >
+              목표 글자 수{" "}
+              <span className="text-muted-foreground font-normal">(선택)</span>
+            </label>
+            <input
+              id="target"
+              name="target"
+              type="number"
+              inputMode="numeric"
+              value={targetRaw}
+              onChange={(e) => onChangeTargetRaw(e.target.value)}
+              disabled={locked}
+              placeholder="예: 800 — 모르면 비워 두세요"
+              className={cn(
+                "border-border bg-background text-foreground w-full rounded-lg border px-3 py-2 text-sm",
+                targetInvalid && "border-band-warn",
+                locked && "cursor-not-allowed opacity-60",
+              )}
+            />
+            {targetInvalid && (
+              <p className="text-band-warn-foreground mt-1 text-xs">
+                목표 글자 수는 50~2,000자로 입력해 주세요
+              </p>
             )}
-          />
-          {targetInvalid && (
-            <p className="text-band-warn-foreground mt-1 text-xs">
-              목표 글자 수는 50~2,000자로 입력해 주세요
-            </p>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <div className="mt-4">

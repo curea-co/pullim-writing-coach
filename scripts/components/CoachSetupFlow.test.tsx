@@ -76,4 +76,23 @@ describe("CoachSetupFlow", () => {
     // 입력했던 과제 내용이 유실되지 않고 복원되어 있어야 함
     expect(screen.getByLabelText(/과제 내용/)).toHaveValue(PROMPT);
   });
+
+  it("과제 제출 후 새로고침(재마운트)해도 입력한 과제가 draft로 복원됨", async () => {
+    const user = userEvent.setup();
+    const PROMPT = "교복 자율화에 대한 자신의 주장을 근거 2개 이상으로 쓰시오";
+    const { unmount } = render(<CoachSetupFlow />);
+    await user.selectOptions(screen.getByLabelText(/학년/), "중2");
+    await user.selectOptions(screen.getByLabelText(/과목/), "과학");
+    await user.selectOptions(screen.getByLabelText(/어떤 글/), "설명문");
+    await user.clear(screen.getByLabelText(/과제 내용/));
+    await user.type(screen.getByLabelText(/과제 내용/), PROMPT);
+    await user.click(screen.getByRole("button", { name: /다음/ }));
+    // 모드 선택 단계 도달 + draft 저장됨
+    expect(screen.getByTestId("mode-free")).toBeInTheDocument();
+    expect(window.localStorage.getItem("pwc-coach-assignment-draft-v1")).not.toBeNull();
+    // 새로고침 시뮬: 언마운트 후 새 인스턴스 마운트 → 과제 입력 단계로 복귀하며 입력값 복원
+    unmount();
+    render(<CoachSetupFlow />);
+    expect(screen.getByLabelText(/과제 내용/)).toHaveValue(PROMPT);
+  });
 });

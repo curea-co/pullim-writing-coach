@@ -64,6 +64,7 @@ export default function AssignmentStep({
           promptText={promptText}
           targetInvalid={targetInvalid}
           locked={false}
+          hideTarget // 코치는 목표 분량 미사용(서버가 null 고정) — dead input 숨김.
           onChangeSchoolLevel={setSchoolLevel}
           onChangeSubject={setSubject}
           onChangeGenre={setGenre}
