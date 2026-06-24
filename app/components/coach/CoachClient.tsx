@@ -46,6 +46,7 @@ import { DEMO_TOKEN_KEY } from "@/app/components/TokenGate";
 import styles from "@/app/coach/coach.module.css";
 import Canvas from "./Canvas";
 import GuidePanel from "./GuidePanel";
+import OutlinePanel from "./OutlinePanel";
 import BottomSheet, { type SheetPosition } from "./BottomSheet";
 import NudgeCard from "./NudgeCard";
 import GrowthBars, { GrowthRow } from "./GrowthBars";
@@ -666,6 +667,11 @@ export default function CoachClient({
       } catch {
         /* swallow — 영속 실패가 흐름을 막지 않는다. */
       }
+      try {
+        window.localStorage.removeItem("pwc-outline-v1");
+      } catch {
+        /* swallow — 영속 실패가 흐름을 막지 않는다. */
+      }
     }
     onNewAssignment?.();
   };
@@ -754,6 +760,13 @@ export default function CoachClient({
           {mode === "guide" && state.phase === "write" && (
             <div className="px-[18px] pb-2">
               <GuidePanel genre={assignment.genre} />
+            </div>
+          )}
+
+          {/* 개요 패널 — mode=outline + write 단계일 때만. 직교 패널(reducer 무수정). */}
+          {mode === "outline" && state.phase === "write" && (
+            <div className="px-[18px] pb-2">
+              <OutlinePanel genre={assignment.genre} />
             </div>
           )}
 
