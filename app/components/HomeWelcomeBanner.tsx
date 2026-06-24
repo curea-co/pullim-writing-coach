@@ -33,7 +33,7 @@ export default function HomeWelcomeBanner() {
         </div>
         <Link
           href="/onboarding"
-          className="inline-flex h-10 shrink-0 items-center rounded-lg bg-[#24D39E] px-4 text-sm font-semibold text-white hover:bg-[#1FBE8C]"
+          className="inline-flex h-10 shrink-0 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90"
         >
           온보딩 시작
         </Link>
@@ -45,7 +45,7 @@ export default function HomeWelcomeBanner() {
     <section className="border-border bg-surface mb-8 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
       <div className="min-w-0">
         <p className="text-foreground break-keep text-sm font-semibold">
-          <span className="text-[#1FBE8C]">{profile.nickname}님</span>, 오늘도 좋은 글
+          <span className="text-primary">{profile.nickname}님</span>, 오늘도 좋은 글
           쓰셨어요?
         </p>
         <p className="text-muted-foreground break-keep mt-0.5 text-xs">
@@ -61,7 +61,7 @@ export default function HomeWelcomeBanner() {
       <div className="flex shrink-0 gap-2">
         <Link
           href="/try"
-          className="inline-flex h-10 items-center rounded-lg bg-[#24D39E] px-4 text-sm font-semibold text-white hover:bg-[#1FBE8C]"
+          className="inline-flex h-10 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90"
         >
           내 글 채점받기
         </Link>

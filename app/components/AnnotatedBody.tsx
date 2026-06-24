@@ -81,7 +81,7 @@ export default function AnnotatedBody({
               className={cn(
                 "bg-band-normal-surface text-band-normal-foreground rounded-[3px] px-0.5 underline decoration-band-normal/60 underline-offset-2",
                 clickable &&
-                  "cursor-pointer hover:bg-band-normal hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#24D39E] focus-visible:ring-offset-1 transition-colors",
+                  "cursor-pointer hover:bg-band-normal hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 transition-colors",
               )}
             >
               {seg.text}

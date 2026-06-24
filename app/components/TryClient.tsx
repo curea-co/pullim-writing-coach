@@ -98,7 +98,7 @@ export default function TryClient() {
             <button
               type="button"
               onClick={() => setInlineOpen(true)}
-              className="shrink-0 rounded-lg bg-[#24D39E] px-3 py-2 text-xs font-semibold text-white hover:bg-[#1FBE8C]"
+              className="shrink-0 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90"
             >
               프로필 만들기
             </button>

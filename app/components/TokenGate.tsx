@@ -41,9 +41,12 @@ function writeToken(v: string | null) {
 
 export default function TokenGate({
   defaults,
+  children,
 }: {
   // ScoreForm 폼 필드 프리필 — TryClient가 프로필에서 주입.
   defaults?: { school_level?: string; subject?: string; genre?: string };
+  // 코치 등 다른 게이티드 화면을 자식으로 받는다. 제공 시 ScoreForm 대신 렌더.
+  children?: (onAuthExpired: () => void) => React.ReactNode;
 } = {}) {
   // 서버/하이드레이션 스냅샷은 null(미인증) → 입력 화면. 하이드레이션 후 실제 토큰으로 전환.
   const token = useSyncExternalStore(subscribeToken, readToken, () => null);
@@ -81,6 +84,13 @@ export default function TokenGate({
     setEntered(false);
     setInput("");
     setAuthError(null); // 로그아웃 = 인증 상태 초기화 → 다음 진입에 stale 오류 안 남김(curea-review-ai 지적)
+  }
+
+  // 401(E-AUTH) 공통 핸들러 — ScoreForm·children 양쪽이 공유.
+  function handleAuthExpired() {
+    setEntered(true);
+    writeToken(null);
+    setAuthError("비밀번호가 올바르지 않아요. 다시 입력해 주세요.");
   }
 
   if (!showForm) {
@@ -174,16 +184,11 @@ export default function TokenGate({
           </form>
         </section>
       )}
-      <ScoreForm
-        defaults={defaults}
-        onAuthExpired={() => {
-          // 제출 시 서버 401(E-AUTH): stale 토큰을 폐기(재사용 401 루프 방지)하되,
-          // entered 래치로 ScoreForm은 계속 마운트 → 작성 글 보존. 재입력 배너만 노출.
-          setEntered(true);
-          writeToken(null);
-          setAuthError("비밀번호가 올바르지 않아요. 다시 입력해 주세요.");
-        }}
-      />
+      {children ? (
+        children(handleAuthExpired)
+      ) : (
+        <ScoreForm defaults={defaults} onAuthExpired={handleAuthExpired} />
+      )}
     </div>
   );
 }

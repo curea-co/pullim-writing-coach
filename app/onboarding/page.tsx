@@ -181,7 +181,7 @@ function Step1({ onNext }: { onNext: () => void }) {
       <button
         type="button"
         onClick={onNext}
-        className="mt-2 inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#24D39E] text-sm font-semibold text-white hover:bg-[#1FBE8C]"
+        className="mt-2 inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground hover:opacity-90"
       >
         시작하기
       </button>
@@ -344,7 +344,7 @@ function Step3({ profile }: { profile: Profile | null }) {
             checked={!!consent.guardianConsentAt}
             onChange={(e) => handleGuardianChange(e.target.checked)}
             aria-required="true"
-            className="mt-0.5 h-4 w-4 shrink-0 accent-[#24D39E]"
+            className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
           />
           <div className="break-keep text-xs leading-relaxed">
             <span className="text-foreground block text-sm font-semibold">
@@ -374,7 +374,7 @@ function Step3({ profile }: { profile: Profile | null }) {
           type="button"
           onClick={() => go("/samples/e")}
           disabled={!ready}
-          className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#24D39E] text-sm font-semibold text-white hover:bg-[#1FBE8C] disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           샘플 e부터 볼래요
         </button>
@@ -385,6 +385,14 @@ function Step3({ profile }: { profile: Profile | null }) {
           className="border-border bg-surface text-foreground hover:bg-muted inline-flex h-12 w-full items-center justify-center rounded-xl border text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
         >
           내 글 바로 채점받을래요
+        </button>
+        <button
+          type="button"
+          onClick={() => go("/coach")}
+          disabled={!ready}
+          className="border-border bg-surface text-foreground hover:bg-muted inline-flex h-12 w-full items-center justify-center rounded-xl border text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          과정 코치로 직접 고쳐 써볼래요
         </button>
       </div>
 

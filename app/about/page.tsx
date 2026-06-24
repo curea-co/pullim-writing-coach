@@ -111,7 +111,7 @@ export default function AboutPage() {
       <div className="mt-12 flex flex-wrap items-center gap-3">
         <Link
           href="/try"
-          className="inline-flex items-center justify-center rounded-lg bg-[#24D39E] px-5 py-3 text-sm font-semibold text-white hover:bg-[#1FBE8C]"
+          className="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90"
         >
           직접 채점받기 →
         </Link>

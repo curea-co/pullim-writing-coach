@@ -78,7 +78,7 @@ export default function MePage() {
           </p>
           <Link
             href="/onboarding"
-            className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-xl bg-[#24D39E] px-4 text-sm font-semibold text-white hover:bg-[#1FBE8C]"
+            className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90"
           >
             온보딩 시작하기
           </Link>

@@ -41,25 +41,26 @@ import {
   type TeacherRubric,
   serializeRubricForPrompt,
 } from "@/app/lib/teacher-rubric";
+import type { CoachAssignment, WritingMode } from "@/app/lib/coach-setup";
 import { DEMO_TOKEN_KEY } from "@/app/components/TokenGate";
 import styles from "@/app/coach/coach.module.css";
 import Canvas from "./Canvas";
+import GuidePanel from "./GuidePanel";
 import BottomSheet, { type SheetPosition } from "./BottomSheet";
 import NudgeCard from "./NudgeCard";
 import GrowthBars, { GrowthRow } from "./GrowthBars";
 import { BlockIcon, MastGlyph } from "./icons";
 
-// ── 과제 컨텍스트(데모 기본값) ──────────────────────────────────────
-// 실서비스는 프로필/과제 선택에서 주입. 여기선 프로토타입과 동일한 데모 과제.
-const ASSIGNMENT = {
+// ── 데모 기본 과제 — prop 미주입(직접 마운트·테스트) 시 폴백 ──────────
+// 실서비스는 CoachSetupFlow에서 CoachAssignment prop으로 주입.
+const DEMO_ASSIGNMENT: CoachAssignment = {
   school_level: "중2",
   subject: "과학",
   genre: "설명문",
-  target_char_count: null as number | null,
-  prompt_text:
-    "화산의 형성 과정과 그것이 우리 삶에 미치는 영향을 설명하는 글을 쓰시오.",
+  target_char_count: null,
+  prompt_text: "화산의 형성 과정과 그것이 우리 삶에 미치는 영향을 설명하는 글을 쓰시오.",
+  title: "화산의 형성과 영향",
 };
-const ASSIGNMENT_TITLE = "화산의 형성과 영향";
 
 // nudge 대상 4영역(성장 가능성 제외) — 루브릭 칩 "약점" 표시용.
 const NUDGEABLE: readonly AreaName[] = ["과제 이해", "내용 충실도", "구조·논리", "표현·문장"];
@@ -251,13 +252,13 @@ function reducer(state: State, action: Action): State {
 // ── 세션 영속 (storage.ts 패턴 — SSR 가드 + 방어적 파싱) ──────────────
 // 순수 모듈(coach-session·process-log·teacher-rubric)은 import만 하고, 부수효과는 여기서만.
 
-// ASSIGNMENT(데모 과제) → 세션 메타(target_char_count 제외).
-function sessionAssignment(): SessionAssignment {
+// 과제 → 세션 메타(target_char_count 제외).
+function sessionAssignment(a: CoachAssignment): SessionAssignment {
   return {
-    school_level: ASSIGNMENT.school_level,
-    subject: ASSIGNMENT.subject,
-    genre: ASSIGNMENT.genre,
-    prompt_text: ASSIGNMENT.prompt_text,
+    school_level: a.school_level,
+    subject: a.subject,
+    genre: a.genre,
+    prompt_text: a.prompt_text,
   };
 }
 
@@ -365,13 +366,14 @@ function initState(): State {
 
 // ── API 호출 (TryClient/ScoreForm 패턴 답습) ─────────────────────────
 type CoachRequest = {
-  assignment: typeof ASSIGNMENT;
+  assignment: Pick<CoachAssignment, "school_level" | "subject" | "genre" | "target_char_count" | "prompt_text">;
   rubric?: string;
   submission: { body: string };
 };
 
 async function callCoach(
   body: string,
+  assignment: CoachAssignment,
   rubricText?: string,
 ): Promise<
   | { ok: true; output: CoachOutput }
@@ -382,7 +384,13 @@ async function callCoach(
   if (!token) return { ok: false, auth: true };
 
   const payload: CoachRequest = {
-    assignment: ASSIGNMENT,
+    assignment: {
+      school_level: assignment.school_level,
+      subject: assignment.subject,
+      genre: assignment.genre,
+      target_char_count: assignment.target_char_count,
+      prompt_text: assignment.prompt_text,
+    },
     submission: { body },
     // 교사 루브릭이 있으면 rubric 필드로 전송(route.ts 요청 계약). 없으면 미전송.
     ...(rubricText ? { rubric: rubricText } : {}),
@@ -452,7 +460,17 @@ function toScoreMap(output: CoachOutput): Record<AreaName, number> {
 }
 
 // ────────────────────────────────────────────────────────────────────
-export default function CoachClient({ onAuthExpired }: { onAuthExpired?: () => void }) {
+export default function CoachClient({
+  assignment: assignmentProp,
+  mode = "free",
+  onAuthExpired,
+  onNewAssignment,
+}: {
+  assignment?: CoachAssignment;
+  mode?: WritingMode;
+  onAuthExpired?: () => void;
+  onNewAssignment?: () => void;
+}) {
   const [state, dispatch] = useReducer(reducer, undefined, initState);
   const [currentNudge, setCurrentNudge] = useState<CoachNudge | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(false); // nudge/growth open↔peek 토글
@@ -463,6 +481,9 @@ export default function CoachClient({ onAuthExpired }: { onAuthExpired?: () => v
   // 교사 루브릭 직렬화 텍스트(마운트 시 1회 읽음). 있으면 /api/coach rubric 필드로 전송.
   const rubricRef = useRef<string | undefined>(undefined);
 
+  const assignment = assignmentProp ?? DEMO_ASSIGNMENT;
+  const assignmentTitle = assignment.title ?? assignment.prompt_text.slice(0, 24);
+
   const busy = state.phase === "checking" || state.phase === "rechecking";
 
   // ── 마운트: 루브릭 읽기 + 저장된 세션 복원(이어쓰기) ──
@@ -471,7 +492,16 @@ export default function CoachClient({ onAuthExpired }: { onAuthExpired?: () => v
     rubricRef.current = loadRubricText();
 
     const saved = loadSession();
-    if (saved) {
+    // 다른 과제의 세션이 남아 있으면 복원하지 않는다(curea-review-ai 지적): 새 과제 헤더 아래로
+    // 이전 글·점수가 되살아나는 혼선 방지. 과제 식별 4필드(학년·과목·장르·과제문)가 모두 같아야 동일 과제로 본다.
+    const sa = saved?.assignment;
+    const sameAssignment =
+      !!sa &&
+      sa.school_level === assignment.school_level &&
+      sa.subject === assignment.subject &&
+      sa.genre === assignment.genre &&
+      sa.prompt_text === assignment.prompt_text;
+    if (saved && sameAssignment) {
       sessionRef.current = saved;
       const lastDraft = saved.draftHistory[saved.draftHistory.length - 1];
       // 본문·점수·기준선·회차를 write 단계로 복원(다음 [봐줘]로 라이브 루프 재개).
@@ -482,6 +512,9 @@ export default function CoachClient({ onAuthExpired }: { onAuthExpired?: () => v
         baseline: fromAreaScores(saved.baseline),
         revisions: Math.max(0, saved.draftHistory.length - 1),
       });
+    } else if (saved) {
+      clearSession();
+      clearProcessLog();
     }
     // 마운트 1회(루브릭 읽기 + 세션 복원). dispatch는 안정적이라 deps 불필요.
   }, []);
@@ -492,7 +525,7 @@ export default function CoachClient({ onAuthExpired }: { onAuthExpired?: () => v
   const runCheck = async () => {
     if (!state.body.trim()) return;
     dispatch({ type: "CHECK_START" });
-    const r = await callCoach(state.body, rubricRef.current);
+    const r = await callCoach(state.body, assignment, rubricRef.current);
     if (!r.ok) {
       if (r.auth) {
         dispatch({ type: "AUTH_EXPIRED" }); // 글 보존하고 write 복귀
@@ -515,7 +548,7 @@ export default function CoachClient({ onAuthExpired }: { onAuthExpired?: () => v
     const sess = sessionRef.current;
     let revisionTracked = false;
     if (!sess) {
-      sessionRef.current = createSession(sessionAssignment(), state.body, areaScores, rubricRef.current);
+      sessionRef.current = createSession(sessionAssignment(assignment), state.body, areaScores, rubricRef.current);
     } else {
       const lastBody = sess.draftHistory[sess.draftHistory.length - 1]?.body ?? "";
       if (state.body !== lastBody) {
@@ -545,7 +578,7 @@ export default function CoachClient({ onAuthExpired }: { onAuthExpired?: () => v
     const lastBody = sessionRef.current?.draftHistory[sessionRef.current.draftHistory.length - 1]?.body ?? "";
     const wasRevised = sessionRef.current ? state.body !== lastBody : true;
     dispatch({ type: "RECHECK_START" });
-    const r = await callCoach(state.body, rubricRef.current);
+    const r = await callCoach(state.body, assignment, rubricRef.current);
     if (!r.ok) {
       if (r.auth) {
         dispatch({ type: "AUTH_EXPIRED" });
@@ -565,7 +598,7 @@ export default function CoachClient({ onAuthExpired }: { onAuthExpired?: () => v
     const areaScores = toAreaScores(scores);
     if (!sessionRef.current) {
       // 이론상 RECHECK 전 CHECK 필수라 발생 불가지만 방어적으로 세션 생성.
-      sessionRef.current = createSession(sessionAssignment(), state.body, areaScores, rubricRef.current);
+      sessionRef.current = createSession(sessionAssignment(assignment), state.body, areaScores, rubricRef.current);
     } else if (wasRevised) {
       sessionRef.current = recordRevision(sessionRef.current, state.body, areaScores, area, before, after);
     } else {
@@ -620,6 +653,19 @@ export default function CoachClient({ onAuthExpired }: { onAuthExpired?: () => v
     dispatch({ type: "RESET" });
   };
 
+  const handleNewAssignment = () => {
+    // 기존 reset()으로 세션·과정 로그·상태 초기화 후, 가이드 메모도 제거하고 onNewAssignment 콜백 호출.
+    reset();
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.removeItem("pwc-guide-memos-v1");
+      } catch {
+        /* swallow — 영속 실패가 흐름을 막지 않는다. */
+      }
+    }
+    onNewAssignment?.();
+  };
+
   return (
     <div className={`${styles.root} ${styles.stageBg} flex w-full flex-col items-center`}>
       {/* OS 토픽바 */}
@@ -662,10 +708,10 @@ export default function CoachClient({ onAuthExpired }: { onAuthExpired?: () => v
               <BlockIcon name="pen" size={38} className="rounded-[var(--r-md)]" />
               <div>
                 <div className={`${styles.brandFont} text-[16px] font-bold tracking-[-0.01em]`}>
-                  {ASSIGNMENT_TITLE}
+                  {assignmentTitle}
                 </div>
                 <div className={`${styles.monoFont} mt-px text-[10.5px] text-[var(--ink-4)]`}>
-                  수행평가 · {ASSIGNMENT.genre} · 채점 5영역
+                  수행평가 · {assignment.genre} · 채점 5영역
                 </div>
               </div>
             </div>
@@ -700,6 +746,13 @@ export default function CoachClient({ onAuthExpired }: { onAuthExpired?: () => v
             textareaRef={textareaRef}
           />
 
+          {/* 가이드 패널 — mode=guide + write 단계일 때만. 직교 패널(reducer 무수정). */}
+          {mode === "guide" && state.phase === "write" && (
+            <div className="px-[18px] pb-2">
+              <GuidePanel genre={assignment.genre} />
+            </div>
+          )}
+
           {/* 바텀시트 */}
           <BottomSheet
             position={sheetPosition}
@@ -721,7 +774,7 @@ export default function CoachClient({ onAuthExpired }: { onAuthExpired?: () => v
           </BottomSheet>
 
           {/* 완료화면 */}
-          <CompletionView state={state} onRestart={reset} />
+          <CompletionView state={state} onRestart={reset} onNewAssignment={handleNewAssignment} />
         </div>
       </div>
 
@@ -845,7 +898,15 @@ function SheetBody({
 }
 
 // ── 완료화면 ────────────────────────────────────────────────────────
-function CompletionView({ state, onRestart }: { state: State; onRestart: () => void }) {
+function CompletionView({
+  state,
+  onRestart,
+  onNewAssignment,
+}: {
+  state: State;
+  onRestart: () => void;
+  onNewAssignment: () => void;
+}) {
   const [wedgeOpen, setWedgeOpen] = useState(false);
   const on = state.phase === "done";
   const baseline = state.baseline ?? emptyScores();
@@ -914,13 +975,23 @@ function CompletionView({ state, onRestart }: { state: State; onRestart: () => v
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={onRestart}
-        className={`${styles.brandFont} mt-4 inline-flex w-full items-center justify-center rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[14px] font-semibold text-[var(--ink-2)] transition hover:border-[var(--ink-4)] hover:bg-[var(--pb-1)]`}
-      >
-        다시 해보기 ↺
-      </button>
+      <div className="mt-4 flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={onRestart}
+          className={`${styles.brandFont} inline-flex w-full items-center justify-center rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[14px] font-semibold text-[var(--ink-2)] transition hover:border-[var(--ink-4)] hover:bg-[var(--pb-1)]`}
+        >
+          다시 해보기 ↺
+        </button>
+        <button
+          type="button"
+          data-testid="coach-new-assignment"
+          onClick={onNewAssignment}
+          className={`${styles.brandFont} inline-flex w-full items-center justify-center rounded-xl px-4 py-2.5 text-[13px] font-medium text-[var(--ink-4)] transition hover:text-[var(--ink-2)]`}
+        >
+          다른 과제로 쓰기
+        </button>
+      </div>
     </div>
   );
 }

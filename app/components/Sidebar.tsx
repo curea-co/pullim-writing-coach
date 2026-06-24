@@ -41,6 +41,16 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
           실시간
         </span>
       </Link>
+      <Link
+        href="/coach"
+        onClick={onNavigate}
+        className={itemCls(pathname === "/coach")}
+      >
+        과정 코치
+        <span className="bg-accent-mid-surface text-accent-mid ml-auto rounded-full px-1.5 py-0.5 text-[10px] font-semibold">
+          베타
+        </span>
+      </Link>
       {/* 2026-05-31 #11 채점 결과 조회 — 직접 채점받기 바로 아래(짝지어 노출) */}
       <Link
         href="/results"
