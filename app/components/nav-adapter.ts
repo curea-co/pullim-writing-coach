@@ -31,5 +31,7 @@ export function railItems(pathname: string): RailItem[] {
 }
 
 export function tabItems(pathname: string): RailItem[] {
-  return NAV.slice(0, 4).map((n) => ({ label: n.label, href: n.href, active: isActive(n.href, pathname) }));
+  // Mobile bottom bar: the 5 primary content routes (홈/직접 채점/과정 코치/채점 결과/샘플).
+  // 내 정보·서비스 소개 stay rail-only (reachable on mobile via the home banner/closing CTA).
+  return NAV.slice(0, 5).map((n) => ({ label: n.label, href: n.href, active: isActive(n.href, pathname) }));
 }

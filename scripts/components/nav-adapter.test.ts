@@ -15,8 +15,8 @@ describe("nav-adapter", () => {
     expect(items.find((i) => i.href === "/samples")?.active).toBe(true);
     expect(items.find((i) => i.href === "/")?.active).toBe(false);
   });
-  it("tabItems returns the first 4 routes", () => {
-    expect(tabItems("/try").map((i) => i.href)).toEqual(["/", "/try", "/coach", "/results"]);
+  it("tabItems returns the 5 primary routes incl. /samples", () => {
+    expect(tabItems("/try").map((i) => i.href)).toEqual(["/", "/try", "/coach", "/results", "/samples"]);
     expect(tabItems("/try").find((i) => i.href === "/try")?.active).toBe(true);
   });
 });
