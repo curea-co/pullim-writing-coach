@@ -38,6 +38,16 @@ test("plainToHtml: HTML 특수문자 이스케이프", () => {
   assert.equal(plainToHtml("<태그> & 기호"), "<p>&lt;태그&gt; &amp; 기호</p>");
 });
 
+test("빈 문단 앞 선행 블록 보존", () => {
+  assert.equal(htmlToPlain("<p></p><p>a</p>"), "\na");
+});
+test("빈 문단 뒤 후행 블록 보존", () => {
+  assert.equal(htmlToPlain("<p>a</p><p></p>"), "a\n");
+});
+test("a·b 두 문단 조인", () => {
+  assert.equal(htmlToPlain("<p>a</p><p>b</p>"), "a\nb");
+});
+
 // 라운드트립 테스트
 test("roundtrip: htmlToPlain(plainToHtml(...))", () => {
   assert.equal(htmlToPlain(plainToHtml("가\n나")), "가\n나");
@@ -45,4 +55,16 @@ test("roundtrip: htmlToPlain(plainToHtml(...))", () => {
 test("roundtrip: 오탈자·띄어쓰기 보존", () => {
   const original = "화산은  위험하다 됬다";
   assert.equal(htmlToPlain(plainToHtml(original)), original);
+});
+test("roundtrip: 선행 개행 보존 (\\na)", () => {
+  assert.equal(htmlToPlain(plainToHtml("\na")), "\na");
+});
+test("roundtrip: 후행 개행 보존 (a\\n)", () => {
+  assert.equal(htmlToPlain(plainToHtml("a\n")), "a\n");
+});
+test("roundtrip: 내부 빈 줄 보존 (a\\n\\nb)", () => {
+  assert.equal(htmlToPlain(plainToHtml("a\n\nb")), "a\n\nb");
+});
+test("roundtrip: 빈 문자열", () => {
+  assert.equal(htmlToPlain(plainToHtml("")), "");
 });

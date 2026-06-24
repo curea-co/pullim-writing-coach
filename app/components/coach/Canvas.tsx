@@ -31,14 +31,25 @@ export default function Canvas({
   editorRef?: React.Ref<RichEditorHandle>;
 }) {
   const count = cp(htmlToPlain(valueHtml).trim());
+  const charCountId = "canvas-char-count-live";
 
   return (
     <div className="relative flex-1 overflow-hidden">
+      {/* 시각 글자수 배지 — 스크린리더에서는 숨김 */}
       <span
         className={`${styles.monoFont} absolute right-3.5 top-2 z-10 text-[10.5px] text-[var(--ink-5)]`}
         aria-hidden="true"
       >
         {count.toLocaleString("ko-KR")}자
+      </span>
+      {/* 스크린리더용 글자수 라이브 리전 — 시각적으로 숨김 */}
+      <span
+        id={charCountId}
+        role="status"
+        aria-live="polite"
+        className="sr-only"
+      >
+        현재 {count.toLocaleString("ko-KR")}자
       </span>
       <div className="h-full w-full overflow-auto px-[18px] pb-[130px] pt-[18px]">
         <RichEditor
@@ -50,6 +61,7 @@ export default function Canvas({
           editorRef={editorRef}
           placeholder="여기에 직접 글을 써 보세요."
           ariaLabel="글쓰기 캔버스"
+          ariaDescribedby={charCountId}
           dataTestid="coach-canvas"
           editableClassName={styles.canvas}
         />
