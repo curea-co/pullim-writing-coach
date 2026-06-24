@@ -27,7 +27,7 @@ import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { CoachNudge, CoachOutput } from "@/app/lib/coach-schema";
 import type { AreaName } from "@/app/data/scoring";
 import type { RichEditorHandle } from "@/app/components/editor/RichEditor";
-import { plainToHtml } from "@/app/lib/editor-doc";
+import { plainToHtml, htmlToPlain } from "@/app/lib/editor-doc";
 import { validateCoachOutput } from "@/app/lib/coach-schema";
 import { topNudge } from "@/app/lib/nudge-priority";
 import { AREAS } from "@/app/lib/grading";
@@ -537,8 +537,15 @@ export default function CoachClient({
         baseline: fromAreaScores(saved.baseline),
         revisions: Math.max(0, saved.draftHistory.length - 1),
       });
-      // 리치 HTML 복원(reducer 외부): 저장된 HTML이 있으면 우선 사용, 없으면 평문 → HTML 변환.
-      setBodyHtml(loadBodyHtml() || plainToHtml(lastDraft.body));
+      // 리치 HTML 복원(reducer 외부): 저장된 HTML이 있으면 우선 사용하되 state.body도 그 평문으로
+      // 재동기화(editor↔coach 불일치 방지). 없으면 평문 → HTML 변환(state.body는 RESTORE와 이미 동일).
+      const savedHtml = loadBodyHtml();
+      if (savedHtml) {
+        setBodyHtml(savedHtml);
+        dispatch({ type: "EDIT", body: htmlToPlain(savedHtml) }); // re-sync state.body to what the editor shows
+      } else {
+        setBodyHtml(plainToHtml(lastDraft.body));
+      }
     } else if (saved) {
       clearSession();
       clearProcessLog();

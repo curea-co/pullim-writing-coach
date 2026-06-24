@@ -30,6 +30,12 @@ describe("Canvas", () => {
     expect(typeof onChange).toBe("function");
   });
 
+  it("글자수 카운터가 valueHtml의 코드포인트 기준 자수를 표시한다", () => {
+    // htmlToPlain("<p>안녕</p>").trim() = "안녕" → cp = 2 → "2자"
+    render(<Canvas valueHtml="<p>안녕</p>" onChange={() => {}} />);
+    expect(screen.getByText("2자")).toBeInTheDocument();
+  });
+
   it("spellcheck/onToggleSpellcheck prop 전달 시 throw 없이 마운트된다", () => {
     const toggle = vi.fn();
     expect(() =>
