@@ -479,6 +479,7 @@ export default function CoachClient({
   const [state, dispatch] = useReducer(reducer, undefined, initState);
   const [currentNudge, setCurrentNudge] = useState<CoachNudge | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(false); // nudge/growth open↔peek 토글
+  const [outlineCollapsed, setOutlineCollapsed] = useState(false); // outline 패널 접기(로컬 UI state)
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // 라이브 세션(순수 CoachSession 모델) — 반복 갱신은 항상 새 객체로 교체(불변). 부수효과는 영속 헬퍼.
@@ -651,6 +652,7 @@ export default function CoachClient({
   const reset = () => {
     setCurrentNudge(null);
     setSheetExpanded(false);
+    setOutlineCollapsed(false); // 새 라운드는 개요 패널 다시 열림
     // 라이브 세션·과정 로그도 초기화(새 라운드는 깨끗한 궤적에서 시작).
     sessionRef.current = null;
     clearSession();
@@ -763,10 +765,16 @@ export default function CoachClient({
             </div>
           )}
 
-          {/* 개요 패널 — mode=outline + write 단계일 때만. 직교 패널(reducer 무수정). */}
-          {mode === "outline" && state.phase === "write" && (
+          {/* 개요 패널 — mode=outline + write 단계 + 패널 미접힘일 때만. 직교 패널(reducer 무수정). */}
+          {mode === "outline" && state.phase === "write" && !outlineCollapsed && (
             <div className="px-[18px] pb-2">
-              <OutlinePanel genre={assignment.genre} />
+              <OutlinePanel
+                genre={assignment.genre}
+                onStartBody={() => {
+                  setOutlineCollapsed(true);
+                  textareaRef.current?.focus();
+                }}
+              />
             </div>
           )}
 
