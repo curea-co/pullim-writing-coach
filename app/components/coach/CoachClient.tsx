@@ -550,16 +550,21 @@ export default function CoachClient({
         baseline: fromAreaScores(saved.baseline),
         revisions: Math.max(0, saved.draftHistory.length - 1),
       });
-      // 리치 HTML 복원(reducer 외부): sig가 현재 과제와 일치하는 저장 HTML이 있으면 우선 사용하되
-      // state.body도 그 HTML의 평문으로 재동기화(editor↔coach 불일치 방지).
-      // sig 불일치(다른 과제 HTML) 또는 미저장 → 세션 평문에서 HTML 재생성.
+      // 리치 HTML 복원(reducer 외부): sig + htmlToPlain(html) === savedBody 둘 다 만족할 때만
+      // 저장 HTML을 신뢰한다. sig는 같더라도 html의 평문이 세션 마지막 draft와 다르면
+      // (quota 실패·탭 레이스 등으로 html이 stalе) 세션 평문에서 HTML을 재생성한다.
+      // state.body는 RESTORE 액션으로 이미 savedBody로 설정되어 있으며,
+      // html 신뢰 분기에서도 htmlToPlain(html) === savedBody이므로 추가 EDIT 동기화 불필요.
       const savedBody = lastDraft.body;
       const savedHtmlEntry = loadBodyHtml();
-      if (savedHtmlEntry && savedHtmlEntry.sig === assignmentSig(assignment)) {
-        setBodyHtml(savedHtmlEntry.html);
-        dispatch({ type: "EDIT", body: htmlToPlain(savedHtmlEntry.html) }); // keep state.body in sync with what's shown
+      if (
+        savedHtmlEntry &&
+        savedHtmlEntry.sig === assignmentSig(assignment) &&
+        htmlToPlain(savedHtmlEntry.html) === savedBody
+      ) {
+        setBodyHtml(savedHtmlEntry.html); // html is the formatted version of exactly the session's last draft → safe
       } else {
-        setBodyHtml(plainToHtml(savedBody)); // no match / other assignment → reconstruct from session plain; state.body already = savedBody via RESTORE
+        setBodyHtml(plainToHtml(savedBody)); // mismatch/stale/other-assignment → reconstruct from session plain
       }
     } else if (saved) {
       clearSession();

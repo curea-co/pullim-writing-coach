@@ -26,6 +26,18 @@ function loadBodyHtml(): { sig: string; html: string } | null {
 const A1 = { school_level: "중2", subject: "과학", genre: "설명문", prompt_text: "화산" };
 const A2 = { school_level: "중2", subject: "국어", genre: "논설문", prompt_text: "독서" };
 
+// ── htmlToPlain 인라인 재현 (editor-doc.ts와 동일 로직) ──────────────────────
+function htmlToPlain(html: string): string {
+  if (!html) return "";
+  const withBreaks = html
+    .replace(/<\/(p|h[1-6]|div|li)>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "");
+  const ENTITIES: Record<string, string> = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'", "&nbsp;": " " };
+  const decoded = withBreaks.replace(/&[a-zA-Z#0-9]+;/g, (m) => ENTITIES[m] ?? m);
+  return decoded.replace(/\n+$/g, "").replace(/^\n+/g, "");
+}
+
 describe("body_html sig 스코프 (CoachClient 로직 단위 재현)", () => {
   beforeEach(() => localStorage.clear());
 
@@ -58,6 +70,53 @@ describe("body_html sig 스코프 (CoachClient 로직 단위 재현)", () => {
   it("sig·html 필드가 없으면 null을 반환한다", () => {
     localStorage.setItem(BODY_HTML_KEY, JSON.stringify({ foo: "bar" }));
     expect(loadBodyHtml()).toBeNull();
+  });
+
+  // ── 신선도 규칙(Codex 리뷰 round 5) ─────────────────────────────────────────
+  // html의 평문 투영 === 세션 마지막 draft body일 때만 신뢰; 아니면 세션 평문으로 재구성.
+
+  it("sig 일치 + htmlToPlain(html) === savedBody → 신뢰 (html 그대로 사용)", () => {
+    const sig = assignmentSig(A1);
+    const html = "<p><strong>화산</strong>의 형성</p>";
+    const savedBody = "화산의 형성"; // htmlToPlain(html)
+    saveBodyHtml(sig, html);
+    const entry = loadBodyHtml();
+    // 복원 조건 평가
+    const trusted =
+      !!entry &&
+      entry.sig === sig &&
+      htmlToPlain(entry.html) === savedBody;
+    expect(trusted).toBe(true);
+    // 신뢰 분기 → html을 그대로 사용해야 함
+    expect(entry!.html).toBe(html);
+  });
+
+  it("sig 일치 + htmlToPlain(html) !== savedBody → 거부 (세션 평문으로 재구성)", () => {
+    const sig = assignmentSig(A1);
+    // html이 저장된 이후 세션 draft body가 학생 추가 입력으로 달라진 케이스
+    const staleHtml = "<p>오래된 내용</p>";
+    const latestBody = "최신 내용"; // 세션 최신 draft (html과 다름)
+    saveBodyHtml(sig, staleHtml);
+    const entry = loadBodyHtml();
+    const trusted =
+      !!entry &&
+      entry.sig === sig &&
+      htmlToPlain(entry.html) === latestBody;
+    // 평문 불일치 → 거부
+    expect(trusted).toBe(false);
+  });
+
+  it("sig 불일치 + htmlToPlain 일치여도 → 거부 (다른 과제 HTML)", () => {
+    // 다른 과제로 저장했지만 우연히 같은 평문인 케이스
+    const html = "<p>동일 본문</p>";
+    const savedBody = "동일 본문";
+    saveBodyHtml(assignmentSig(A2), html);
+    const entry = loadBodyHtml();
+    const trusted =
+      !!entry &&
+      entry.sig === assignmentSig(A1) && // A1 과제 sig와 비교
+      htmlToPlain(entry.html) === savedBody;
+    expect(trusted).toBe(false);
   });
 });
 

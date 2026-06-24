@@ -28,7 +28,22 @@ export default function RichEditor({
   const editor = useEditor({
     immediatelyRender: false, // SSR 안전
     editable: !disabled,
-    extensions: [StarterKit.configure({ heading: { levels: [1, 2] } }), TextStyle, FontSize],
+    extensions: [
+      StarterKit.configure({
+        heading: { levels: [1, 2] },
+        bulletList: false,
+        orderedList: false,
+        listItem: false,
+        blockquote: false,
+        codeBlock: false,
+        code: false,
+        strike: false,
+        italic: false,
+        horizontalRule: false,
+      }),
+      TextStyle,
+      FontSize,
+    ],
     content: valueHtml || "",
     editorProps: {
       attributes: {
