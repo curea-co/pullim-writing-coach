@@ -35,20 +35,15 @@ export default function Canvas({
 
   return (
     <div className="relative flex-1 overflow-hidden">
-      {/* 시각 글자수 배지 — 스크린리더에서는 숨김 */}
+      {/* 시각 글자수 배지 — 스크린리더에서는 숨김. pointer-events-none: 위에 떠도 툴바 클릭을 가로채지 않음 */}
       <span
-        className={`${styles.monoFont} absolute right-3.5 top-2 z-10 text-[10.5px] text-[var(--ink-5)]`}
+        className={`${styles.monoFont} pointer-events-none absolute right-3.5 top-2 z-10 text-[10.5px] text-[var(--ink-5)]`}
         aria-hidden="true"
       >
         {count.toLocaleString("ko-KR")}자
       </span>
-      {/* 스크린리더용 글자수 라이브 리전 — 시각적으로 숨김 */}
-      <span
-        id={charCountId}
-        role="status"
-        aria-live="polite"
-        className="sr-only"
-      >
+      {/* 스크린리더용 글자수 — aria-describedby 정적 설명(매 타이핑 낭독 방지: live region 아님) */}
+      <span id={charCountId} className="sr-only">
         현재 {count.toLocaleString("ko-KR")}자
       </span>
       <div className="h-full w-full overflow-auto px-[18px] pb-[130px] pt-[18px]">

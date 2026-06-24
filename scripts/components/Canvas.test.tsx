@@ -168,11 +168,14 @@ describe("Canvas", () => {
     expect(screen.getByText("2자")).toBeInTheDocument();
   });
 
-  it("글자수 라이브 리전(id=canvas-char-count-live)이 존재한다 (a11y)", () => {
+  it("글자수 정적 설명(id=canvas-char-count-live)이 존재하고 live region이 아니다 (a11y)", () => {
     render(<Canvas valueHtml="<p>안녕</p>" onChange={() => {}} />);
-    const liveEl = document.getElementById("canvas-char-count-live");
-    expect(liveEl).not.toBeNull();
-    expect(liveEl?.getAttribute("aria-live")).toBe("polite");
+    const descEl = document.getElementById("canvas-char-count-live");
+    expect(descEl).not.toBeNull();
+    // aria-describedby용 정적 설명 — 매 타이핑마다 낭독하지 않도록 live region이 아니어야 함
+    expect(descEl?.getAttribute("aria-live")).toBeNull();
+    expect(descEl?.getAttribute("role")).toBeNull();
+    expect(descEl?.textContent).toContain("2자");
   });
 
   it("editable에 aria-describedby가 canvas-char-count-live를 가리킨다 (a11y)", () => {
