@@ -1,6 +1,6 @@
-import { Extension } from "@tiptap/react";
+import { Extension } from "@tiptap/core";
 // TextStyle 위에 fontSize 속성을 얹는 최소 확장. setFontSize/unsetFontSize 커맨드 제공.
-declare module "@tiptap/react" {
+declare module "@tiptap/core" {
   interface Commands<ReturnType> {
     fontSize: { setFontSize: (size: string) => ReturnType; unsetFontSize: () => ReturnType };
   }

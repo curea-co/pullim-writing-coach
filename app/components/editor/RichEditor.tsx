@@ -48,7 +48,7 @@ export default function RichEditor({
     content: valueHtml || "",
     editorProps: {
       attributes: {
-        class: `tiptap min-h-40 w-full px-3 py-2 text-sm leading-relaxed focus:outline-none${editableClassName ? ` ${editableClassName}` : ""}`,
+        class: `tiptap min-h-40 h-full w-full px-3 py-2 text-sm leading-relaxed focus:outline-none${editableClassName ? ` ${editableClassName}` : ""}`,
         spellcheck: spellcheck ? "true" : "false",
         ...(ariaLabel ? { "aria-label": ariaLabel } : {}),
         ...(ariaDescribedby ? { "aria-describedby": ariaDescribedby } : {}),
@@ -89,12 +89,14 @@ export default function RichEditor({
   }, [editor, spellcheck]);
 
   return (
-    <div className="border-border bg-background rounded-lg border">
+    <div className="border-border bg-background flex h-full flex-col rounded-lg border">
       <EditorToolbar editor={editor} spellcheck={spellcheck} onToggleSpellcheck={onToggleSpellcheck} disabled={disabled} />
-      <EditorContent editor={editor} />
-      {placeholder && editor?.isEmpty ? (
-        <div className="text-subtle-foreground pointer-events-none -mt-9 px-3 text-sm" aria-hidden>{placeholder}</div>
-      ) : null}
+      <div className="flex-1 overflow-auto">
+        <EditorContent editor={editor} className="h-full" />
+        {placeholder && editor?.isEmpty ? (
+          <div className="text-subtle-foreground pointer-events-none -mt-9 px-3 text-sm" aria-hidden>{placeholder}</div>
+        ) : null}
+      </div>
     </div>
   );
 }
