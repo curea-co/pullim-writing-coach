@@ -152,3 +152,32 @@ test("saveDraft: 일반 denied — denied reason", () => {
   assert.equal(result.ok, false);
   assert.equal(result.reason, "denied");
 });
+
+// ── body_html (RichEditor 서식 영속, 가산 필드) ──────────────────────────
+test("isDraftSnapshot: body_html undefined → 통과(선택 필드)", () => {
+  assert.ok(isDraftSnapshot({ body: "x", saved_at: "2026-05-29T15:00:00+09:00" }));
+});
+
+test("isDraftSnapshot: body_html string → 통과", () => {
+  assert.ok(isDraftSnapshot({ body: "x", saved_at: "x", body_html: "<p>x</p>" }));
+});
+
+test("isDraftSnapshot: body_html 비-string → 거부", () => {
+  assert.equal(isDraftSnapshot({ body: "x", saved_at: "x", body_html: 42 }), false);
+  assert.equal(isDraftSnapshot({ body: "x", saved_at: "x", body_html: true }), false);
+  assert.equal(isDraftSnapshot({ body: "x", saved_at: "x", body_html: [] }), false);
+});
+
+test("saveDraft + loadDraft roundtrip: body_html 보존", () => {
+  saveDraft({ body: "안녕", body_html: "<p>안녕</p>" });
+  const loaded = loadDraft();
+  assert.ok(loaded);
+  assert.equal(loaded.body_html, "<p>안녕</p>");
+});
+
+test("saveDraft: body_html 없으면 loaded.body_html === undefined", () => {
+  saveDraft({ body: "안녕" });
+  const loaded = loadDraft();
+  assert.ok(loaded);
+  assert.equal(loaded.body_html, undefined);
+});

@@ -247,6 +247,7 @@ const DRAFT_KEY = "pwc_draft_v1";
 
 export type DraftSnapshot = {
   body: string;                    // 학생 글 원본 (정규화 전)
+  body_html?: string;              // RichEditor HTML(서식 영속, 가산). 복원은 이걸 우선, 없으면 plainToHtml(body).
   // 타입은 string으로 두되 isDraftSnapshot이 enum 멤버십을 검증 — Codex 리뷰 2026-05-29.
   //   타입 narrow를 안 하는 이유: ScoreForm의 schoolLevel은 useState<string>("")로
   //   select onChange에서 enum 값이 들어오는 구조라, 호출자 캐스팅 부담을 안 만들기 위함.
@@ -282,6 +283,7 @@ export function isDraftSnapshot(v: unknown): v is DraftSnapshot {
   for (const k of ["target_raw", "prompt_text"] as const) {
     if (o[k] !== undefined && typeof o[k] !== "string") return false;
   }
+  if (o.body_html !== undefined && typeof o.body_html !== "string") return false;
   return true;
 }
 

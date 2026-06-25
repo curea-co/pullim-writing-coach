@@ -21,6 +21,7 @@ export type ScoreWizardProps = {
 
 export default function ScoreWizard({ onAuthExpired, defaults }: ScoreWizardProps): React.ReactNode {
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [spellcheckOn, setSpellcheckOn] = useState(false); // RichEditor 맞춤법 표시 UI 상태(소유).
   const formTopRef = useRef<HTMLDivElement>(null);
 
   const form = useScoreForm({
@@ -52,7 +53,8 @@ export default function ScoreWizard({ onAuthExpired, defaults }: ScoreWizardProp
       {step === 1 && (
         <StepEssay
           body={form.body}
-          onChangeBody={form.setBody}
+          bodyHtml={form.bodyHtml}
+          onEditorChange={form.onEditorChange}
           bodyCount={form.bodyCount}
           bodyError={form.bodyError}
           bodyOk={form.bodyOk}
@@ -60,6 +62,8 @@ export default function ScoreWizard({ onAuthExpired, defaults }: ScoreWizardProp
           locked={form.locked}
           lastSavedAt={form.lastSavedAt}
           targetNum={form.targetNum}
+          spellcheck={spellcheckOn}
+          onToggleSpellcheck={() => setSpellcheckOn((v) => !v)}
           restoredDraft={form.restoredDraft}
           onApplyRestore={form.applyRestore}
           onDismissRestore={form.dismissRestore}

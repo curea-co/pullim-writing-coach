@@ -32,6 +32,7 @@ import {
   saveDraft,
 } from "@/app/lib/storage";
 import { computeProgress } from "@/app/lib/progress";
+import { plainToHtml } from "@/app/lib/editor-doc";
 import { DEMO_TOKEN_KEY } from "@/app/components/TokenGate";
 
 // 요청 계약 (contract §3.1). body 는 **원본** — 정규화·char_count 는 서버 권위.
@@ -68,6 +69,8 @@ export type UseScoreFormReturn = {
   // ── Essay field ──────────────────────────────────────────────────────
   body: string;
   setBody: (v: string) => void;
+  bodyHtml: string;                 // RichEditor HTML(서식 보존) — StepEssay valueHtml로 전달
+  onEditorChange: (c: { html: string; text: string }) => void;  // RichEditor onChange — bodyHtml/body 원자적 갱신
   bodyCount: number;                // charCount(normalizeBody(body))
   bodyError: { code: string; message: string } | null;
   bodyOk: boolean;
@@ -78,8 +81,8 @@ export type UseScoreFormReturn = {
   fileError: string | null;
   isDraggingFile: boolean;
   handleFileInput: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  handleDrop: (e: React.DragEvent<HTMLTextAreaElement>) => void;
-  handleDragOver: (e: React.DragEvent<HTMLTextAreaElement>) => void;
+  handleDrop: (e: React.DragEvent<HTMLElement>) => void;
+  handleDragOver: (e: React.DragEvent<HTMLElement>) => void;
   handleDragLeave: () => void;
 
   // ── Draft banner ─────────────────────────────────────────────────────
@@ -146,6 +149,7 @@ export function useScoreForm(opts: {
   const [targetRaw, setTargetRaw] = useState(() => getMostUsedMeta("target_raw") ?? "");
   const [promptText, setPromptText] = useState("");
   const [body, setBody] = useState("");
+  const [bodyHtml, setBodyHtml] = useState("");
   const [submitState, setSubmitState] = useState<SubmitState>({ phase: "idle" });
 
   // 제출 횟수(첫 제출=1, 새 제출마다 +1). 재시도는 유지.
@@ -216,6 +220,7 @@ export function useScoreForm(opts: {
     const t = setTimeout(() => {
       const res = saveDraft({
         body,
+        body_html: bodyHtml,
         school_level: schoolLevel || undefined,
         subject: subject || undefined,
         genre: genre || undefined,
@@ -225,7 +230,7 @@ export function useScoreForm(opts: {
       if (res.ok) setLastSavedAt(res.saved_at);
     }, 800);
     return () => clearTimeout(t);
-  }, [body, schoolLevel, subject, genre, targetRaw, promptText, submitState.phase, restoredDraft]);
+  }, [body, bodyHtml, schoolLevel, subject, genre, targetRaw, promptText, submitState.phase, restoredDraft]);
 
   // #9 제출 성공 시 draft 폐기.
   useEffect(() => {
@@ -238,6 +243,7 @@ export function useScoreForm(opts: {
   function applyRestore() {
     if (!restoredDraft) return;
     setBody(restoredDraft.body);
+    setBodyHtml(restoredDraft.body_html ?? plainToHtml(restoredDraft.body));
     if (restoredDraft.school_level) setSchoolLevel(restoredDraft.school_level);
     if (restoredDraft.subject) setSubject(restoredDraft.subject);
     if (restoredDraft.genre) setGenre(restoredDraft.genre);
@@ -256,12 +262,19 @@ export function useScoreForm(opts: {
   function applyClipboard() {
     if (!clipboardPreview) return;
     setBody(clipboardPreview);
+    setBodyHtml(plainToHtml(clipboardPreview));
     setClipboardPreview(null);
   }
 
   function dismissClipboard() {
     setClipboardPreview(null);
   }
+
+  // RichEditor onChange — bodyHtml(서식)·body(평문 투영)를 원자적으로 갱신.
+  const onEditorChange = (c: { html: string; text: string }) => {
+    setBodyHtml(c.html);
+    setBody(c.text);
+  };
 
   // #C/#M3 ② 파일 → 텍스트 변환.
   async function readTextFile(file: File) {
@@ -329,6 +342,7 @@ export function useScoreForm(opts: {
         return;
       }
       setBody(text);
+      setBodyHtml(plainToHtml(text));
     } catch {
       setFileError(
         isDocx
@@ -348,7 +362,7 @@ export function useScoreForm(opts: {
     return Array.from(dt.types || []).includes("Files");
   }
 
-  function handleDrop(e: React.DragEvent<HTMLTextAreaElement>) {
+  function handleDrop(e: React.DragEvent<HTMLElement>) {
     if (!hasFilesInDataTransfer(e.dataTransfer)) {
       setIsDraggingFile(false);
       return;
@@ -359,7 +373,7 @@ export function useScoreForm(opts: {
     if (file) void readTextFile(file);
   }
 
-  function handleDragOver(e: React.DragEvent<HTMLTextAreaElement>) {
+  function handleDragOver(e: React.DragEvent<HTMLElement>) {
     if (!hasFilesInDataTransfer(e.dataTransfer)) {
       return;
     }
@@ -557,6 +571,8 @@ export function useScoreForm(opts: {
     // Essay field
     body,
     setBody,
+    bodyHtml,
+    onEditorChange,
     bodyCount,
     bodyError,
     bodyOk,

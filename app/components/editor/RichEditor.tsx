@@ -21,10 +21,11 @@ export interface RichEditorProps {
   onToggleSpellcheck?: () => void;
   dataTestid?: string;
   editableClassName?: string;  // contenteditable 루트에 추가 클래스(예: styles.canvas 노트 배경)
+  editableId?: string;         // contenteditable 요소의 id (e2e 셀렉터 + a11y 훅)
 }
 
 export default function RichEditor({
-  valueHtml, onChange, spellcheck = false, disabled = false, placeholder, editorRef, ariaLabel, ariaDescribedby, onToggleSpellcheck, dataTestid, editableClassName,
+  valueHtml, onChange, spellcheck = false, disabled = false, placeholder, editorRef, ariaLabel, ariaDescribedby, onToggleSpellcheck, dataTestid, editableClassName, editableId,
 }: RichEditorProps) {
   const editor = useEditor({
     immediatelyRender: false, // SSR 안전
@@ -54,6 +55,7 @@ export default function RichEditor({
         ...(ariaLabel ? { "aria-label": ariaLabel } : {}),
         ...(ariaDescribedby ? { "aria-describedby": ariaDescribedby } : {}),
         ...(dataTestid ? { "data-testid": dataTestid } : {}),
+        ...(editableId ? { id: editableId } : {}),
       },
     },
     onUpdate: ({ editor }) => {

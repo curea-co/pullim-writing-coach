@@ -15,6 +15,7 @@ import {
   computeProgress,
 } from "@/app/lib/progress";
 import type { DraftSnapshot } from "@/app/lib/storage";
+import RichEditor from "@/app/components/editor/RichEditor";
 
 // #9 본문 자동 저장 — saved_at(ISO) → "M/D HH:MM" 짧은 카피.
 function formatSavedAt(iso: string): string {
@@ -32,9 +33,10 @@ function formatSavedAt(iso: string): string {
 }
 
 export type StepEssayProps = {
-  // Essay state (seam: later swap textarea for RichEditor here)
-  body: string;
-  onChangeBody: (v: string) => void; // RichEditor seam: plain-text projection feeds this
+  // Essay state (RichEditor seam)
+  body: string;                     // 평문 — 글자수·검증·배너·클립보드 조건에 사용
+  bodyHtml: string;                 // RichEditor에 주입하는 HTML 값
+  onEditorChange: (c: { html: string; text: string }) => void;
   bodyCount: number;
   bodyError: { code: string; message: string } | null;
   bodyOk: boolean;
@@ -42,6 +44,9 @@ export type StepEssayProps = {
   locked: boolean;
   lastSavedAt: string | null;
   targetNum: number | null;
+  // Spellcheck (ScoreWizard가 소유, prop으로 전달)
+  spellcheck: boolean;
+  onToggleSpellcheck: () => void;
   // Draft banner
   restoredDraft: DraftSnapshot | null;
   onApplyRestore: () => void;
@@ -55,8 +60,8 @@ export type StepEssayProps = {
   fileError: string | null;
   isDraggingFile: boolean;
   onFileInput: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onDrop: (e: React.DragEvent<HTMLTextAreaElement>) => void;
-  onDragOver: (e: React.DragEvent<HTMLTextAreaElement>) => void;
+  onDrop: (e: React.DragEvent<HTMLElement>) => void;
+  onDragOver: (e: React.DragEvent<HTMLElement>) => void;
   onDragLeave: () => void;
   // Navigation
   onNext: () => void; // "다음 단계" button handler
@@ -64,7 +69,8 @@ export type StepEssayProps = {
 
 export default function StepEssay({
   body,
-  onChangeBody,
+  bodyHtml,
+  onEditorChange,
   bodyCount,
   bodyError,
   bodyOk,
@@ -72,6 +78,8 @@ export default function StepEssay({
   locked,
   lastSavedAt,
   targetNum,
+  spellcheck,
+  onToggleSpellcheck,
   restoredDraft,
   onApplyRestore,
   onDismissRestore,
@@ -175,26 +183,29 @@ export default function StepEssay({
           두세요 — 그 부분도 채점 대상이에요.
         </p>
 
-        {/* === RichEditor seam: swap this block for <RichEditor> and pipe htmlToPlain → onChangeBody === */}
-        <textarea
-          id="body"
-          name="body"
-          aria-label="학생 글 본문"
-          value={body}
-          onChange={(e) => onChangeBody(e.target.value)}
+        {/* === RichEditor seam (textarea→RichEditor). 드래그&드롭은 래퍼 div로 이동. === */}
+        <div
           onDrop={onDrop}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
-          disabled={locked}
-          rows={12}
-          placeholder="여기에 글 전체를 붙여넣어 주세요 (50자 이상). .txt·.md·.docx 파일을 끌어다 놓아도 돼요."
           className={cn(
-            "border-border bg-background text-foreground w-full resize-y rounded-lg border px-3 py-2 text-sm leading-relaxed transition-colors",
-            bodyError && "border-band-warn",
-            isDraggingFile && "border-accent-mid bg-accent-mid-surface/40 border-2",
-            locked && "cursor-not-allowed opacity-60"
+            "rounded-lg transition-colors",
+            bodyError && "ring-band-warn ring-1",
+            isDraggingFile && "ring-accent-mid bg-accent-mid-surface/40 ring-2",
+            locked && "opacity-60",
           )}
-        />
+        >
+          <RichEditor
+            valueHtml={bodyHtml}
+            onChange={onEditorChange}
+            editableId="body"
+            ariaLabel="학생 글 본문"
+            spellcheck={spellcheck}
+            onToggleSpellcheck={onToggleSpellcheck}
+            disabled={locked}
+            placeholder="여기에 글을 써 보세요. 헤더·볼드·폰트크기를 쓸 수 있어요."
+          />
+        </div>
         {/* === end RichEditor seam === */}
 
         {/* #C 파일 업로드 버튼 + DnD 안내 + 에러 */}
