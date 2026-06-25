@@ -65,6 +65,7 @@ describe("StepInfo", () => {
     expect(document.getElementById("school-level")).toBeInTheDocument();
     expect(document.getElementById("subject")).toBeInTheDocument();
     expect(document.getElementById("genre")).toBeInTheDocument();
+    expect(document.getElementById("target")).toBeInTheDocument();
     expect(document.getElementById("prompt")).toBeInTheDocument();
   });
 });
