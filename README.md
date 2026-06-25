@@ -31,8 +31,6 @@
 5. 결과 — 5영역 점수 · 잘한 점/고칠 점 · 수정 가이드 · 성취 서사 · 내보내기
 ```
 
-> 전체 기능 인벤토리는 [docs/Daily/feature_list_2026-06-25.md](docs/Daily/feature_list_2026-06-25.md) 참고.
-
 ---
 
 ## 채점 5영역 (rubric v0.5)
@@ -70,7 +68,7 @@
 | `POST /api/coach` | 과정 코치 상호작용 응답 | Claude Haiku 4.5 |
 
 - 모든 라우트는 `x-demo-token` 게이트(상수시간 비교)로 보호됩니다.
-- `/api/score`는 IP당 분당 10회 rate limit.
+- rate limit(`middleware.ts`, user/IP 2단, 분당): `/api/score`·`/api/extract` = user 10·IP 60 · `/api/coach` = user 20·IP 120.
 
 ### 환경변수 (`.env.example` 참고)
 
@@ -89,7 +87,7 @@
 - **Tailwind CSS v4** — 시맨틱 토큰(`@theme`) 기반, `cn()`(clsx + tailwind-merge) 유틸
 - **TipTap** 리치 에디터 (작성 캔버스)
 - **PUDS** dashboard shell — OS 스타일 홈·셸·네비게이션
-- **Anthropic SDK** (Claude Haiku 4.5) — 추출·채점·코치
+- **Claude** (Haiku 4.5) — 추출·채점·코치. Messages API를 raw `fetch`로 호출(`app/lib/server/anthropic.ts`, `@anthropic-ai/sdk` 미사용)
 - **Sentry** 에러 모니터링 (env 설정 시)
 - 테스트: **Vitest**(컴포넌트) · Node `--test`(unit) · **Playwright**(e2e)
 - 배포: **Vercel** (`main` push → 자동 프로덕션 배포)
