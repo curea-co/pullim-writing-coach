@@ -4,7 +4,7 @@
 //
 // 실행: npm run test:e2e (Playwright config로 dev 서버 자동 기동).
 
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 const MOCK_BODY =
   "오늘 학교에서 친구들과 점심을 먹으며 교복 자율화에 대해 토론했다. " +
@@ -31,6 +31,16 @@ const MOCK_OUTPUT = {
   },
 };
 
+// Helper: fill the #body TipTap contenteditable.
+// #body is a contenteditable div — .fill() and .toHaveValue() don't work on it.
+// Apply the coach.spec.ts pattern: click → select-all → insertText.
+async function fillBody(page: Page, text: string) {
+  const el = page.locator("#body");
+  await el.click();
+  await page.keyboard.press("ControlOrMeta+A");
+  await page.keyboard.insertText(text);
+}
+
 test.describe("/try 동선 happy path (paradigm v1 wizard)", () => {
   test.beforeEach(async ({ context, page }) => {
     // /api/score를 mock — 백엔드·토큰 무관하게 E2E 가능.
@@ -55,8 +65,8 @@ test.describe("/try 동선 happy path (paradigm v1 wizard)", () => {
     const nextButton = page.getByRole("button", { name: /다음 단계/ });
     await expect(nextButton).toBeDisabled();
 
-    // 본문 채움 — id="body"
-    await page.locator("#body").fill(MOCK_BODY);
+    // 본문 채움 — id="body" (TipTap contenteditable)
+    await fillBody(page, MOCK_BODY);
     await expect(nextButton).toBeEnabled();
   });
 
@@ -74,7 +84,7 @@ test.describe("/try 동선 happy path (paradigm v1 wizard)", () => {
     await page.goto("/try");
 
     // Step 1
-    await page.locator("#body").fill(MOCK_BODY);
+    await fillBody(page, MOCK_BODY);
     await page.getByRole("button", { name: /다음 단계/ }).click();
 
     // Step 2 — 글 미리보기 + 메타 폼
@@ -111,7 +121,7 @@ test.describe("/try 동선 happy path (paradigm v1 wizard)", () => {
     await page.goto("/try");
 
     // Step 1 → Step 2 진입
-    await page.locator("#body").fill(MOCK_BODY);
+    await fillBody(page, MOCK_BODY);
     await page.getByRole("button", { name: /다음 단계/ }).click();
     await expect(page.getByText("내 글 미리보기")).toBeVisible();
 
@@ -121,12 +131,12 @@ test.describe("/try 동선 happy path (paradigm v1 wizard)", () => {
 
     // Step 1으로 복귀, body 유지
     await expect(page.getByRole("heading", { name: "1. 글을 넣어 주세요" })).toBeVisible();
-    await expect(page.locator("#body")).toHaveValue(MOCK_BODY);
+    await expect(page.locator("#body")).toContainText(MOCK_BODY);
   });
 
   test("Step 2 disabled hint — 누락 필드 동적 나열", async ({ page }) => {
     await page.goto("/try");
-    await page.locator("#body").fill(MOCK_BODY);
+    await fillBody(page, MOCK_BODY);
     await page.getByRole("button", { name: /다음 단계/ }).click();
 
     // 메타 비어 있음 — AI 첨삭 받기 disabled + 안내
