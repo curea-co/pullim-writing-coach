@@ -124,19 +124,16 @@ export default function ResultView({
           <span className="text-subtle-foreground tabular-nums">01</span>
           점수
         </h2>
-        <div className="mb-2 flex items-baseline gap-3">
-          <div className="text-foreground text-5xl font-bold tracking-tight">
+
+        {/* Hero: total score + band */}
+        <div className="bg-surface-raised rounded-xl p-5 text-center mb-4">
+          <div className="text-foreground text-5xl font-bold tracking-tight tabular-nums">
             {output.total_score}
-            <span className="text-subtle-foreground text-xl font-normal">
-              {" "}
-              / 100
-            </span>
+            <span className="text-subtle-foreground text-xl font-normal"> / 100</span>
           </div>
-          <span className={cn("text-sm font-medium", band.textClass)}>
-            {band.label}
-          </span>
+          <p className={cn("mt-1 text-sm font-semibold", band.textClass)}>{band.label}</p>
+          <p className="text-muted-foreground mt-1 text-xs">{band.message}</p>
         </div>
-        <p className="text-muted-foreground mb-4 text-xs">{band.message}</p>
 
         {gap && (
           <div className="border-accent-gap-surface bg-accent-gap-surface text-accent-gap mb-4 rounded-lg border px-3 py-2 text-xs">
@@ -231,7 +228,7 @@ export default function ResultView({
               <div
                 key={sc.area}
                 id={feedbackAreaId(i)}
-                className="border-border scroll-mt-20 rounded border-l-2 pl-3"
+                className="border-border scroll-mt-20 rounded-lg border p-3"
               >
                 <div className="mb-1 flex items-center gap-2">
                   <span className="text-foreground text-sm font-semibold">
