@@ -32,7 +32,6 @@ import {
   saveDraft,
 } from "@/app/lib/storage";
 import { computeProgress } from "@/app/lib/progress";
-import { scrollBehavior } from "@/app/lib/utils";
 import { DEMO_TOKEN_KEY } from "@/app/components/TokenGate";
 
 // 요청 계약 (contract §3.1). body 는 **원본** — 정규화·char_count 는 서버 권위.
@@ -121,7 +120,6 @@ export type UseScoreFormReturn = {
   handleResubmit: () => void;   // returns to step essay (caller controls `step` state)
 
   // ── Refs for scroll ──────────────────────────────────────────────────
-  formTopRef: React.RefObject<HTMLDivElement | null>;
   outcomeRef: React.RefObject<HTMLDivElement | null>;
 
   // ── Revision ─────────────────────────────────────────────────────────
@@ -169,7 +167,6 @@ export function useScoreForm(opts: {
   const [fileError, setFileError] = useState<string | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   // Refs for scroll
-  const formTopRef = useRef<HTMLDivElement>(null);
   const outcomeRef = useRef<HTMLDivElement>(null);
 
   // #9 마운트 시 1회 — 저장된 draft가 있으면 배너로 사용자에게 선택권 부여.
@@ -554,7 +551,6 @@ export function useScoreForm(opts: {
     // Wizard controls step state — call onResubmit callback instead of setStep(1).
     setSubmitState({ phase: "idle" });
     onResubmit?.();
-    formTopRef.current?.scrollIntoView({ behavior: scrollBehavior() });
   }
 
   return {
@@ -613,7 +609,6 @@ export function useScoreForm(opts: {
     handleResubmit,
 
     // Refs for scroll
-    formTopRef,
     outcomeRef,
 
     // Revision
