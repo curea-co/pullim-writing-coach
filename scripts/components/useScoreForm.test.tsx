@@ -83,7 +83,13 @@ describe("useScoreForm", () => {
     });
     act(() => { result.current.handleSubmit({ preventDefault: () => {} } as React.FormEvent); });
     await waitFor(() => expect(result.current.submitState.phase).toBe("result"));
-    expect(globalThis.fetch).toHaveBeenCalledWith("/api/score", expect.objectContaining({ method: "POST" }));
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/score",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({ "x-demo-token": "test-mock" }),
+      }),
+    );
   });
 
   it("401 response → onAuthExpired called, phase back to idle", async () => {

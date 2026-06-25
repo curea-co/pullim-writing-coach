@@ -32,6 +32,7 @@ import {
   saveDraft,
 } from "@/app/lib/storage";
 import { computeProgress } from "@/app/lib/progress";
+import { scrollBehavior } from "@/app/lib/utils";
 import { DEMO_TOKEN_KEY } from "@/app/components/TokenGate";
 
 // 요청 계약 (contract §3.1). body 는 **원본** — 정규화·char_count 는 서버 권위.
@@ -553,7 +554,7 @@ export function useScoreForm(opts: {
     // Wizard controls step state — call onResubmit callback instead of setStep(1).
     setSubmitState({ phase: "idle" });
     onResubmit?.();
-    formTopRef.current?.scrollIntoView({ behavior: "smooth" });
+    formTopRef.current?.scrollIntoView({ behavior: scrollBehavior() });
   }
 
   return {
