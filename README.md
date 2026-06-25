@@ -100,10 +100,12 @@
 
 ```bash
 npm install
-cp .env.example .env   # 키 입력. 빈 값이면 /api/coach는 mock으로 동작(키 없이 코치 체험 가능), 추출·채점은 비활성
+cp .env.example .env   # 키 입력 (아래 참고)
 npm run dev            # http://localhost:3000
 npm run build          # 프로덕션 빌드
 ```
+
+> **최소 실행 조건**: `DEMO_ACCESS_TOKEN`은 **반드시** 설정해야 합니다 — 비어 있으면 API가 fail-closed(401)되고 `TokenGate`도 통과 못 해 `/coach` 진입 자체가 막힙니다. 자동 입장하려면 `NEXT_PUBLIC_DEMO_TOKEN`도 같은 값으로 설정. `ANTHROPIC_API_KEY`는 선택 — 없으면 `/api/coach`는 mock으로 동작하고 추출·채점만 비활성됩니다.
 
 ### 테스트
 
