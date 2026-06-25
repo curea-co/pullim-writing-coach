@@ -21,6 +21,28 @@ const MOCK_OUTPUT = {
   meta: { model_version: "v1", generated_at: "2026-06-02T10:00:00+09:00", is_verified: false, disclaimer: "AI 채점입니다." },
 };
 
+// Helper: inject body text via hidden file input (reliable in jsdom — bypasses TipTap contenteditable).
+// #body is a TipTap contenteditable div; user.type on it triggers unhandled jsdom errors from
+// ProseMirror's posAtCoords/getClientRects. The file-upload path (handleFileInput → setBody/setBodyHtml)
+// is the robust jsdom approach: it directly updates hook state without touching the ProseMirror DOM.
+async function fillBody(user: ReturnType<typeof userEvent.setup>, text: string) {
+  const fileInput = document.getElementById("body-file-upload") as HTMLInputElement;
+  await user.upload(fileInput, new File([text], "essay.txt", { type: "text/plain" }));
+}
+
+// Helper: assert body editor content. #body is a TipTap contenteditable (no `value` prop).
+// Use textContent to verify its text — toHaveValue() only works on <input>/<textarea>/<select>.
+function expectBodyContent(text: string) {
+  const bodyEl = document.getElementById("body");
+  expect(bodyEl).toBeInTheDocument();
+  expect(bodyEl?.textContent?.trim()).toBe(text.trim());
+}
+
+function expectBodyEmpty() {
+  const bodyEl = document.getElementById("body");
+  expect(bodyEl?.textContent?.trim() ?? "").toBe("");
+}
+
 describe("ScoreWizard", () => {
   let originalClipboardDescriptor: PropertyDescriptor | undefined;
 
@@ -49,6 +71,16 @@ describe("ScoreWizard", () => {
     }
   });
 
+  // a11y semantic smoke (Codex 리뷰): 본문 에디터가 접근성 textbox로 노출되는지 검증.
+  //   파일업로드 우회 헬퍼가 가린 'role=textbox + 접근명' 회귀를 이 한 케이스가 잡는다.
+  it("본문 에디터가 role=textbox + aria-label '학생 글 본문'으로 노출된다 (a11y)", () => {
+    render(<ScoreWizard />);
+    const editor = screen.getByRole("textbox", { name: "학생 글 본문" });
+    expect(editor).toBeInTheDocument();
+    expect(editor).toHaveAttribute("id", "body");
+    expect(editor).toHaveAttribute("aria-multiline", "true");
+  });
+
   it("initial render: Step 1 visible, Stepper visible, Step 2 hidden", () => {
     render(<ScoreWizard />);
     expect(screen.getByRole("heading", { name: "1. 글을 넣어 주세요" })).toBeInTheDocument();
@@ -59,9 +91,9 @@ describe("ScoreWizard", () => {
   it("body filled → '다음 단계' enabled → click → Step 2 visible", async () => {
     const user = userEvent.setup();
     render(<ScoreWizard />);
-    await user.type(screen.getByRole("textbox", { name: "학생 글 본문" }), MOCK_BODY);
+    await fillBody(user, MOCK_BODY);
     const nextBtn = screen.getByRole("button", { name: /다음 단계/ });
-    expect(nextBtn).toBeEnabled();
+    await waitFor(() => expect(nextBtn).toBeEnabled());
     await user.click(nextBtn);
     expect(screen.getByRole("heading", { name: /2\. 과제 정보/ })).toBeInTheDocument();
     expect(screen.getByText("내 글 미리보기")).toBeInTheDocument();
@@ -70,18 +102,20 @@ describe("ScoreWizard", () => {
   it("Step 2 [수정] → Step 1 restored, body preserved", async () => {
     const user = userEvent.setup();
     render(<ScoreWizard />);
-    await user.type(screen.getByRole("textbox", { name: "학생 글 본문" }), MOCK_BODY);
+    await fillBody(user, MOCK_BODY);
+    await waitFor(() => expect(screen.getByRole("button", { name: /다음 단계/ })).toBeEnabled());
     await user.click(screen.getByRole("button", { name: /다음 단계/ }));
     await user.click(screen.getByText("내 글 미리보기"));
     await user.click(screen.getByRole("button", { name: /수정/ }));
     expect(screen.getByRole("heading", { name: "1. 글을 넣어 주세요" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "학생 글 본문" })).toHaveValue(MOCK_BODY);
+    expectBodyContent(MOCK_BODY);
   });
 
   it("full flow Step 1→2→3: submit → result shown (#result-score)", async () => {
     const user = userEvent.setup();
     render(<ScoreWizard />);
-    await user.type(screen.getByRole("textbox", { name: "학생 글 본문" }), MOCK_BODY);
+    await fillBody(user, MOCK_BODY);
+    await waitFor(() => expect(screen.getByRole("button", { name: /다음 단계/ })).toBeEnabled());
     await user.click(screen.getByRole("button", { name: /다음 단계/ }));
     await user.selectOptions(screen.getByLabelText("학교·학년"), "중2");
     await user.selectOptions(screen.getByLabelText("과목"), "국어");
@@ -95,7 +129,8 @@ describe("ScoreWizard", () => {
   it("result → resubmit → Step 1 restored, body preserved", async () => {
     const user = userEvent.setup();
     render(<ScoreWizard />);
-    await user.type(screen.getByRole("textbox", { name: "학생 글 본문" }), MOCK_BODY);
+    await fillBody(user, MOCK_BODY);
+    await waitFor(() => expect(screen.getByRole("button", { name: /다음 단계/ })).toBeEnabled());
     await user.click(screen.getByRole("button", { name: /다음 단계/ }));
     await user.selectOptions(screen.getByLabelText("학교·학년"), "중2");
     await user.selectOptions(screen.getByLabelText("과목"), "국어");
@@ -106,13 +141,14 @@ describe("ScoreWizard", () => {
     const resubmitBtn = screen.getByRole("button", { name: /고쳐쓰기 시작|한 번 더 고쳐쓰기/ });
     await user.click(resubmitBtn);
     expect(screen.getByRole("heading", { name: "1. 글을 넣어 주세요" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "학생 글 본문" })).toHaveValue(MOCK_BODY);
+    expectBodyContent(MOCK_BODY);
   });
 
   it("Stepper hidden in step 3 (result/loading/error phase)", async () => {
     const user = userEvent.setup();
     render(<ScoreWizard />);
-    await user.type(screen.getByRole("textbox", { name: "학생 글 본문" }), MOCK_BODY);
+    await fillBody(user, MOCK_BODY);
+    await waitFor(() => expect(screen.getByRole("button", { name: /다음 단계/ })).toBeEnabled());
     await user.click(screen.getByRole("button", { name: /다음 단계/ }));
     await user.selectOptions(screen.getByLabelText("학교·학년"), "중2");
     await user.selectOptions(screen.getByLabelText("과목"), "국어");
@@ -127,7 +163,8 @@ describe("ScoreWizard", () => {
   it("defaults prop: Step 2 shows prefilled school_level/subject/genre", async () => {
     const user = userEvent.setup();
     render(<ScoreWizard defaults={{ school_level: "고3", subject: "국어", genre: "감상문·독후감" }} />);
-    await user.type(screen.getByRole("textbox", { name: "학생 글 본문" }), MOCK_BODY);
+    await fillBody(user, MOCK_BODY);
+    await waitFor(() => expect(screen.getByRole("button", { name: /다음 단계/ })).toBeEnabled());
     await user.click(screen.getByRole("button", { name: /다음 단계/ }));
     expect(screen.getByLabelText("학교·학년")).toHaveValue("고3");
     expect(screen.getByLabelText("과목")).toHaveValue("국어");
@@ -142,9 +179,9 @@ describe("ScoreWizard", () => {
     const user = userEvent.setup();
     render(<ScoreWizard />);
     expect(screen.getByText("📝 이전에 쓰던 작업이 있어요")).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "학생 글 본문" })).toHaveValue("");
+    expectBodyEmpty();
     await user.click(screen.getByRole("button", { name: "이어 쓰기" }));
-    expect(screen.getByRole("textbox", { name: "학생 글 본문" })).toHaveValue(MOCK_BODY);
+    expectBodyContent(MOCK_BODY);
     expect(screen.queryByText("📝 이전에 쓰던 작업이 있어요")).not.toBeInTheDocument();
   });
 
@@ -153,7 +190,8 @@ describe("ScoreWizard", () => {
   it("[migrated] Step 2 empty meta → AI 첨삭 받기 disabled + 누락 hint 노출", async () => {
     const user = userEvent.setup();
     render(<ScoreWizard />);
-    await user.type(screen.getByRole("textbox", { name: "학생 글 본문" }), MOCK_BODY);
+    await fillBody(user, MOCK_BODY);
+    await waitFor(() => expect(screen.getByRole("button", { name: /다음 단계/ })).toBeEnabled());
     await user.click(screen.getByRole("button", { name: /다음 단계/ }));
     const submit = screen.getByRole("button", { name: "AI 첨삭 받기" });
     expect(submit).toBeDisabled();
@@ -166,7 +204,8 @@ describe("ScoreWizard", () => {
   it("[migrated] 결과 후 resubmit → Step 1 복귀 + body·meta 모두 유지", async () => {
     const user = userEvent.setup();
     render(<ScoreWizard />);
-    await user.type(screen.getByRole("textbox", { name: "학생 글 본문" }), MOCK_BODY);
+    await fillBody(user, MOCK_BODY);
+    await waitFor(() => expect(screen.getByRole("button", { name: /다음 단계/ })).toBeEnabled());
     await user.click(screen.getByRole("button", { name: /다음 단계/ }));
     await user.selectOptions(screen.getByLabelText("학교·학년"), "중2");
     await user.selectOptions(screen.getByLabelText("과목"), "국어");
@@ -178,8 +217,9 @@ describe("ScoreWizard", () => {
     await user.click(resubmitBtn);
     // Step 1 복귀 + body 유지
     expect(screen.getByRole("heading", { name: "1. 글을 넣어 주세요" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "학생 글 본문" })).toHaveValue(MOCK_BODY);
+    expectBodyContent(MOCK_BODY);
     // Step 2 진입해 meta 5필드 유지 검증
+    await waitFor(() => expect(screen.getByRole("button", { name: /다음 단계/ })).toBeEnabled());
     await user.click(screen.getByRole("button", { name: /다음 단계/ }));
     expect(screen.getByLabelText("학교·학년")).toHaveValue("중2");
     expect(screen.getByLabelText("과목")).toHaveValue("국어");
@@ -203,8 +243,9 @@ describe("ScoreWizard", () => {
     const user = userEvent.setup();
     render(<ScoreWizard />);
     await user.click(screen.getByRole("button", { name: "이어 쓰기" }));
-    expect(screen.getByRole("textbox", { name: "학생 글 본문" })).toHaveValue(MOCK_BODY);
+    expectBodyContent(MOCK_BODY);
     // Step 2 진입해 meta 검증
+    await waitFor(() => expect(screen.getByRole("button", { name: /다음 단계/ })).toBeEnabled());
     await user.click(screen.getByRole("button", { name: /다음 단계/ }));
     expect(screen.getByLabelText("학교·학년")).toHaveValue("중2");
     expect(screen.getByLabelText("과목")).toHaveValue("국어");

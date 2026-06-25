@@ -21,10 +21,11 @@ export interface RichEditorProps {
   onToggleSpellcheck?: () => void;
   dataTestid?: string;
   editableClassName?: string;  // contenteditable 루트에 추가 클래스(예: styles.canvas 노트 배경)
+  editableId?: string;         // contenteditable 요소의 id (e2e 셀렉터 + a11y 훅)
 }
 
 export default function RichEditor({
-  valueHtml, onChange, spellcheck = false, disabled = false, placeholder, editorRef, ariaLabel, ariaDescribedby, onToggleSpellcheck, dataTestid, editableClassName,
+  valueHtml, onChange, spellcheck = false, disabled = false, placeholder, editorRef, ariaLabel, ariaDescribedby, onToggleSpellcheck, dataTestid, editableClassName, editableId,
 }: RichEditorProps) {
   const editor = useEditor({
     immediatelyRender: false, // SSR 안전
@@ -51,9 +52,13 @@ export default function RichEditor({
       attributes: {
         class: `tiptap min-h-40 h-full w-full px-3 py-2 text-sm leading-relaxed focus:outline-none${editableClassName ? ` ${editableClassName}` : ""}`,
         spellcheck: spellcheck ? "true" : "false",
+        // contenteditable을 접근성 textbox로 노출 — 스크린리더가 다중행 입력으로 인식 + getByRole 검증 가능.
+        role: "textbox",
+        "aria-multiline": "true",
         ...(ariaLabel ? { "aria-label": ariaLabel } : {}),
         ...(ariaDescribedby ? { "aria-describedby": ariaDescribedby } : {}),
         ...(dataTestid ? { "data-testid": dataTestid } : {}),
+        ...(editableId ? { id: editableId } : {}),
       },
     },
     onUpdate: ({ editor }) => {
