@@ -52,6 +52,9 @@ export default function RichEditor({
       attributes: {
         class: `tiptap min-h-40 h-full w-full px-3 py-2 text-sm leading-relaxed focus:outline-none${editableClassName ? ` ${editableClassName}` : ""}`,
         spellcheck: spellcheck ? "true" : "false",
+        // contenteditable을 접근성 textbox로 노출 — 스크린리더가 다중행 입력으로 인식 + getByRole 검증 가능.
+        role: "textbox",
+        "aria-multiline": "true",
         ...(ariaLabel ? { "aria-label": ariaLabel } : {}),
         ...(ariaDescribedby ? { "aria-describedby": ariaDescribedby } : {}),
         ...(dataTestid ? { "data-testid": dataTestid } : {}),

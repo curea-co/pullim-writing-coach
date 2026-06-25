@@ -71,6 +71,16 @@ describe("ScoreWizard", () => {
     }
   });
 
+  // a11y semantic smoke (Codex 리뷰): 본문 에디터가 접근성 textbox로 노출되는지 검증.
+  //   파일업로드 우회 헬퍼가 가린 'role=textbox + 접근명' 회귀를 이 한 케이스가 잡는다.
+  it("본문 에디터가 role=textbox + aria-label '학생 글 본문'으로 노출된다 (a11y)", () => {
+    render(<ScoreWizard />);
+    const editor = screen.getByRole("textbox", { name: "학생 글 본문" });
+    expect(editor).toBeInTheDocument();
+    expect(editor).toHaveAttribute("id", "body");
+    expect(editor).toHaveAttribute("aria-multiline", "true");
+  });
+
   it("initial render: Step 1 visible, Stepper visible, Step 2 hidden", () => {
     render(<ScoreWizard />);
     expect(screen.getByRole("heading", { name: "1. 글을 넣어 주세요" })).toBeInTheDocument();
