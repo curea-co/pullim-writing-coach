@@ -19,7 +19,7 @@
   ↓
 1. 데모 비밀번호 (TokenGate)
   ↓
-2. 과제 입력 (MetaForm — 학년·과목·장르·분량·과제 안내)
+2. 과제 입력 (MetaForm — 학년·과목·장르·과제 안내. 목표 분량은 코치에서 미사용 → 숨김)
   ↓
 3. 모드 선택
    ├─ 이미 글 있어요
@@ -76,8 +76,8 @@
 
 | 변수 | 용도 |
 |---|---|
-| `ANTHROPIC_API_KEY` | 추출·채점·코치 모델 호출 (필수) |
-| `DEMO_ACCESS_TOKEN` | 데모 접근 비밀번호(서버 검증) |
+| `ANTHROPIC_API_KEY` | 추출·채점 모델 호출에 필요. 선택 — 미설정 시 `/api/coach`는 mock으로 동작, 추출·채점만 비활성 |
+| `DEMO_ACCESS_TOKEN` | 데모 접근 비밀번호(서버 검증). 비어 있으면 API가 401 fail-closed → 사실상 필수 |
 | `NEXT_PUBLIC_DEMO_TOKEN` | 설정 시 TokenGate 자동 입력(비번 0회 입장). ⚠ 번들 노출 → rate limit·예산 알람 필수 |
 | `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | 에러 모니터링 (미설정 시 no-op) |
 
@@ -105,7 +105,7 @@ npm run dev            # http://localhost:3000
 npm run build          # 프로덕션 빌드
 ```
 
-> **최소 실행 조건**: `DEMO_ACCESS_TOKEN`은 **반드시** 설정해야 합니다 — 비어 있으면 API가 fail-closed(401)되고 `TokenGate`도 통과 못 해 `/coach` 진입 자체가 막힙니다. 자동 입장하려면 `NEXT_PUBLIC_DEMO_TOKEN`도 같은 값으로 설정. `ANTHROPIC_API_KEY`는 선택 — 없으면 `/api/coach`는 mock으로 동작하고 추출·채점만 비활성됩니다.
+> **최소 실행 조건**: `DEMO_ACCESS_TOKEN`을 설정하세요. `TokenGate`는 클라이언트 게이트라 화면 진입은 가능하지만, 비어 있으면 첫 API 호출이 401 fail-closed로 실패해 코치를 실제로 쓸 수 없습니다. 자동 입장하려면 `NEXT_PUBLIC_DEMO_TOKEN`도 같은 값으로 설정. `ANTHROPIC_API_KEY`는 선택 — 없으면 `/api/coach`는 mock으로 동작하고 추출·채점만 비활성됩니다.
 
 ### 테스트
 
