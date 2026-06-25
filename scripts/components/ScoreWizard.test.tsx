@@ -147,4 +147,67 @@ describe("ScoreWizard", () => {
     expect(screen.getByRole("textbox", { name: "학생 글 본문" })).toHaveValue(MOCK_BODY);
     expect(screen.queryByText("📝 이전에 쓰던 작업이 있어요")).not.toBeInTheDocument();
   });
+
+  // ── Migrated from ScoreForm.test.tsx (unique integration behaviors) ──────────
+
+  it("[migrated] Step 2 empty meta → AI 첨삭 받기 disabled + 누락 hint 노출", async () => {
+    const user = userEvent.setup();
+    render(<ScoreWizard />);
+    await user.type(screen.getByRole("textbox", { name: "학생 글 본문" }), MOCK_BODY);
+    await user.click(screen.getByRole("button", { name: /다음 단계/ }));
+    const submit = screen.getByRole("button", { name: "AI 첨삭 받기" });
+    expect(submit).toBeDisabled();
+    const hint = screen.getByText(/다음을 채우면 채점을 받을 수 있어요/);
+    expect(hint).toHaveTextContent("학교·학년");
+    expect(hint).toHaveTextContent("과목");
+    expect(hint).toHaveTextContent("장르");
+  });
+
+  it("[migrated] 결과 후 resubmit → Step 1 복귀 + body·meta 모두 유지", async () => {
+    const user = userEvent.setup();
+    render(<ScoreWizard />);
+    await user.type(screen.getByRole("textbox", { name: "학생 글 본문" }), MOCK_BODY);
+    await user.click(screen.getByRole("button", { name: /다음 단계/ }));
+    await user.selectOptions(screen.getByLabelText("학교·학년"), "중2");
+    await user.selectOptions(screen.getByLabelText("과목"), "국어");
+    await user.selectOptions(screen.getByLabelText("어떤 글인가요?"), "논설문·주장하는 글");
+    await user.type(screen.getByLabelText("과제 내용"), "충분히 긴 과제 내용입니다");
+    await user.click(screen.getByRole("button", { name: "AI 첨삭 받기" }));
+    await waitFor(() => expect(screen.getByText("75")).toBeInTheDocument(), { timeout: 5000 });
+    const resubmitBtn = screen.getByRole("button", { name: /고쳐쓰기 시작|한 번 더 고쳐쓰기/ });
+    await user.click(resubmitBtn);
+    // Step 1 복귀 + body 유지
+    expect(screen.getByRole("heading", { name: "1. 글을 넣어 주세요" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "학생 글 본문" })).toHaveValue(MOCK_BODY);
+    // Step 2 진입해 meta 5필드 유지 검증
+    await user.click(screen.getByRole("button", { name: /다음 단계/ }));
+    expect(screen.getByLabelText("학교·학년")).toHaveValue("중2");
+    expect(screen.getByLabelText("과목")).toHaveValue("국어");
+    expect(screen.getByLabelText("어떤 글인가요?")).toHaveValue("논설문·주장하는 글");
+    expect(screen.getByLabelText("과제 내용")).toHaveValue("충분히 긴 과제 내용입니다");
+  });
+
+  it("[migrated] draft [이어 쓰기] → Step 2 진입 시 meta 복원", async () => {
+    localStorage.setItem(
+      "pwc_draft_v1",
+      JSON.stringify({
+        body: MOCK_BODY,
+        school_level: "중2",
+        subject: "국어",
+        genre: "논설문·주장하는 글",
+        target_raw: "600",
+        prompt_text: "이전 과제 내용",
+        saved_at: "2026-06-02T10:00:00+09:00",
+      }),
+    );
+    const user = userEvent.setup();
+    render(<ScoreWizard />);
+    await user.click(screen.getByRole("button", { name: "이어 쓰기" }));
+    expect(screen.getByRole("textbox", { name: "학생 글 본문" })).toHaveValue(MOCK_BODY);
+    // Step 2 진입해 meta 검증
+    await user.click(screen.getByRole("button", { name: /다음 단계/ }));
+    expect(screen.getByLabelText("학교·학년")).toHaveValue("중2");
+    expect(screen.getByLabelText("과목")).toHaveValue("국어");
+    expect(screen.getByLabelText("과제 내용")).toHaveValue("이전 과제 내용");
+  });
 });
