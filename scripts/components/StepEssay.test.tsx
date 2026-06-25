@@ -105,4 +105,36 @@ describe("StepEssay", () => {
     render(<StepEssay {...baseProps} bodyError={{ code: "E2", message: "본문을 50자 이상 입력해 주세요" }} />);
     expect(screen.getByText("본문을 50자 이상 입력해 주세요")).toBeInTheDocument();
   });
+
+  it("textarea 입력이 onChangeBody(평문)를 호출한다 (RichEditor seam 계약)", async () => {
+    const onChangeBody = vi.fn();
+    const user = userEvent.setup();
+    render(<StepEssay {...baseProps} onChangeBody={onChangeBody} />);
+    await user.type(screen.getByRole("textbox", { name: "학생 글 본문" }), "가");
+    expect(onChangeBody).toHaveBeenCalledWith("가");
+  });
+
+  it("파일 선택이 onFileInput을 호출한다", async () => {
+    const onFileInput = vi.fn();
+    const user = userEvent.setup();
+    render(<StepEssay {...baseProps} onFileInput={onFileInput} />);
+    const input = document.getElementById("body-file-upload") as HTMLInputElement;
+    await user.upload(input, new File(["내용"], "essay.txt", { type: "text/plain" }));
+    expect(onFileInput).toHaveBeenCalledOnce();
+  });
+
+  it("클립보드 '무시'가 onDismissClipboard를 호출한다", async () => {
+    const onDismissClipboard = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <StepEssay
+        {...baseProps}
+        clipboardPreview="클립보드 내용 30자 이상입니다 충분히 길어요."
+        body=""
+        onDismissClipboard={onDismissClipboard}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "무시" }));
+    expect(onDismissClipboard).toHaveBeenCalledOnce();
+  });
 });
