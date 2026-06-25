@@ -68,6 +68,7 @@ describe("StepResult", () => {
   it("result: shows #result-score with total_score", () => {
     render(<StepResult {...baseProps} submitState={{ phase: "result", output: MOCK_OUTPUT, assignment: MOCK_ASSIGNMENT }} />);
     expect(document.getElementById("result-score")).toBeInTheDocument();
+    expect(document.getElementById("result-guide")).toBeInTheDocument();
     expect(screen.getByText("75")).toBeInTheDocument();
   });
 
