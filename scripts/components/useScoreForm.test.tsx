@@ -55,7 +55,7 @@ describe("useScoreForm", () => {
   it("setBody to 50+ chars → bodyOk=true", () => {
     const { result } = renderHook(() => useScoreForm({}));
     act(() => {
-      result.current.setBody("오늘 학교에서 친구들과 점심을 먹으며 교복 자율화에 대해 토론했다. 나는 교복이 학생의 개성을 제한한다고 생각한다.");
+      result.current.onEditorChange({ html: "<p>오늘 학교에서 친구들과 점심을 먹으며 교복 자율화에 대해 토론했다. 나는 교복이 학생의 개성을 제한한다고 생각한다.</p>", text: "오늘 학교에서 친구들과 점심을 먹으며 교복 자율화에 대해 토론했다. 나는 교복이 학생의 개성을 제한한다고 생각한다." });
     });
     expect(result.current.bodyOk).toBe(true);
   });
@@ -63,7 +63,7 @@ describe("useScoreForm", () => {
   it("all fields filled → canSubmit=true", () => {
     const { result } = renderHook(() => useScoreForm({}));
     act(() => {
-      result.current.setBody("오늘 학교에서 친구들과 점심을 먹으며 교복 자율화에 대해 토론했다. 나는 교복이 학생의 개성을 제한한다고 생각한다.");
+      result.current.onEditorChange({ html: "<p>오늘 학교에서 친구들과 점심을 먹으며 교복 자율화에 대해 토론했다. 나는 교복이 학생의 개성을 제한한다고 생각한다.</p>", text: "오늘 학교에서 친구들과 점심을 먹으며 교복 자율화에 대해 토론했다. 나는 교복이 학생의 개성을 제한한다고 생각한다." });
       result.current.setSchoolLevel("중2");
       result.current.setSubject("국어");
       result.current.setGenre("논설문·주장하는 글");
@@ -75,7 +75,7 @@ describe("useScoreForm", () => {
   it("handleSubmit with canSubmit=true → fetch called + phase=result", async () => {
     const { result } = renderHook(() => useScoreForm({}));
     act(() => {
-      result.current.setBody("오늘 학교에서 친구들과 점심을 먹으며 교복 자율화에 대해 토론했다. 나는 교복이 학생의 개성을 제한한다고 생각한다.");
+      result.current.onEditorChange({ html: "<p>오늘 학교에서 친구들과 점심을 먹으며 교복 자율화에 대해 토론했다. 나는 교복이 학생의 개성을 제한한다고 생각한다.</p>", text: "오늘 학교에서 친구들과 점심을 먹으며 교복 자율화에 대해 토론했다. 나는 교복이 학생의 개성을 제한한다고 생각한다." });
       result.current.setSchoolLevel("중2");
       result.current.setSubject("국어");
       result.current.setGenre("논설문·주장하는 글");
@@ -99,7 +99,7 @@ describe("useScoreForm", () => {
     const onAuthExpired = vi.fn();
     const { result } = renderHook(() => useScoreForm({ onAuthExpired }));
     act(() => {
-      result.current.setBody("오늘 학교에서 친구들과 점심을 먹으며 교복 자율화에 대해 토론했다. 나는 교복이 학생의 개성을 제한한다고 생각한다.");
+      result.current.onEditorChange({ html: "<p>오늘 학교에서 친구들과 점심을 먹으며 교복 자율화에 대해 토론했다. 나는 교복이 학생의 개성을 제한한다고 생각한다.</p>", text: "오늘 학교에서 친구들과 점심을 먹으며 교복 자율화에 대해 토론했다. 나는 교복이 학생의 개성을 제한한다고 생각한다." });
       result.current.setSchoolLevel("중2");
       result.current.setSubject("국어");
       result.current.setGenre("논설문·주장하는 글");
@@ -150,7 +150,7 @@ describe("useScoreForm", () => {
     }));
     const { result } = renderHook(() => useScoreForm({}));
     act(() => {
-      result.current.setBody("오늘 학교에서 친구들과 점심을 먹으며 교복 자율화에 대해 토론했다. 나는 교복이 학생의 개성을 제한한다고 생각한다.");
+      result.current.onEditorChange({ html: "<p>오늘 학교에서 친구들과 점심을 먹으며 교복 자율화에 대해 토론했다. 나는 교복이 학생의 개성을 제한한다고 생각한다.</p>", text: "오늘 학교에서 친구들과 점심을 먹으며 교복 자율화에 대해 토론했다. 나는 교복이 학생의 개성을 제한한다고 생각한다." });
       result.current.setSchoolLevel("중2"); result.current.setSubject("국어");
       result.current.setGenre("논설문·주장하는 글");
       result.current.setPromptText("교복 자율화에 대한 자신의 주장을 근거 2개 이상으로 쓰시오.");

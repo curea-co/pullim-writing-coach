@@ -68,7 +68,7 @@ export type SubmitState =
 export type UseScoreFormReturn = {
   // ── Essay field ──────────────────────────────────────────────────────
   body: string;
-  setBody: (v: string) => void;
+  // setBody는 외부 노출하지 않는다(평문만 바꾸면 bodyHtml/draft.body_html과 desync). 외부는 onEditorChange만 사용.
   bodyHtml: string;                 // RichEditor HTML(서식 보존) — StepEssay valueHtml로 전달
   onEditorChange: (c: { html: string; text: string }) => void;  // RichEditor onChange — bodyHtml/body 원자적 갱신
   bodyCount: number;                // charCount(normalizeBody(body))
@@ -570,7 +570,6 @@ export function useScoreForm(opts: {
   return {
     // Essay field
     body,
-    setBody,
     bodyHtml,
     onEditorChange,
     bodyCount,
