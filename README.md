@@ -21,10 +21,10 @@
   ↓
 2. 과제 입력 (MetaForm — 학년·과목·장르·과제 안내. 목표 분량은 코치에서 미사용 → 숨김)
   ↓
-3. 모드 선택
-   ├─ 이미 글 있어요
-   ├─ 아직 안 썼어요  → 장르별 가이드 질문
-   └─ 개요 먼저       → 개요 패널 → 개요→본문 전환
+3. 모드 선택 (자유 쓰기 · 가이드 · 개요 먼저 활성 / 말하기는 준비 중)
+   ├─ 자유 쓰기
+   ├─ 가이드 (질문 따라)  → 장르별 가이드 질문
+   └─ 개요 먼저           → 개요 패널 → 개요→본문 전환
   ↓
 4. 작성 캔버스(RichEditor)에서 본문 작성 → 코치 점검 (/api/coach)
   ↓
@@ -112,7 +112,7 @@ npm run build          # 프로덕션 빌드
 ```bash
 npm run test:unit        # normalizeBody·validate·guards
 npm run test:components  # Vitest + RTL
-npm run test:e2e         # Playwright (/try wizard)
+npm run test:e2e         # Playwright (/coach happy path + /try 위저드·채널 회귀)
 npm run typecheck
 ```
 
