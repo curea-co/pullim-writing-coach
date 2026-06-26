@@ -72,7 +72,7 @@ const TILES = [
 
 export default function Home() {
   return (
-    <main className="mx-auto w-full max-w-5xl px-5 py-10 md:py-12">
+    <main className="w-full max-w-5xl px-5 py-10 md:py-12">
       {/* 1. ServiceHero */}
       <ServiceHero
         icon={<ServiceIcon name="writing" size={56} />}
@@ -144,7 +144,7 @@ export default function Home() {
 
       {/* 6. 닫는 CTA */}
       <div className="mt-8 mb-4">
-        <Card className="flex flex-col items-center gap-4 p-8 text-center md:p-12">
+        <Card className="flex flex-col items-start gap-4 p-8 text-left md:p-12">
           <CardTitle className="break-keep text-xl md:text-2xl">
             지금 글을 가지고 있다면, 바로 채점받아 보세요.
           </CardTitle>
@@ -152,7 +152,7 @@ export default function Home() {
             본문을 붙여넣고 학년·과목만 알려주시면 1분 안에 채점·첨삭·수정 가이드까지 받아볼 수 있어요.
             결과는 PDF로 저장해 선생님과 공유하기 좋아요.
           </CardDescription>
-          <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
+          <div className="mt-2 flex flex-wrap items-center justify-start gap-3">
             <Link
               href="/try"
               className="inline-flex items-center justify-center rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90"

@@ -84,7 +84,7 @@ export default function ResultsListPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-5 py-8 md:py-12">
+    <main className="w-full max-w-4xl px-5 py-8 md:py-12">
       <Breadcrumb items={[{ label: "홈", href: "/" }, { label: "채점 결과 조회" }]} />
 
       <header className="mb-6">
@@ -99,7 +99,7 @@ export default function ResultsListPage() {
       )}
 
       {state === "empty" && (
-        <section className="border-border bg-surface rounded-xl border p-8 text-center">
+        <section className="border-border bg-surface rounded-xl border p-8 text-left">
           <p className="text-foreground text-base font-semibold">아직 받은 채점 결과가 없어요</p>
           <p className="text-muted-foreground break-keep mt-2 text-sm">
             글 한 편을 채점받으면 여기에 자동으로 쌓여요. 최대 20건 보관돼요.
@@ -183,7 +183,7 @@ export default function ResultsListPage() {
           </div>
 
           {visible.length === 0 ? (
-            <div className="border-border bg-surface text-muted-foreground rounded-xl border p-6 text-center text-sm">
+            <div className="border-border bg-surface text-muted-foreground rounded-xl border p-6 text-left text-sm">
               조건에 맞는 결과가 없어요. 필터·검색어를 조정해 보세요.
             </div>
           ) : (

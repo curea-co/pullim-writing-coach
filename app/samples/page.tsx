@@ -26,7 +26,7 @@ const CATEGORY_CHIP: Record<string, string> = {
 
 export default function SamplesIndexPage() {
   return (
-    <main className="mx-auto w-full max-w-4xl px-5 py-10 md:py-14">
+    <main className="w-full max-w-4xl px-5 py-10 md:py-14">
       <Breadcrumb items={[{ label: "홈", href: "/" }, { label: "샘플 채점 결과" }]} />
 
       <header className="mb-8 mt-4">

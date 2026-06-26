@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 
 export default function AboutPage() {
   return (
-    <main className="mx-auto w-full max-w-3xl px-5 py-8 md:py-12">
+    <main className="w-full max-w-3xl px-5 py-8 md:py-12">
       <Breadcrumb items={[{ label: "홈", href: "/" }, { label: "서비스 소개" }]} />
 
       <header className="mb-10">
