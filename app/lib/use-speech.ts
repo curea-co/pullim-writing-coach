@@ -35,7 +35,7 @@ export interface UseSpeechRecognition {
 
 export function useSpeechRecognition(opts: { lang?: string; onResult: (finalText: string) => void }): UseSpeechRecognition {
   const { lang = "ko-KR", onResult } = opts;
-  const [supported] = useState(() => getCtor() !== null);
+  const [supported, setSupported] = useState(false);
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +83,7 @@ export function useSpeechRecognition(opts: { lang?: string; onResult: (finalText
   }, [lang]);
 
   useEffect(() => () => { recRef.current?.stop(); }, []);
+  useEffect(() => { setSupported(getCtor() !== null); }, []);
 
   return { supported, listening, interim, error, start, stop };
 }

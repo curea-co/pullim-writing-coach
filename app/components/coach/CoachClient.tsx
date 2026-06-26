@@ -684,14 +684,9 @@ export default function CoachClient({
     }
   };
 
-  // ── 음성 삽입 핸들러 — VoicePanel onInsert 콜백. reducer 외부(EDIT 디스패치만). ──
-  const handleVoiceInsert = (text: string) => {
-    const next = state.body ? `${state.body}\n${text}` : text;
-    dispatch({ type: "EDIT", body: next });
-    const html = plainToHtml(next);
-    setBodyHtml(html);
-    saveBodyHtml(assignmentSig(assignment), html);
-  };
+  // ── 음성 삽입 핸들러 — VoicePanel onInsert 콜백. 에디터 doc에 직접 paragraph append.
+  //   기존 서식(heading/bold/font-size) 보존 + stale closure 없음. ──
+  const handleVoiceInsert = (text: string) => { editorRef.current?.insertBlock(text); };
 
   // ── 시트 위치 결정 ──
   const sheetPosition: SheetPosition = useMemo(() => {

@@ -9,17 +9,30 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 
 // ── Canvas stub — TipTap/ProseMirror 없이 마운트 가능하게 ──────────────────
+let capturedInsertBlock: ((text: string) => void) | null = null;
 vi.mock("@/app/components/coach/Canvas", () => ({
-  default: ({ onChange }: { onChange: (v: { html: string; text: string }) => void }) => (
-    <div data-testid="canvas-stub">
-      <button
-        data-testid="canvas-trigger-insert"
-        onClick={() => onChange({ html: "<p>캔버스 입력</p>", text: "캔버스 입력" })}
-      >
-        캔버스 입력 트리거
-      </button>
-    </div>
-  ),
+  default: ({ onChange, editorRef }: { onChange: (v: { html: string; text: string }) => void; editorRef?: React.Ref<{ focus: () => void; insertBlock: (text: string) => void }> }) => {
+    React.useEffect(() => {
+      if (editorRef && typeof editorRef === "object" && "current" in editorRef) {
+        const insertBlock = vi.fn((t: string) => { capturedInsertBlock = insertBlock; void t; });
+        capturedInsertBlock = insertBlock;
+        (editorRef as React.MutableRefObject<{ focus: () => void; insertBlock: (text: string) => void }>).current = {
+          focus: vi.fn(),
+          insertBlock,
+        };
+      }
+    });
+    return (
+      <div data-testid="canvas-stub">
+        <button
+          data-testid="canvas-trigger-insert"
+          onClick={() => onChange({ html: "<p>캔버스 입력</p>", text: "캔버스 입력" })}
+        >
+          캔버스 입력 트리거
+        </button>
+      </div>
+    );
+  },
 }));
 
 // ── VoicePanel stub — onInsert 콜백을 외부에서 트리거할 수 있게 노출 ─────────
@@ -71,6 +84,7 @@ const DEMO_ASSIGNMENT: CoachAssignment = {
 beforeEach(() => {
   window.localStorage.clear();
   capturedOnInsert = null;
+  capturedInsertBlock = null;
 });
 
 describe("CoachClient voice 분기", () => {
@@ -94,33 +108,25 @@ describe("CoachClient voice 분기", () => {
     expect(screen.queryByTestId("voice-panel-stub")).not.toBeInTheDocument();
   });
 
-  it("handleVoiceInsert: 빈 본문에 첫 줄 삽입 시 선행 개행 없이 그대로 설정된다", () => {
+  it("handleVoiceInsert: editorRef.current.insertBlock(text)를 호출한다 (서식 보존 + stale closure 없음)", () => {
     render(<CoachClient assignment={DEMO_ASSIGNMENT} mode="voice" />);
     expect(capturedOnInsert).not.toBeNull();
-    // 빈 본문 → 삽입 텍스트가 그대로 body가 되어야 함 (앞에 \n 없이)
     act(() => {
       capturedOnInsert!("화산은 위험하다");
     });
-    // localStorage에 body_html이 저장됐는지 확인 (saveBodyHtml이 호출됐다는 증거)
-    const raw = window.localStorage.getItem("pwc-coach-body-html-v1");
-    expect(raw).not.toBeNull();
-    const parsed = JSON.parse(raw!) as { sig: string; html: string };
-    expect(parsed.html).toContain("화산은 위험하다");
-    // html이 \n으로 시작하지 않음 (빈 본문 → text가 선행 개행 없음)
-    expect(parsed.html).not.toMatch(/^\s*\n/);
+    // insertBlock이 호출됐어야 한다 (에디터 경유 삽입 → 서식 보존)
+    expect(capturedInsertBlock).not.toBeNull();
+    expect(capturedInsertBlock).toHaveBeenCalledWith("화산은 위험하다");
   });
 
-  it("handleVoiceInsert: 기존 본문이 있으면 \\n으로 이어붙인다", () => {
+  it("handleVoiceInsert: 연속 삽입 시 각각 insertBlock을 호출한다 (stale closure 없음)", () => {
     render(<CoachClient assignment={DEMO_ASSIGNMENT} mode="voice" />);
     expect(capturedOnInsert).not.toBeNull();
-    // 첫 번째 삽입
     act(() => { capturedOnInsert!("첫 번째 줄"); });
-    // 두 번째 삽입
     act(() => { capturedOnInsert!("두 번째 줄"); });
-    const raw = window.localStorage.getItem("pwc-coach-body-html-v1");
-    expect(raw).not.toBeNull();
-    const parsed = JSON.parse(raw!) as { sig: string; html: string };
-    // 두 줄이 별개 문단으로 반영(= \n 구분자 보존) — 구분자 누락 회귀를 잡는다.
-    expect(parsed.html).toContain("<p>첫 번째 줄</p><p>두 번째 줄</p>");
+    // 두 번 모두 insertBlock이 호출됐어야 한다
+    expect(capturedInsertBlock).toHaveBeenCalledTimes(2);
+    expect(capturedInsertBlock).toHaveBeenNthCalledWith(1, "첫 번째 줄");
+    expect(capturedInsertBlock).toHaveBeenNthCalledWith(2, "두 번째 줄");
   });
 });

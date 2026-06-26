@@ -23,8 +23,10 @@ describe("useSpeechRecognition", () => {
   beforeEach(() => { mock = new MockRec(); (window as unknown as { SpeechRecognition?: unknown }).SpeechRecognition = function MockCtor() { return mock; } as unknown as new () => MockRec; });
   afterEach(() => { delete (window as unknown as { SpeechRecognition?: unknown }).SpeechRecognition; delete (window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition; });
 
-  it("supported=true when SpeechRecognition exists", () => {
+  it("supported=true when SpeechRecognition exists", async () => {
     const { result } = renderHook(() => useSpeechRecognition({ onResult: () => {} }));
+    // supported is set in a mount effect (SSR-safe: first render is false, then flips to true after mount)
+    await act(async () => {});
     expect(result.current.supported).toBe(true);
   });
   it("start → listening, final 결과는 onResult, interim은 state", () => {
@@ -39,9 +41,10 @@ describe("useSpeechRecognition", () => {
     act(() => result.current.stop());
     expect(result.current.listening).toBe(false);
   });
-  it("supported=false when no SpeechRecognition", () => {
+  it("supported=false when no SpeechRecognition", async () => {
     delete (window as unknown as { SpeechRecognition?: unknown }).SpeechRecognition;
     const { result } = renderHook(() => useSpeechRecognition({ onResult: () => {} }));
+    await act(async () => {});
     expect(result.current.supported).toBe(false);
   });
   it("start() 동기 throw → error 설정, listening=false, 재시도 가능", () => {

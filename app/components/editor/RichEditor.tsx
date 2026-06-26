@@ -8,7 +8,7 @@ import EditorToolbar from "./EditorToolbar";
 import { htmlToPlain } from "@/app/lib/editor-doc";
 
 export interface RichEditorChange { html: string; text: string }
-export interface RichEditorHandle { focus: () => void }
+export interface RichEditorHandle { focus: () => void; insertBlock: (text: string) => void }
 export interface RichEditorProps {
   valueHtml: string;
   onChange: (c: RichEditorChange) => void;
@@ -67,7 +67,13 @@ export default function RichEditor({
     },
   });
 
-  useImperativeHandle(editorRef, () => ({ focus: () => editor?.commands.focus() }), [editor, editorRef]);
+  useImperativeHandle(editorRef, () => ({
+    focus: () => editor?.commands.focus(),
+    insertBlock: (text: string) => {
+      if (!editor) return;
+      editor.chain().focus().insertContentAt(editor.state.doc.content.size, { type: "paragraph", content: text ? [{ type: "text", text }] : [] }).run();
+    },
+  }), [editor, editorRef]);
 
   // valueHtml prop 변화를 에디터에 동기화 (복원/리셋 시 반영).
   // 타이핑 중엔 호스트가 getHTML()을 valueHtml에 저장하므로 값이 같아 setContent 스킵 → 커서 유지.
