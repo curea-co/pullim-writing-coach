@@ -45,6 +45,8 @@ export default function StepResult({
       {submit.phase === "loading" && (
         <section
           ref={outcomeRef}
+          role="status"
+          aria-live="polite"
           className="border-border bg-surface flex items-center gap-3 rounded-xl border p-6"
         >
           <span
