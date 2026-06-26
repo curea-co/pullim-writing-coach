@@ -106,6 +106,7 @@ export default function TokenGate({
             type="password"
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            aria-label="데모 비밀번호"
             placeholder="데모 비밀번호"
             autoComplete="off"
             className={cn(
@@ -167,6 +168,7 @@ export default function TokenGate({
               type="password"
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              aria-label="데모 비밀번호"
               placeholder="데모 비밀번호"
               autoComplete="off"
               className="border-band-warn bg-background text-foreground flex-1 rounded-lg border px-3 py-2.5 text-sm"

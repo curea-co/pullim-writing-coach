@@ -17,7 +17,7 @@ export default function TryPage() {
           href="/"
           className="text-muted-foreground hover:text-foreground text-sm"
         >
-          ← 샘플 목록으로
+          ← 홈으로
         </Link>
       </nav>
 
