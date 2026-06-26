@@ -17,6 +17,14 @@ describe("VoicePanel", () => {
     await user.click(screen.getByTestId("voice-mic"));
     expect(mockHook.start).toHaveBeenCalledOnce();
   });
+  it("마이크 토글 — 듣는 중이면 클릭 시 stop 호출", async () => {
+    mockHook.listening = true;
+    const user = userEvent.setup();
+    render(<VoicePanel onInsert={() => {}} />);
+    await user.click(screen.getByTestId("voice-mic"));
+    expect(mockHook.stop).toHaveBeenCalledOnce();
+    expect(mockHook.start).not.toHaveBeenCalled();
+  });
   it("final 전사가 누적되고 '본문에 넣기'가 onInsert(text) 호출", async () => {
     const onInsert = vi.fn();
     const user = userEvent.setup();
