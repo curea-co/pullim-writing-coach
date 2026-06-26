@@ -46,7 +46,7 @@ import {
 import type { CoachAssignment, WritingMode } from "@/app/lib/coach-setup";
 import { DEMO_TOKEN_KEY } from "@/app/components/TokenGate";
 import styles from "@/app/coach/coach.module.css";
-import { loadDoneCount, bumpDoneCount, hasDoneCounted, markDoneCounted } from "@/app/lib/storage";
+import { loadDoneCount, bumpDoneCount, loadLastDoneFingerprint, setLastDoneFingerprint } from "@/app/lib/storage";
 import Canvas from "./Canvas";
 import GuidePanel from "./GuidePanel";
 import OutlinePanel from "./OutlinePanel";
@@ -520,7 +520,8 @@ export default function CoachClient({
   const [bodyHtml, setBodyHtml] = useState(""); // 리치 에디터 HTML(reducer 외부 — body는 계속 평문)
   const [coachSpellcheck, setCoachSpellcheck] = useState(false);
   // 끈기 스트릭 — 완료 시 bumpDoneCount() 결과로 갱신(reducer 외부).
-  const [doneStreak, setDoneStreak] = useState(() => loadDoneCount());
+  //   초기값은 0(서버/클라 첫 렌더 일치 — hydration mismatch 방지); 마운트 후 effect에서 실제 값 주입.
+  const [doneStreak, setDoneStreak] = useState(0);
   const editorRef = useRef<RichEditorHandle>(null);
 
   // 라이브 세션(순수 CoachSession 모델) — 반복 갱신은 항상 새 객체로 교체(불변). 부수효과는 영속 헬퍼.
@@ -585,14 +586,18 @@ export default function CoachClient({
   }, []);
 
   // ── 완료 시 끈기 스트릭 1회 증가 ──
-  // reducer 외부: done phase 진입 시 과제당 1번만 bumpDoneCount().
-  //   doneCountedRef = 같은 마운트 내 effect 재실행 방어. hasDoneCounted(sig) = 새로고침 후 같은 과제
-  //   재통과 시 영속 중복집계 방어(RESTORE가 통과 세션을 write로 되살려도 재집계 안 됨).
+  // 마운트 후 끈기 스트릭 실제값 주입(SSR 0 → 클라 localStorage). hydration 이후라 mismatch 없음.
+  useEffect(() => { setDoneStreak(loadDoneCount()); }, []);
+
+  // reducer 외부: done phase 진입 시 '완료 1건'을 1번만 집계.
+  //   doneCountedRef = 같은 마운트 내 effect 재실행 방어. 완료 지문(고쳐쓰기수:최종글자수)으로 영속 중복집계
+  //   방어 — 새로고침 후 같은 글 재통과는 지문이 같아 재집계 안 되고, 같은 과제를 다시 써서 끝내면(지문이
+  //   달라짐) 새 완료로 집계된다. 본문/과제문 같은 자유입력은 저장하지 않는다(데이터 최소화).
   useEffect(() => {
     if (state.phase === "done" && !doneCountedRef.current) {
       doneCountedRef.current = true;
-      const sig = assignmentSig(assignment);
-      if (!hasDoneCounted(sig)) { markDoneCounted(sig); setDoneStreak(bumpDoneCount()); }
+      const fp = `${state.revisions}:${Array.from(state.body.trim()).length}`;
+      if (loadLastDoneFingerprint() !== fp) { setLastDoneFingerprint(fp); setDoneStreak(bumpDoneCount()); }
       else setDoneStreak(loadDoneCount());
     }
   }, [state.phase]);

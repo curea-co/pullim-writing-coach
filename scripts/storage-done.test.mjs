@@ -27,7 +27,7 @@ const storageMock = new MemoryStorage();
 globalThis.window = { localStorage: storageMock };
 
 // 동적 import — window 주입 후라야 storage.ts가 SSR 가드를 통과.
-const { loadDoneCount, bumpDoneCount, hasDoneCounted, markDoneCounted } = await import("../app/lib/storage.ts");
+const { loadDoneCount, bumpDoneCount, loadLastDoneFingerprint, setLastDoneFingerprint } = await import("../app/lib/storage.ts");
 
 beforeEach(() => storageMock.clear());
 
@@ -59,13 +59,15 @@ test("loadDoneCount — 음수 값 시 0 반환", () => {
   assert.equal(loadDoneCount(), 0);
 });
 
-test("hasDoneCounted/markDoneCounted — 과제 서명별 1회 집계(새로고침 재통과 중복 방지)", () => {
-  const sig = "중2|과학|설명문|화산";
-  assert.equal(hasDoneCounted(sig), false);
-  markDoneCounted(sig);
-  assert.equal(hasDoneCounted(sig), true);
-  // 같은 sig 재마크는 멱등(중복 추가 없음)
-  markDoneCounted(sig);
-  // 다른 과제는 독립
-  assert.equal(hasDoneCounted("고1|국어|논설문|환경"), false);
+test("완료 지문(fingerprint) 1개만 보관 — 같은 글 재통과는 재집계 안 함, 다른 글은 집계", () => {
+  assert.equal(loadLastDoneFingerprint(), ""); // 초기엔 없음
+  setLastDoneFingerprint("3:412");
+  assert.equal(loadLastDoneFingerprint(), "3:412");
+  // 같은 지문이면 호스트 로직이 재집계를 건너뜀(여기선 저장값 동일 확인)
+  assert.equal(loadLastDoneFingerprint() === "3:412", true);
+  // 다른 완료(고쳐쓰기수/글자수 변화) → 다른 지문 → 새 완료로 갱신
+  setLastDoneFingerprint("5:530");
+  assert.equal(loadLastDoneFingerprint(), "5:530");
+  // 자유입력(과제문/본문)은 저장되지 않음 — 값은 비내용 메타뿐
+  assert.equal(/[가-힣]/.test(loadLastDoneFingerprint()), false);
 });

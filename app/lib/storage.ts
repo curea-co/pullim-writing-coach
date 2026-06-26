@@ -653,16 +653,15 @@ export function bumpDoneCount(): number {
   try { const next = loadDoneCount() + 1; window.localStorage.setItem(DONE_COUNT_KEY, String(next)); return next; } catch { return loadDoneCount(); }
 }
 
-// 이미 끈기 스트릭에 집계된 과제 서명 집합 — 새로고침 후 같은 과제 재통과 시 중복 집계를 막는다(과제당 1회).
-const DONE_COUNTED_KEY = "pwc_done_counted_v1";
-function loadCountedSigs(): string[] {
-  if (typeof window === "undefined") return [];
-  try { const v = JSON.parse(window.localStorage.getItem(DONE_COUNTED_KEY) ?? "[]"); return Array.isArray(v) ? v.filter((x) => typeof x === "string") : []; } catch { return []; }
+// 마지막으로 집계한 '완료 지문'(비내용 메타: 고쳐쓰기수:최종글자수) 1개만 보관.
+//   새로고침 후 같은 글을 재통과하면 지문이 같아 재집계 안 됨; 같은 과제를 다시 써서 끝내면(고쳐쓰기수·
+//   글자수가 달라짐) 새 완료로 집계됨. 본문/과제문 같은 자유입력은 저장하지 않는다(데이터 최소화).
+const DONE_FP_KEY = "pwc_done_fp_v1";
+export function loadLastDoneFingerprint(): string {
+  if (typeof window === "undefined") return "";
+  try { return window.localStorage.getItem(DONE_FP_KEY) ?? ""; } catch { return ""; }
 }
-export function hasDoneCounted(sig: string): boolean {
-  return loadCountedSigs().includes(sig);
-}
-export function markDoneCounted(sig: string): void {
+export function setLastDoneFingerprint(fp: string): void {
   if (typeof window === "undefined") return;
-  try { const set = loadCountedSigs(); if (!set.includes(sig)) { set.push(sig); window.localStorage.setItem(DONE_COUNTED_KEY, JSON.stringify(set)); } } catch { /* quota/denied — best-effort */ }
+  try { window.localStorage.setItem(DONE_FP_KEY, fp); } catch { /* quota/denied — best-effort */ }
 }
