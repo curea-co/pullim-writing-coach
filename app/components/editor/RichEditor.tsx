@@ -111,10 +111,10 @@ export default function RichEditor({
   return (
     <div className="border-border bg-background flex h-full flex-col rounded-lg border">
       <EditorToolbar editor={editor} spellcheck={spellcheck} onToggleSpellcheck={onToggleSpellcheck} disabled={disabled} />
-      <div className="flex-1 overflow-auto">
+      <div className="relative flex-1 overflow-auto">
         <EditorContent editor={editor} className="h-full" />
         {placeholder && editor?.isEmpty ? (
-          <div className="text-subtle-foreground pointer-events-none -mt-9 px-3 text-sm" aria-hidden>{placeholder}</div>
+          <div className="text-subtle-foreground pointer-events-none absolute left-0 top-0 px-3 py-2 text-sm" aria-hidden>{placeholder}</div>
         ) : null}
       </div>
     </div>
