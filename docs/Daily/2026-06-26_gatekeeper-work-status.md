@@ -4,7 +4,7 @@
 > **완료 판정 원칙**: "2번(서버환경 구성 + 로그인 동작)이 0%면 개발 완료 0%." → 코드가 있어도 `dev-os.pullim.ai` 로그인 → writing-coach 인가 동작이 **서버환경에서 검증**돼야 '완료'.
 > **역할 분담**: 1번 = 에이전트 작성(완료) · 2~4번 = 사람 검수(근거기반 초안 + ⚠검증필요).
 > 라이브 상태 2026-06-26 curl 실측. 머지 PR 94건 / 오픈 PR #99(dev sync)뿐.
-> ⚠ **SoT 주의(ADR-021)**: 본 문서는 **writing-coach 상태 스냅샷(비권위)**이다. 서비스별 구현·인가·갭의 권위는 `docs/design/services/<svc>/`·각 작업 카드에 있으며 본 문서는 **요약·링크만** 한다(사실 중복 금지). 드리프트 시 설계 SoT 우선. ※ 본 문서의 정위치는 writing-coach 레포이며, pullim-api에는 참조용으로만 존재.
+> ⚠ **SoT 주의**: 본 문서는 **writing-coach 상태 스냅샷(비권위)**이다. 풀림 플랫폼 서비스별 구현·인가·갭의 권위는 **외부 레포 [curea-co/pullim-api](https://github.com/curea-co/pullim-api)의 `docs/design/`(ADR-021 체계)**에 있으며, 본 문서의 pullim-api 관련 서술은 그 외부 SoT 인용·관측이다(본 레포에서 검증 불가, 드리프트 시 외부 SoT 우선).
 
 ---
 
@@ -27,7 +27,8 @@
 - **과정 코치 동선(`/coach`)**: TokenGate → 과제 입력(MetaForm) → 모드 선택(자유·가이드·개요 / 말하기 준비중) → 작성 캔버스(RichEditor) → 코칭(점수·넛지·성취막대·과정로그)
 - **라이브 API 3종**(자체 Next.js, Claude Haiku 직접 호출): `POST /api/score`(5영역 채점) · `/api/extract`(안내서 추출) · `/api/coach`(코치 상호작용)
 - **대필 가드**: 정적 텍스트 가드(#75) — 대필 0 불변식
-- **RichEditor**(TipTap, #86) · **PUDS 대시보드 셸 + OS 스타일 홈**(#81~#85) · **안내서 추출 UI**(UniversalCapture·AssignmentCard·ConfidenceChip, #69·#70)
+- **RichEditor**(TipTap, #86) · **PUDS 대시보드 셸 + OS 스타일 홈**(#81~#85)
+- **안내서 추출 UI/API**(UniversalCapture·AssignmentCard·ConfidenceChip·`/api/extract`, #69·#70) — 구현됨, 단 **현재 `/coach` 동선에는 미배선**(별도). 실제 `/coach`는 AssignmentStep(MetaForm)→ModeSelectStep→CoachClient (README.md 명시)
 - **5영역 rubric 채점**(rubric v0.5) · 결과 뷰·본문 주석·수정 전후 비교·내보내기
 - 인프라: 토큰 게이트·rate limit(2단 user10·IP60)·Sentry·테스트(unit·components·e2e CI 4잡)
 - 데모: 5종 학생 글 anchor
@@ -61,14 +62,14 @@
 
 ## 3. 현재 개발중 / 개발해야 하는 목록
 
-### 3-1. API 갭 (pullim-api 미구현 → 여기 등록 · 참고: /Users/kokho/workspace/pullim-api)
-- **pullim-api `writing` 모듈 부재** — `writing` entitlement 키만 존재(`entitlement-flags.constants.ts`), **백엔드 모듈·엔티티·엔드포인트 없음**(`docs/design/services/`에 writing 폴더 없음). 현재 채점/추출/코치는 writing-coach 자체 Next.js `/api` + Claude 직접 호출.
+### 3-1. API 갭 (pullim-api 미구현 → 여기 등록 · 외부 레포: [curea-co/pullim-api](https://github.com/curea-co/pullim-api))
+- **pullim-api `writing` 모듈 부재** — `writing` entitlement 키만 존재(pullim-api `src/auth/common/constants/entitlement-flags.constants.ts`), **백엔드 모듈·엔티티·엔드포인트 없음**(pullim-api `src/`·`docs/design/services/`에 writing 없음). 현재 채점/추출/코치는 writing-coach 자체 Next.js `/api` + Claude 직접 호출. ※ pullim-api 사실은 본 레포에서 검증 불가 — 2026-06-26 pullim-api `dev` 기준 관측.
   - → 중앙 아키텍처가 pullim-api 경유를 요구하면 **writing BE 신설 필요**. standalone 유지면 불필요(아키텍처 결정 사항).
 - **OS-SSO 인증 연동** — writing-coach에 cookie SSO + `/auth/csrf` + `EntitlementGuard('writing')` 미배선. dev-os 로그인 claim 수용 경로 없음.
 
 ### 3-2. writing-coach 자체 갭
 - **중앙 로그인 랜딩 + 공통 헤더** — 로그인 클릭 → 중앙 로그인 랜딩 + 쿼리 리다이렉트, 상단 헤더 공통화. 현재 자체 TokenGate.
-  - 랜딩 URL은 설계 SoT(`docs/design/_platform/plan.md`)가 이미 정리: apex `pullim.ai`도 로그인 UI 노출 가능 + 미인증 서비스 리다이렉트 **canonical 진입 = `os.pullim.ai/login?next=`**. writing-coach는 이 canonical 진입을 따르면 됨(본 문서는 SoT 인용만, 결정 아님).
+  - 랜딩 URL은 **외부 SoT**(pullim-api 레포 `docs/design/_platform/plan.md`)에서 확정 — apex `pullim.ai`도 로그인 UI 가능 + 미인증 서비스 리다이렉트 canonical 진입 `os.pullim.ai/login?next=`로 정리된 것으로 관측(본 레포 검증 불가, **외부 SoT 확인 필요**). writing-coach는 그 canonical 진입을 따르면 됨 — 본 문서는 결정 아님.
 - **결제·크레딧 = writing-coach 범위 밖** — 결제·엔타이틀먼트 발급은 중앙(pullim-api `billing` + OS) 소관. writing-coach는 발급된 `writing` flag로 **인가(게이팅)만** 수행, 결제 UI·원장 미구축(불필요).
 - **잔여 PR**: #99(dev←main sync) 머지 후 dev/main 정합.
 - 과정 코치 mock 구간 고도화(coach-mock 등 ⚪) · `/try` 레거시 정리.
@@ -99,5 +100,5 @@
 
 ## 부록 — 검증 방법
 - 라이브: `curl -s -o /dev/null -w "%{http_code}" https://writing.pullim.ai/`(200) · `https://dev-writing.pullim.ai/`(302 SSO 보호).
-- 인증 방식 확인: `app/lib/server/anthropic.ts`·`middleware.ts` → `DEMO_ACCESS_TOKEN`/`x-demo-token`만(OS-SSO·EntitlementGuard 없음).
-- OS 통합 검증(미연동): pullim-api `POST /auth/dev/seed-member`로 `writing` flag 계정 발급 → dev-os 로그인 → writing-coach 진입 — **현재 경로 없음**.
+- 인증 방식 확인: 인증 근거는 `app/lib/server/anthropic.ts`의 `isAuthorized`(`DEMO_ACCESS_TOKEN` ↔ `x-demo-token` 비교)뿐 — cookie SSO·EntitlementGuard 없음. (`middleware.ts`는 rate limit만 담당, 인증 아님.)
+- OS 통합 검증(미연동): pullim-api(외부 레포) `POST /auth/dev/seed-member`로 `writing` flag 계정 발급 → dev-os 로그인 → writing-coach 진입 — **현재 경로 없음**.
