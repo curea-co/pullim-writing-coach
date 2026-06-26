@@ -46,7 +46,6 @@ import {
 import type { CoachAssignment, WritingMode } from "@/app/lib/coach-setup";
 import { DEMO_TOKEN_KEY } from "@/app/components/TokenGate";
 import styles from "@/app/coach/coach.module.css";
-import { countedSessionCount, markCountedSession, loadSessionId, newSessionId, clearSessionId } from "@/app/lib/storage";
 import Canvas from "./Canvas";
 import GuidePanel from "./GuidePanel";
 import OutlinePanel from "./OutlinePanel";
@@ -55,7 +54,6 @@ import BottomSheet, { type SheetPosition } from "./BottomSheet";
 import NudgeCard from "./NudgeCard";
 import GrowthBars, { GrowthRow } from "./GrowthBars";
 import BreakthroughBadge from "./BreakthroughBadge";
-import PersistDots from "./PersistDots";
 import ProcessTimeline from "./ProcessTimeline";
 import { BlockIcon, MastGlyph } from "./icons";
 import ShareStory from "./ShareStory";
@@ -519,19 +517,12 @@ export default function CoachClient({
   const [outlineCollapsed, setOutlineCollapsed] = useState(false); // outline 패널 접기(로컬 UI state)
   const [bodyHtml, setBodyHtml] = useState(""); // 리치 에디터 HTML(reducer 외부 — body는 계속 평문)
   const [coachSpellcheck, setCoachSpellcheck] = useState(false);
-  // 끈기 스트릭 — 완료 시 집계 세션 집합 크기(countedSessionCount)로 갱신(reducer 외부).
-  //   초기값은 0(서버/클라 첫 렌더 일치 — hydration mismatch 방지); 마운트 후 effect에서 실제 값 주입.
-  const [doneStreak, setDoneStreak] = useState(0);
   const editorRef = useRef<RichEditorHandle>(null);
 
   // 라이브 세션(순수 CoachSession 모델) — 반복 갱신은 항상 새 객체로 교체(불변). 부수효과는 영속 헬퍼.
   const sessionRef = useRef<CoachSession | null>(null);
   // 교사 루브릭 직렬화 텍스트(마운트 시 1회 읽음). 있으면 /api/coach rubric 필드로 전송.
   const rubricRef = useRef<string | undefined>(undefined);
-  // 완료 카운트 중복 방지 ref — 같은 마운트 내 effect 재실행 방어.
-  const doneCountedRef = useRef(false);
-  // 현재 세션의 비내용 고유 id — 완료 집계의 안정적 식별값(길이/회차 충돌 없음). 새 세션 발급·복원·리셋.
-  const sessionIdRef = useRef("");
 
   const assignment = assignmentProp ?? DEMO_ASSIGNMENT;
   const assignmentTitle = assignment.title ?? assignment.prompt_text.slice(0, 24);
@@ -555,7 +546,6 @@ export default function CoachClient({
       sa.prompt_text === assignment.prompt_text;
     if (saved && sameAssignment) {
       sessionRef.current = saved;
-      sessionIdRef.current = loadSessionId(); // 같은 세션 복원 — 발급된 id 복원(없으면 done effect가 발급)
       const lastDraft = saved.draftHistory[saved.draftHistory.length - 1];
       // 본문·점수·기준선·회차를 write 단계로 복원(다음 [봐줘]로 라이브 루프 재개).
       dispatch({
@@ -588,25 +578,6 @@ export default function CoachClient({
     // 마운트 1회(루브릭 읽기 + 세션 복원). dispatch는 안정적이라 deps 불필요.
   }, []);
 
-  // ── 완료 시 끈기 스트릭 1회 증가 ──
-  // 마운트 후 끈기 스트릭 실제값 주입(SSR 0 → 클라 localStorage). hydration 이후라 mismatch 없음.
-  useEffect(() => { setDoneStreak(countedSessionCount()); }, []);
-
-  // reducer 외부: done phase 진입 시 현재 세션 id를 '집계한 세션 집합'에 넣고, 스트릭 = 집합 크기로 갱신.
-  //   markCountedSession은 멱등 — 같은 세션이 새로고침/과제전환/다중 탭으로 다시 done 돼도 집합에 1번만
-  //   들어가므로 별도 카운터 없이 중복증가·desync가 구조적으로 불가능. 같은 과제를 다시 써서 끝내면
-  //   (reset→새 세션→새 id) 새 완료로 +1. id는 충돌 없는 세션 단위 값, 본문/과제문은 저장하지 않는다.
-  //   doneCountedRef = 같은 마운트 내 effect 재실행을 줄이는 가벼운 가드(정확성은 집합 멱등성이 보장).
-  useEffect(() => {
-    if (state.phase === "done" && !doneCountedRef.current) {
-      doneCountedRef.current = true;
-      let id = sessionIdRef.current;
-      if (!id) { id = newSessionId(); sessionIdRef.current = id; } // 방어: id 미발급 경로 — 발급 후 집계
-      markCountedSession(id);
-      setDoneStreak(countedSessionCount());
-    }
-  }, [state.phase]);
-
   // ── 첫 점검 (봐줘) ──
   // 매 렌더 새 클로저 — 호출 시점의 최신 state.body를 캡처(stale 방지). 의존성 추적 불필요.
   // Codex/E2E 가드: 빈 캔버스에서 [봐줘] 클릭 시 코치 호출 안 함 (write 상태 유지, nudge 미생성).
@@ -637,7 +608,6 @@ export default function CoachClient({
     let revisionTracked = false;
     if (!sess) {
       sessionRef.current = createSession(sessionAssignment(assignment), state.body, areaScores, rubricRef.current);
-      sessionIdRef.current = newSessionId(); // 새 세션 발급 — 완료 집계 식별값
     } else {
       const lastBody = sess.draftHistory[sess.draftHistory.length - 1]?.body ?? "";
       if (state.body !== lastBody) {
@@ -688,7 +658,6 @@ export default function CoachClient({
     if (!sessionRef.current) {
       // 이론상 RECHECK 전 CHECK 필수라 발생 불가지만 방어적으로 세션 생성.
       sessionRef.current = createSession(sessionAssignment(assignment), state.body, areaScores, rubricRef.current);
-      sessionIdRef.current = newSessionId();
     } else if (wasRevised) {
       sessionRef.current = recordRevision(sessionRef.current, state.body, areaScores, area, before, after);
     } else {
@@ -748,17 +717,11 @@ export default function CoachClient({
     sessionRef.current = null;
     clearSession();
     clearProcessLog();
-    // 새 라운드는 새 세션 id를 발급받도록 초기화 — 다음 완료는 새 완료로 집계됨.
-    sessionIdRef.current = "";
-    clearSessionId();
-    // 새 과제는 다시 카운트 가능(같은 마운트 중복 방지 ref 초기화).
-    doneCountedRef.current = false;
     dispatch({ type: "RESET" });
   };
 
   const handleNewAssignment = () => {
     // 기존 reset()으로 세션·과정 로그·상태 초기화 후, 가이드 메모도 제거하고 onNewAssignment 콜백 호출.
-    // reset() 내부에서 doneCountedRef.current = false 처리됨 — 새 과제 재카운트 가능.
     reset();
     if (typeof window !== "undefined") {
       try {
@@ -918,7 +881,7 @@ export default function CoachClient({
           </BottomSheet>
 
           {/* 완료화면 */}
-          <CompletionView state={state} onRestart={reset} onNewAssignment={handleNewAssignment} session={sessionRef.current} doneStreak={doneStreak} assignment={assignment} />
+          <CompletionView state={state} onRestart={reset} onNewAssignment={handleNewAssignment} session={sessionRef.current} assignment={assignment} />
         </div>
       </div>
 
@@ -1047,14 +1010,12 @@ function CompletionView({
   onRestart,
   onNewAssignment,
   session,
-  doneStreak,
   assignment,
 }: {
   state: State;
   onRestart: () => void;
   onNewAssignment: () => void;
   session: CoachSession | null;
-  doneStreak: number;
   assignment: CoachAssignment;
 }) {
   const [wedgeOpen, setWedgeOpen] = useState(false);
@@ -1088,7 +1049,6 @@ function CompletionView({
 
       {session ? <BreakthroughBadge areas={selectBreakthroughs(buildProcessLog(session))} /> : null}
 
-      <PersistDots count={doneStreak} />
       {session ? <ProcessTimeline nodes={buildTimeline(session)} /> : null}
 
       {/* 공유 카드 title은 검증된 과제명만 — 없으면 자유입력 prompt_text가 아니라 안전한 장르 기반 일반명 사용. */}
