@@ -46,7 +46,7 @@ import {
 import type { CoachAssignment, WritingMode } from "@/app/lib/coach-setup";
 import { DEMO_TOKEN_KEY } from "@/app/components/TokenGate";
 import styles from "@/app/coach/coach.module.css";
-import { loadDoneCount, bumpDoneCount } from "@/app/lib/storage";
+import { loadDoneCount, bumpDoneCount, hasDoneCounted, markDoneCounted } from "@/app/lib/storage";
 import Canvas from "./Canvas";
 import GuidePanel from "./GuidePanel";
 import OutlinePanel from "./OutlinePanel";
@@ -585,12 +585,15 @@ export default function CoachClient({
   }, []);
 
   // ── 완료 시 끈기 스트릭 1회 증가 ──
-  // reducer 외부(ref 가드): done phase 진입 시 과제당 1번만 bumpDoneCount().
-  // effect 재실행(StrictMode 등) 대비 doneCountedRef로 중복 차단.
+  // reducer 외부: done phase 진입 시 과제당 1번만 bumpDoneCount().
+  //   doneCountedRef = 같은 마운트 내 effect 재실행 방어. hasDoneCounted(sig) = 새로고침 후 같은 과제
+  //   재통과 시 영속 중복집계 방어(RESTORE가 통과 세션을 write로 되살려도 재집계 안 됨).
   useEffect(() => {
     if (state.phase === "done" && !doneCountedRef.current) {
       doneCountedRef.current = true;
-      setDoneStreak(bumpDoneCount());
+      const sig = assignmentSig(assignment);
+      if (!hasDoneCounted(sig)) { markDoneCounted(sig); setDoneStreak(bumpDoneCount()); }
+      else setDoneStreak(loadDoneCount());
     }
   }, [state.phase]);
 
@@ -1073,7 +1076,8 @@ function CompletionView({
       <PersistDots count={doneStreak} />
       {session ? <ProcessTimeline nodes={buildTimeline(session)} /> : null}
 
-      {session ? <ShareStory text={formatStoryText({ title: assignment.title ?? assignment.prompt_text.slice(0, 24), genre: assignment.genre, revisions: state.revisions, breakthroughs: selectBreakthroughs(buildProcessLog(session)) })} /> : null}
+      {/* 공유 카드 title은 검증된 과제명만 — 없으면 자유입력 prompt_text가 아니라 안전한 장르 기반 일반명 사용. */}
+      {session ? <ShareStory text={formatStoryText({ title: assignment.title ?? `${assignment.genre} 글`, genre: assignment.genre, revisions: state.revisions, breakthroughs: selectBreakthroughs(buildProcessLog(session)) })} /> : null}
 
       {/* 과정 로그 */}
       <div className="mt-[18px] rounded-[var(--r-lg)] border border-[var(--line)] bg-white p-[18px] shadow-[var(--sh-1)]">

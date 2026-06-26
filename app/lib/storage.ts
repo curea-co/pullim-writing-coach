@@ -652,3 +652,17 @@ export function bumpDoneCount(): number {
   if (typeof window === "undefined") return 0;
   try { const next = loadDoneCount() + 1; window.localStorage.setItem(DONE_COUNT_KEY, String(next)); return next; } catch { return loadDoneCount(); }
 }
+
+// 이미 끈기 스트릭에 집계된 과제 서명 집합 — 새로고침 후 같은 과제 재통과 시 중복 집계를 막는다(과제당 1회).
+const DONE_COUNTED_KEY = "pwc_done_counted_v1";
+function loadCountedSigs(): string[] {
+  if (typeof window === "undefined") return [];
+  try { const v = JSON.parse(window.localStorage.getItem(DONE_COUNTED_KEY) ?? "[]"); return Array.isArray(v) ? v.filter((x) => typeof x === "string") : []; } catch { return []; }
+}
+export function hasDoneCounted(sig: string): boolean {
+  return loadCountedSigs().includes(sig);
+}
+export function markDoneCounted(sig: string): void {
+  if (typeof window === "undefined") return;
+  try { const set = loadCountedSigs(); if (!set.includes(sig)) { set.push(sig); window.localStorage.setItem(DONE_COUNTED_KEY, JSON.stringify(set)); } } catch { /* quota/denied — best-effort */ }
+}
