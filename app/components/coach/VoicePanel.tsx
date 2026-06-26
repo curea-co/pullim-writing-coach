@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSpeechRecognition } from "@/app/lib/use-speech";
 
 export default function VoicePanel({ onInsert, disabled = false }: { onInsert: (text: string) => void; disabled?: boolean }) {
@@ -7,6 +7,12 @@ export default function VoicePanel({ onInsert, disabled = false }: { onInsert: (
   const { supported, listening, interim, error, start, stop } = useSpeechRecognition({
     onResult: (t) => setLines((prev) => [...prev, t]),
   });
+
+  // 코치 처리(busy)로 disabled 전환 시 녹음 중이면 즉시 정지 — 버튼이 비활성이라 직접 못 끄는데
+  //   인식이 계속 살아 코치 응답을 읽는 소리·잡음이 다음 초안에 섞이는 것을 막는다.
+  useEffect(() => {
+    if (disabled && listening) stop();
+  }, [disabled, listening, stop]);
 
   // 판정 전(null): 중립 표시 — '미지원' 안내도 마이크도 그리지 않아 SSR/CSR 첫 렌더 일치 + 깜빡임 방지.
   if (supported === null) {

@@ -59,6 +59,11 @@ describe("VoicePanel", () => {
     expect(screen.queryByText(/지원하지 않아요/)).not.toBeInTheDocument();
     expect(screen.queryByTestId("voice-mic")).not.toBeInTheDocument();
   });
+  it("녹음 중 disabled로 전환되면 stop()을 호출한다 (코치 처리 중 인식 정지)", () => {
+    mockHook.listening = true;
+    render(<VoicePanel onInsert={() => {}} disabled={true} />);
+    expect(mockHook.stop).toHaveBeenCalled();
+  });
   it("disabled=true — 마이크 버튼과 '본문에 넣기' 버튼이 disabled, 전사 텍스트는 여전히 노출", async () => {
     const user = userEvent.setup();
     render(<VoicePanel onInsert={() => {}} disabled={true} />);
