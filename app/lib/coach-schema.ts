@@ -159,6 +159,24 @@ function questionFieldIsDeclarative(q: string): boolean {
   return DECLARATIVE_END.test(t);
 }
 
+// (6) 질문형 covert 대필: 모델이 '완성 문장다운' 후보를 인용하고 **그 인용을 직접 목적어로** 글에 넣으라고 제안.
+//   "'화산은 위험하다'를 넣어보면 어때?" 류 — 짧은 인용+물음표라 #1~#5를 우회하는 사각을 닫는다.
+//   핵심 정밀화: 인용 **직후** 목적격 조사(를/을) + (그대로) + 삽입동사(넣/추가/포함/붙여/집어넣)가 와야 한다.
+//     · 인용이 주어(는/은)이거나 사이에 다른 말이 끼면 코칭으로 보고 통과 — 학생 자기 문장을 인용해 "더 자세히
+//       넣어 설명해 볼까?"(echo+보강)나 "…'는 좋은 장면이야, 더 넣어 볼까?"는 오차단하지 않는다.
+//     · 코치 mock의 연결어 템플릿("'먼저 ~, 그래서 ~'처럼 … 넣어 볼까요?")도 인용 뒤가 '처럼'이라 자동 통과
+//       (별도 '~' 예외 불필요 — 인용 안에 '~'를 끼워 우회하던 구멍도 동시에 제거).
+//   인용이 '문장다움'(서술 종결/다어절/≥10자)일 때만 — 개념어 단일 인용('예시'/'주장')은 제외(오차단 방지).
+function quotedInsertionSuggestion(text: string): boolean {
+  const re = new RegExp(
+    `[${QUOTE_CHARS}]([^${QUOTE_CHARS}]{2,})[${QUOTE_CHARS}]\\s*(?:를|을)\\s*(?:그대로\\s*)?(?:넣|추가|붙여|포함|집어넣)`,
+  );
+  const m = re.exec(text);
+  if (!m) return false;
+  const quoted = m[1].trim();
+  return DECLARATIVE_END.test(quoted) || /\s/.test(quoted) || quoted.length >= 10;
+}
+
 // 한 nudge(진단+유도질문)에 대필 신호가 있으면 위반. 위반 메시지는 nudge 인덱스를 포함.
 export function checkGenerationBlock(o: CoachOutput): string[] {
   const v: string[] = [];
@@ -199,6 +217,12 @@ export function checkGenerationBlock(o: CoachOutput): string[] {
     // (5) 질문칸에 서술 완성문장(평서문)을 그대로 박아넣음 — 질문칸 한정(진단 평서문은 허용)
     if (questionFieldIsDeclarative(question)) {
       v.push(`[${i}] 질문칸 서술 완성문장(대필) 감지`);
+      return;
+    }
+    // (6) 질문형 covert 대필: '완성 문장다운' 후보를 인용하고 글에 넣으라고 제안
+    //   "'화산은 위험하다'를 넣어보면 어때?" 류 — 짧은 인용+물음표라 #1~#5를 우회하는 사각을 닫는다.
+    if (quotedInsertionSuggestion(text)) {
+      v.push(`[${i}] 인용 문장 삽입 제안(대필) 감지`);
       return;
     }
   });

@@ -25,8 +25,8 @@ export type CoachAssignment = {
 
 export type CoachSetup = { assignment: CoachAssignment; mode: WritingMode };
 
-// 이번 물결에 실제 동작하는 모드 화이트리스트. voice는 카드 '준비 중'(비활성).
-const ENABLED_MODES: readonly WritingMode[] = ["free", "guide", "outline"];
+// 이번 물결에 실제 동작하는 모드 화이트리스트. 4개 모드 모두 활성.
+const ENABLED_MODES: readonly WritingMode[] = ["free", "guide", "outline", "voice"];
 /** 형태 가드용 전체 모드 화이트리스트 — 활성화 여부가 아님(활성화는 isModeEnabled/ENABLED_MODES). */
 export const ALL_MODES: readonly WritingMode[] = ["free", "guide", "outline", "voice"];
 
@@ -73,7 +73,7 @@ export function parseSetup(raw: string | null): CoachSetup | null {
     if (typeof a.school_level !== "string" || typeof a.subject !== "string") return null;
     if (typeof a.genre !== "string" || typeof a.prompt_text !== "string") return null;
     if (!(a.target_char_count === null || (typeof a.target_char_count === "number" && Number.isInteger(a.target_char_count)))) return null;
-    // 구조뿐 아니라 의미까지 검증(curea-review-ai 지적): 비활성 모드(outline/voice)나 규칙을 어긴
+    // 구조뿐 아니라 의미까지 검증(curea-review-ai 지적): 비활성 모드나 규칙을 어긴
     // 과제가 저장돼 있으면 null로 떨어뜨려 /coach가 곧장 ready로 진입해 UI 가드를 우회하는 걸 막는다.
     const setup = o as CoachSetup;
     if (!isModeEnabled(setup.mode)) return null;

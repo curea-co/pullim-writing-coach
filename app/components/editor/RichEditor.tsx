@@ -8,7 +8,7 @@ import EditorToolbar from "./EditorToolbar";
 import { htmlToPlain } from "@/app/lib/editor-doc";
 
 export interface RichEditorChange { html: string; text: string }
-export interface RichEditorHandle { focus: () => void }
+export interface RichEditorHandle { focus: () => void; insertBlock: (text: string) => void }
 export interface RichEditorProps {
   valueHtml: string;
   onChange: (c: RichEditorChange) => void;
@@ -21,10 +21,11 @@ export interface RichEditorProps {
   onToggleSpellcheck?: () => void;
   dataTestid?: string;
   editableClassName?: string;  // contenteditable 루트에 추가 클래스(예: styles.canvas 노트 배경)
+  editableId?: string;         // contenteditable 요소의 id (e2e 셀렉터 + a11y 훅)
 }
 
 export default function RichEditor({
-  valueHtml, onChange, spellcheck = false, disabled = false, placeholder, editorRef, ariaLabel, ariaDescribedby, onToggleSpellcheck, dataTestid, editableClassName,
+  valueHtml, onChange, spellcheck = false, disabled = false, placeholder, editorRef, ariaLabel, ariaDescribedby, onToggleSpellcheck, dataTestid, editableClassName, editableId,
 }: RichEditorProps) {
   const editor = useEditor({
     immediatelyRender: false, // SSR 안전
@@ -51,9 +52,13 @@ export default function RichEditor({
       attributes: {
         class: `tiptap min-h-40 h-full w-full px-3 py-2 text-sm leading-relaxed focus:outline-none${editableClassName ? ` ${editableClassName}` : ""}`,
         spellcheck: spellcheck ? "true" : "false",
+        // contenteditable을 접근성 textbox로 노출 — 스크린리더가 다중행 입력으로 인식 + getByRole 검증 가능.
+        role: "textbox",
+        "aria-multiline": "true",
         ...(ariaLabel ? { "aria-label": ariaLabel } : {}),
         ...(ariaDescribedby ? { "aria-describedby": ariaDescribedby } : {}),
         ...(dataTestid ? { "data-testid": dataTestid } : {}),
+        ...(editableId ? { id: editableId } : {}),
       },
     },
     onUpdate: ({ editor }) => {
@@ -62,7 +67,21 @@ export default function RichEditor({
     },
   });
 
-  useImperativeHandle(editorRef, () => ({ focus: () => editor?.commands.focus() }), [editor, editorRef]);
+  useImperativeHandle(editorRef, () => ({
+    focus: () => editor?.commands.focus(),
+    insertBlock: (text: string) => {
+      if (!editor) return;
+      const para = { type: "paragraph", content: text ? [{ type: "text", text }] : [] };
+      // 빈 문서(TipTap 기본 빈 <p>)에 append하면 선행 빈 문단이 남아 평문이 "\n…"로 시작한다.
+      //   → 비어 있으면 기본 빈 문단을 '대체'하고, 내용이 있을 때만 끝에 append한다.
+      if (editor.isEmpty) {
+        // setContent 2번째 인자 emitUpdate=true — onUpdate를 발사해 호스트(body/bodyHtml)로 전파.
+        editor.chain().focus().setContent(para, true).run();
+      } else {
+        editor.chain().focus().insertContentAt(editor.state.doc.content.size, para).run();
+      }
+    },
+  }), [editor, editorRef]);
 
   // valueHtml prop 변화를 에디터에 동기화 (복원/리셋 시 반영).
   // 타이핑 중엔 호스트가 getHTML()을 valueHtml에 저장하므로 값이 같아 setContent 스킵 → 커서 유지.
@@ -92,10 +111,10 @@ export default function RichEditor({
   return (
     <div className="border-border bg-background flex h-full flex-col rounded-lg border">
       <EditorToolbar editor={editor} spellcheck={spellcheck} onToggleSpellcheck={onToggleSpellcheck} disabled={disabled} />
-      <div className="flex-1 overflow-auto">
+      <div className="relative flex-1 overflow-auto">
         <EditorContent editor={editor} className="h-full" />
         {placeholder && editor?.isEmpty ? (
-          <div className="text-subtle-foreground pointer-events-none -mt-9 px-3 text-sm" aria-hidden>{placeholder}</div>
+          <div className="text-subtle-foreground pointer-events-none absolute left-0 top-0 px-3 py-2 text-sm" aria-hidden>{placeholder}</div>
         ) : null}
       </div>
     </div>

@@ -83,3 +83,20 @@ export function buildProcessLog(session: CoachSession): ProcessLog {
     stuckAreas,
   };
 }
+
+// 돌파: nudge가 반복돼 '막혔던' 영역(stuckAreas) 중 끝내 개선된(improved) 영역.
+//   '방어 증거(막힘 기록) = 성취 증거(뚫음)'의 이중가치. 신규 데이터 0 — perArea·stuckAreas 환원.
+export function selectBreakthroughs(log: ProcessLog): AreaName[] {
+  const improved = new Set(log.perArea.filter((p) => p.improved).map((p) => p.area));
+  return log.stuckAreas.filter((a) => improved.has(a));
+}
+
+// 과정 타임라인: draftHistory를 n·글자수·증감으로 환원. **body는 절대 포함하지 않는다**(대필 방어 + 사생활).
+export type TimelineNode = { n: number; charCount: number; delta: number };
+export function buildTimeline(session: CoachSession): TimelineNode[] {
+  return session.draftHistory.map((d, i) => ({
+    n: d.n,
+    charCount: d.charCount,
+    delta: i === 0 ? 0 : d.charCount - session.draftHistory[i - 1].charCount,
+  }));
+}
