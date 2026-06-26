@@ -44,6 +44,19 @@ describe("useSpeechRecognition", () => {
     const { result } = renderHook(() => useSpeechRecognition({ onResult: () => {} }));
     expect(result.current.supported).toBe(false);
   });
+  it("start() 동기 throw → error 설정, listening=false, 재시도 가능", () => {
+    // DOMException은 jsdom에서 Error 인스턴스가 아닐 수 있으므로 일반 Error 사용
+    const thrownError = Object.assign(new Error("Permission denied"), { name: "NotAllowedError" });
+    mock.start = vi.fn(() => { throw thrownError; });
+    const { result } = renderHook(() => useSpeechRecognition({ onResult: () => {} }));
+    act(() => result.current.start());
+    expect(result.current.error).toBe("NotAllowedError");
+    expect(result.current.listening).toBe(false);
+    // 두 번째 시도가 wedged 상태 없이 실행될 수 있어야 한다
+    mock.start = vi.fn(); // 이번엔 성공
+    act(() => result.current.start());
+    expect(result.current.listening).toBe(true);
+  });
   it("spontaneous onend resets listening and interim", () => {
     const { result } = renderHook(() => useSpeechRecognition({ onResult: () => {} }));
     act(() => result.current.start());

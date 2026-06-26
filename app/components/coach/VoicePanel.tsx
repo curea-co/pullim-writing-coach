@@ -40,21 +40,34 @@ export default function VoicePanel({ onInsert }: { onInsert: (text: string) => v
         </p>
       ) : null}
       {lines.length > 0 && (
-        <ul className="mt-3 space-y-2">
-          {lines.map((line, i) => (
-            <li key={i} className="flex items-start gap-2">
-              <span className="text-foreground flex-1">{line}</span>
-              <button
-                type="button"
-                data-testid={`voice-insert-${i}`}
-                onClick={() => onInsert(line)}
-                className="text-primary shrink-0 text-xs font-medium underline underline-offset-2"
-              >
-                본문에 넣기 →
-              </button>
-            </li>
-          ))}
-        </ul>
+        <div className="mt-3">
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-subtle-foreground text-xs">인식된 텍스트</span>
+            <button
+              type="button"
+              data-testid="voice-clear"
+              onClick={() => setLines([])}
+              className="text-destructive text-xs underline underline-offset-2"
+            >
+              지우기
+            </button>
+          </div>
+          <ul className="space-y-2">
+            {lines.map((line, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <span className="text-foreground flex-1">{line}</span>
+                <button
+                  type="button"
+                  data-testid={`voice-insert-${i}`}
+                  onClick={() => onInsert(line)}
+                  className="text-primary shrink-0 text-xs font-medium underline underline-offset-2"
+                >
+                  본문에 넣기 →
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );

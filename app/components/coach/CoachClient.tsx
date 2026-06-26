@@ -823,14 +823,14 @@ export default function CoachClient({
 
           {/* 가이드 패널 — mode=guide + write 단계일 때만. 직교 패널(reducer 무수정). */}
           {mode === "guide" && state.phase === "write" && (
-            <div className="px-[18px] pb-2">
+            <div className="px-[18px] pb-[64px]">
               <GuidePanel genre={assignment.genre} />
             </div>
           )}
 
           {/* 개요 패널 — mode=outline + write 단계 + 패널 미접힘일 때만. 직교 패널(reducer 무수정). */}
           {mode === "outline" && state.phase === "write" && !outlineCollapsed && (
-            <div className="px-[18px] pb-2">
+            <div className="px-[18px] pb-[64px]">
               <OutlinePanel
                 genre={assignment.genre}
                 onStartBody={() => {
@@ -841,16 +841,16 @@ export default function CoachClient({
             </div>
           )}
 
-          {/* 음성 패널 — mode=voice + write 단계일 때만. 직교 패널(reducer 무수정). */}
-          {mode === "voice" && state.phase === "write" && (
-            <div className="px-[18px] pb-2">
+          {/* 음성 패널 — mode=voice + 캔버스 편집 가능 상태(busy 아님 + done 아님). 직교 패널(reducer 무수정). */}
+          {mode === "voice" && !busy && state.phase !== "done" && (
+            <div className="px-[18px] pb-[64px]">
               <VoicePanel onInsert={handleVoiceInsert} />
             </div>
           )}
 
           {/* 접은 뒤 재오픈 affordance — '개요를 계속 참고하며 쓰기'를 보장(한 번 보고 숨김 회귀 방지). */}
           {mode === "outline" && state.phase === "write" && outlineCollapsed && (
-            <div className="px-[18px] pb-2">
+            <div className="px-[18px] pb-[64px]">
               <button
                 type="button"
                 onClick={() => setOutlineCollapsed(false)}

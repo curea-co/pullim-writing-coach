@@ -69,10 +69,17 @@ export function useSpeechRecognition(opts: { lang?: string; onResult: (finalText
       listeningRef.current = false;
     };
     rec.onend = () => { setListening(false); setInterim(""); listeningRef.current = false; };
-    recRef.current = rec;
-    rec.start();
-    listeningRef.current = true;
-    setListening(true);
+    try {
+      rec.start();
+      recRef.current = rec;
+      listeningRef.current = true;
+      setListening(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.name : "start-failed");
+      setListening(false);
+      listeningRef.current = false;
+      recRef.current = null;
+    }
   }, [lang]);
 
   useEffect(() => () => { recRef.current?.stop(); }, []);

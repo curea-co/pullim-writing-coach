@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const mockHook = { supported: true, listening: false, interim: "", error: null as string | null, start: vi.fn(), stop: vi.fn() };
@@ -34,6 +34,17 @@ describe("VoicePanel", () => {
     const insertBtn = await screen.findByTestId("voice-insert-0");
     await user.click(insertBtn);
     expect(onInsert).toHaveBeenCalledWith("화산은 위험하다");
+  });
+  it("지우기 버튼 — lines 있을 때 클릭 시 모두 삭제", async () => {
+    const user = userEvent.setup();
+    render(<VoicePanel onInsert={() => {}} />);
+    // 훅의 onResult 콜백으로 줄 주입
+    const voiceOnResult = (globalThis as unknown as { __voiceOnResult: (t: string) => void }).__voiceOnResult;
+    act(() => voiceOnResult("첫 번째 줄"));
+    expect(await screen.findByTestId("voice-insert-0")).toBeInTheDocument();
+    await user.click(screen.getByTestId("voice-clear"));
+    expect(screen.queryByTestId("voice-insert-0")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("voice-clear")).not.toBeInTheDocument();
   });
   it("미지원 브라우저 — 안내 + 마이크 버튼 없음", () => {
     mockHook.supported = false;
