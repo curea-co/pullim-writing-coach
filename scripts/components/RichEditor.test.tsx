@@ -171,4 +171,18 @@ describe("RichEditor", () => {
       console.info("[RichEditor] insertBlock: TipTap editor null in jsdom — mount-only. Formatting preservation covered by e2e.");
     }
   });
+
+  it("insertBlock: 빈 캔버스 첫 삽입 — 선행 빈 줄 없음 (회귀 방지)", () => {
+    // 빈 문서(TipTap 기본 빈 <p>)에 첫 삽입 시 평문이 "\n…"로 시작하면 안 된다.
+    let lastText = "PENDING";
+    const editorRef = { current: null } as React.MutableRefObject<import("@/app/components/editor/RichEditor").RichEditorHandle | null>;
+    render(<RichEditor valueHtml="" onChange={({ text }) => { lastText = text; }} editorRef={editorRef} />);
+    if (editorRef.current) {
+      act(() => editorRef.current!.insertBlock("첫 줄"));
+      expect(lastText).toBe("첫 줄"); // "\n첫 줄"이 아니어야 함(선행 빈 문단 제거)
+    } else {
+      // eslint-disable-next-line no-console
+      console.info("[RichEditor] empty insertBlock: TipTap null in jsdom — e2e covers leading-newline.");
+    }
+  });
 });

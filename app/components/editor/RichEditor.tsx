@@ -71,7 +71,15 @@ export default function RichEditor({
     focus: () => editor?.commands.focus(),
     insertBlock: (text: string) => {
       if (!editor) return;
-      editor.chain().focus().insertContentAt(editor.state.doc.content.size, { type: "paragraph", content: text ? [{ type: "text", text }] : [] }).run();
+      const para = { type: "paragraph", content: text ? [{ type: "text", text }] : [] };
+      // 빈 문서(TipTap 기본 빈 <p>)에 append하면 선행 빈 문단이 남아 평문이 "\n…"로 시작한다.
+      //   → 비어 있으면 기본 빈 문단을 '대체'하고, 내용이 있을 때만 끝에 append한다.
+      if (editor.isEmpty) {
+        // setContent 2번째 인자 emitUpdate=true — onUpdate를 발사해 호스트(body/bodyHtml)로 전파.
+        editor.chain().focus().setContent(para, true).run();
+      } else {
+        editor.chain().focus().insertContentAt(editor.state.doc.content.size, para).run();
+      }
     },
   }), [editor, editorRef]);
 
