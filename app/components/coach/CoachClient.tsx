@@ -46,7 +46,7 @@ import {
 import type { CoachAssignment, WritingMode } from "@/app/lib/coach-setup";
 import { DEMO_TOKEN_KEY } from "@/app/components/TokenGate";
 import styles from "@/app/coach/coach.module.css";
-import { loadDoneCount, bumpDoneCount, loadLastDoneFingerprint, setLastDoneFingerprint, loadSessionId, newSessionId, clearSessionId } from "@/app/lib/storage";
+import { loadDoneCount, bumpDoneCount, hasCountedSession, markCountedSession, loadSessionId, newSessionId, clearSessionId } from "@/app/lib/storage";
 import Canvas from "./Canvas";
 import GuidePanel from "./GuidePanel";
 import OutlinePanel from "./OutlinePanel";
@@ -601,7 +601,7 @@ export default function CoachClient({
       doneCountedRef.current = true;
       let id = sessionIdRef.current;
       if (!id) { id = newSessionId(); sessionIdRef.current = id; } // 방어: id 미발급 경로 — 발급 후 집계
-      if (loadLastDoneFingerprint() !== id) { setLastDoneFingerprint(id); setDoneStreak(bumpDoneCount()); }
+      if (!hasCountedSession(id)) { markCountedSession(id); setDoneStreak(bumpDoneCount()); }
       else setDoneStreak(loadDoneCount());
     }
   }, [state.phase]);

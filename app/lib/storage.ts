@@ -653,16 +653,29 @@ export function bumpDoneCount(): number {
   try { const next = loadDoneCount() + 1; window.localStorage.setItem(DONE_COUNT_KEY, String(next)); return next; } catch { return loadDoneCount(); }
 }
 
-// 마지막으로 끈기 스트릭에 집계한 '세션 id' 1개만 보관(비내용 불투명 식별값).
-//   현재 세션 id와 다르면 새 완료로 집계, 같으면(새로고침 후 같은 세션) 재집계 안 함.
-const DONE_FP_KEY = "pwc_done_fp_v1";
-export function loadLastDoneFingerprint(): string {
-  if (typeof window === "undefined") return "";
-  try { return window.localStorage.getItem(DONE_FP_KEY) ?? ""; } catch { return ""; }
+// 끈기 스트릭에 이미 집계한 '세션 id 집합'(불투명 UUID, 최근 N개로 상한 — 데이터 최소화).
+//   세션별 1회 집계를 보장: 이미 집계한 세션은 과제 전환·새로고침 후 재통과해도 다시 세지 않는다(마지막
+//   1개만 보관하던 방식의 'A완료→B완료→A복원 재통과 시 A 재집계' 허점 제거). 본문/과제문은 저장하지 않는다.
+const DONE_IDS_KEY = "pwc_done_ids_v1";
+const DONE_IDS_CAP = 200;
+function loadCountedSessionIds(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const v = JSON.parse(window.localStorage.getItem(DONE_IDS_KEY) ?? "[]");
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+  } catch { return []; }
 }
-export function setLastDoneFingerprint(fp: string): void {
-  if (typeof window === "undefined") return;
-  try { window.localStorage.setItem(DONE_FP_KEY, fp); } catch { /* quota/denied — best-effort */ }
+export function hasCountedSession(id: string): boolean {
+  return id ? loadCountedSessionIds().includes(id) : false;
+}
+export function markCountedSession(id: string): void {
+  if (typeof window === "undefined" || !id) return;
+  try {
+    const ids = loadCountedSessionIds();
+    if (ids.includes(id)) return;
+    ids.push(id);
+    window.localStorage.setItem(DONE_IDS_KEY, JSON.stringify(ids.slice(-DONE_IDS_CAP))); // 최근 N개 상한
+  } catch { /* quota/denied — best-effort */ }
 }
 
 // 현재 코치 세션의 비내용 고유 id — 새 세션 생성 시 발급(newSessionId)·새로고침 시 복원(loadSessionId).
