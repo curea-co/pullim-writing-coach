@@ -1,5 +1,6 @@
 import Link from "next/link";
 import HomeWelcomeBanner from "./components/HomeWelcomeBanner";
+import HeroMotion3D from "./components/HeroMotion3D";
 import { ServiceHero } from "@/components/ui/service-hero";
 import { ServiceIcon } from "@/components/ui/service-icon";
 import { SectionHead } from "@/components/ui/section-head";
@@ -72,13 +73,14 @@ const TILES = [
 
 export default function Home() {
   return (
-    <main className="w-full max-w-5xl px-5 py-10 md:py-12">
-      {/* 1. ServiceHero */}
+    <main className="w-full max-w-5xl px-4 py-6 md:px-5 md:py-12">
+      {/* 1. ServiceHero — 우측에 순수 CSS 3D 모션(글 시트) 데코 */}
       <ServiceHero
         icon={<ServiceIcon name="writing" size={56} />}
         title="라이팅 코치"
         tagline="학생이 쓴 글을 1분 안에 5영역으로 채점하고, 잘한 점·고칠 점·수정 가이드를 코칭 말투로 보여줘요."
         badges={<Badge intent="primary">데모 · Week 1</Badge>}
+        decoration={<HeroMotion3D />}
         cta={
           <Link
             href="/try"
