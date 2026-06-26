@@ -35,7 +35,7 @@ export default function ResultDetailPage({
 
   if (state === "loading") {
     return (
-      <main className="mx-auto w-full max-w-4xl px-5 py-8 md:py-12">
+      <main className="w-full max-w-4xl px-5 py-8 md:py-12">
         <p className="text-muted-foreground text-sm">불러오는 중…</p>
       </main>
     );
@@ -43,7 +43,7 @@ export default function ResultDetailPage({
 
   if (state === "missing" || !entry) {
     return (
-      <main className="mx-auto w-full max-w-4xl px-5 py-8 md:py-12">
+      <main className="w-full max-w-4xl px-5 py-8 md:py-12">
         <Breadcrumb
           items={[
             { label: "홈", href: "/" },
@@ -51,7 +51,7 @@ export default function ResultDetailPage({
             { label: "찾을 수 없음" },
           ]}
         />
-        <section className="border-border bg-surface rounded-xl border p-6 text-center">
+        <section className="border-border bg-surface rounded-xl border p-6 text-left">
           <p className="text-foreground text-base font-semibold">
             이 채점 결과를 찾을 수 없어요.
           </p>
@@ -74,7 +74,7 @@ export default function ResultDetailPage({
   const dateLabel = formatKstDate(entry.created_at);
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-5 py-8 md:py-12">
+    <main className="w-full max-w-4xl px-5 py-8 md:py-12">
       <Breadcrumb
         items={[
           { label: "홈", href: "/" },

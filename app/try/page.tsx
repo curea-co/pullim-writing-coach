@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 // 블록 A(헤더) = 서버 컴포넌트, 입력/검증/상태는 ScoreForm(클라이언트)에 위임.
 export default function TryPage() {
   return (
-    <main className="mx-auto w-full max-w-2xl px-5 py-8 md:py-12">
+    <main className="w-full max-w-2xl px-5 py-8 md:py-12">
       <nav className="mb-6">
         <Link
           href="/"
