@@ -239,39 +239,12 @@ test.describe("/coach 과정 코치 happy path (COACH_MOCK)", () => {
   });
 });
 
-// ── voice 모드 e2e (목 STT) ──────────────────────────────────────────────────
-//   실제 Web Speech API는 마이크 + 클라우드가 필요하므로 Playwright에서 작동하지 않는다.
-//   page.addInitScript 로 FakeRec을 페이지 로드 전에 주입 → 컴포넌트가 window.SpeechRecognition을
-//   감지하여 supported=true로 시작. start() 호출 시 10ms 후 final result 1건을 발화한다.
-//   VoicePanel → onResult → lines state → voice-insert-0 → handleVoiceInsert → EDIT → 캔버스 반영.
-
-test.describe("/coach voice 모드 e2e (목 STT)", () => {
-  test("voice 모드 — 목 STT 전사 → 본문에 넣기", async ({ page }) => {
-    // ── 1) FakeRec 주입 — navigation BEFORE: getCtor() 최초 호출 시점에 이미 존재해야 함 ──
-    await page.addInitScript(() => {
-      class FakeRec {
-        lang = "";
-        continuous = false;
-        interimResults = false;
-        onresult: ((e: unknown) => void) | null = null;
-        onend: (() => void) | null = null;
-        onerror: unknown = null;
-        start() {
-          setTimeout(() => {
-            this.onresult?.({
-              resultIndex: 0,
-              results: [{ 0: { transcript: "화산은 위험하다" }, isFinal: true, length: 1 }],
-            });
-          }, 10);
-        }
-        stop() {
-          this.onend?.();
-        }
-      }
-      (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = FakeRec;
-    });
-
-    // ── 2) 토큰 게이트 우회 ──
+// ── voice 모드 비활성("준비 중") 회귀 ──────────────────────────────────────────
+//   voice는 실마이크 QA·미성년자 동의 정책 전까지 ENABLED_MODES에서 빠져 비활성이다(VoicePanel·use-speech
+//   코드는 휴면 보존 — 단위/컴포넌트 테스트로 커버). 여기서는 모드 선택에서 '말하기'가 비활성(준비 중)이라
+//   선택되지 않음을 보장한다. 재활성화 시 이 테스트를 STT 전사→본문삽입 플로우로 되돌린다.
+test.describe("/coach voice 모드 — 비활성(준비 중)", () => {
+  test("말하기 카드는 비활성이라 voice 모드로 진입할 수 없다", async ({ page }) => {
     await page.addInitScript(() => {
       window.sessionStorage.setItem("pwc-demo-token", "e2e-mock");
       window.sessionStorage.setItem("COACH_MOCK", "1");
@@ -279,30 +252,17 @@ test.describe("/coach voice 모드 e2e (목 STT)", () => {
       window.localStorage.removeItem("pwc-coach-setup-v1");
     });
 
-    // ── 3) 진입 ──
     await page.goto("/coach");
 
-    // ── 4) 셋업: 과제 입력 → 모드 선택(voice) ──
     await expect(page.getByText("어떤 글을 써볼까요")).toBeVisible();
     await page.getByLabel(/학교·학년/).selectOption("중2");
     await page.getByLabel(/과목/).selectOption("과학");
     await page.getByLabel(/어떤 글/).selectOption("설명문");
     await page.getByLabel(/과제 내용/).fill("화산의 형성 과정과 영향을 설명하는 글을 쓰시오");
     await page.getByRole("button", { name: /다음/ }).click();
-    await page.getByTestId("mode-voice").click();
 
-    // ── 5) 마이크 버튼 클릭 → FakeRec.start() 호출 → 10ms 후 onresult 발화 ──
-    //   VoicePanel은 Canvas 위(BottomSheet 밖)에 배치되므로 일반 .click()으로 동작한다.
-    await page.getByTestId("voice-mic").waitFor({ state: "attached" });
-    await page.getByTestId("voice-mic").click();
-
-    // ── 6) 전사 줄 + "본문에 넣기" 버튼 노출 확인 ──
-    await expect(page.getByTestId("voice-insert-0")).toBeVisible({ timeout: 10_000 });
-
-    // ── 7) "본문에 넣기" 클릭 → handleVoiceInsert → EDIT dispatch → 캔버스 반영 ──
-    await page.getByTestId("voice-insert-0").click();
-
-    // ── 8) 캔버스(TipTap contenteditable)에 전사 텍스트 반영 확인 ──
-    await expect(page.locator("[data-testid=coach-canvas]")).toContainText("화산은 위험하다", { timeout: 5_000 });
+    // 말하기 카드는 비활성(disabled) — 클릭해도 voice 패널로 진입하지 않는다.
+    await expect(page.getByTestId("mode-voice")).toBeDisabled();
+    await expect(page.getByTestId("voice-mic")).toHaveCount(0);
   });
 });
