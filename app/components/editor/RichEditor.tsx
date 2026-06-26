@@ -8,7 +8,7 @@ import EditorToolbar from "./EditorToolbar";
 import { htmlToPlain } from "@/app/lib/editor-doc";
 
 export interface RichEditorChange { html: string; text: string }
-export interface RichEditorHandle { focus: () => void }
+export interface RichEditorHandle { focus: () => void; insertBlock: (text: string) => void }
 export interface RichEditorProps {
   valueHtml: string;
   onChange: (c: RichEditorChange) => void;
@@ -67,7 +67,21 @@ export default function RichEditor({
     },
   });
 
-  useImperativeHandle(editorRef, () => ({ focus: () => editor?.commands.focus() }), [editor, editorRef]);
+  useImperativeHandle(editorRef, () => ({
+    focus: () => editor?.commands.focus(),
+    insertBlock: (text: string) => {
+      if (!editor) return;
+      const para = { type: "paragraph", content: text ? [{ type: "text", text }] : [] };
+      // 빈 문서(TipTap 기본 빈 <p>)에 append하면 선행 빈 문단이 남아 평문이 "\n…"로 시작한다.
+      //   → 비어 있으면 기본 빈 문단을 '대체'하고, 내용이 있을 때만 끝에 append한다.
+      if (editor.isEmpty) {
+        // setContent 2번째 인자 emitUpdate=true — onUpdate를 발사해 호스트(body/bodyHtml)로 전파.
+        editor.chain().focus().setContent(para, true).run();
+      } else {
+        editor.chain().focus().insertContentAt(editor.state.doc.content.size, para).run();
+      }
+    },
+  }), [editor, editorRef]);
 
   // valueHtml prop 변화를 에디터에 동기화 (복원/리셋 시 반영).
   // 타이핑 중엔 호스트가 getHTML()을 valueHtml에 저장하므로 값이 같아 setContent 스킵 → 커서 유지.

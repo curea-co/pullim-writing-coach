@@ -1,0 +1,77 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { renderHook, act } from "@testing-library/react";
+import { useSpeechRecognition } from "@/app/lib/use-speech";
+
+class MockRec {
+  lang = ""; continuous = false; interimResults = false;
+  onresult: ((e: unknown) => void) | null = null;
+  onerror: ((e: unknown) => void) | null = null;
+  onend: (() => void) | null = null;
+  start = vi.fn();
+  stop = vi.fn(() => { this.onend?.(); });
+  // 테스트에서 결과 주입
+  emit(finalText: string, interimText: string) {
+    this.onresult?.({ resultIndex: 0, results: [
+      { 0: { transcript: finalText }, isFinal: true, length: 1 },
+      { 0: { transcript: interimText }, isFinal: false, length: 1 },
+    ] });
+  }
+}
+
+describe("useSpeechRecognition", () => {
+  let mock: MockRec;
+  beforeEach(() => { mock = new MockRec(); (window as unknown as { SpeechRecognition?: unknown }).SpeechRecognition = function MockCtor() { return mock; } as unknown as new () => MockRec; });
+  afterEach(() => { delete (window as unknown as { SpeechRecognition?: unknown }).SpeechRecognition; delete (window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition; });
+
+  it("supported=true when SpeechRecognition exists", async () => {
+    const { result } = renderHook(() => useSpeechRecognition({ onResult: () => {} }));
+    // supported is set in a mount effect (SSR-safe: first render is false, then flips to true after mount)
+    await act(async () => {});
+    expect(result.current.supported).toBe(true);
+  });
+  it("start → listening, final 결과는 onResult, interim은 state", () => {
+    const onResult = vi.fn();
+    const { result } = renderHook(() => useSpeechRecognition({ onResult }));
+    act(() => result.current.start());
+    expect(result.current.listening).toBe(true);
+    expect(mock.lang).toBe("ko-KR");
+    act(() => mock.emit("화산은 위험하다", "그리고"));
+    expect(onResult).toHaveBeenCalledWith("화산은 위험하다");
+    expect(result.current.interim).toBe("그리고");
+    act(() => result.current.stop());
+    expect(result.current.listening).toBe(false);
+  });
+  it("supported=false when no SpeechRecognition", async () => {
+    delete (window as unknown as { SpeechRecognition?: unknown }).SpeechRecognition;
+    const { result } = renderHook(() => useSpeechRecognition({ onResult: () => {} }));
+    await act(async () => {});
+    expect(result.current.supported).toBe(false);
+  });
+  it("start() 동기 throw → error 설정, listening=false, 재시도 가능", () => {
+    // DOMException은 jsdom에서 Error 인스턴스가 아닐 수 있으므로 일반 Error 사용
+    const thrownError = Object.assign(new Error("Permission denied"), { name: "NotAllowedError" });
+    mock.start = vi.fn(() => { throw thrownError; });
+    const { result } = renderHook(() => useSpeechRecognition({ onResult: () => {} }));
+    act(() => result.current.start());
+    expect(result.current.error).toBe("NotAllowedError");
+    expect(result.current.listening).toBe(false);
+    // 두 번째 시도가 wedged 상태 없이 실행될 수 있어야 한다
+    mock.start = vi.fn(); // 이번엔 성공
+    act(() => result.current.start());
+    expect(result.current.listening).toBe(true);
+  });
+  it("spontaneous onend resets listening and interim", () => {
+    const { result } = renderHook(() => useSpeechRecognition({ onResult: () => {} }));
+    act(() => result.current.start());
+    expect(result.current.listening).toBe(true);
+    // inject some interim text first
+    act(() => mock.onresult?.({ resultIndex: 0, results: [
+      { 0: { transcript: "임시 텍스트" }, isFinal: false, length: 1 },
+    ] }));
+    expect(result.current.interim).toBe("임시 텍스트");
+    // browser ends recognition spontaneously (no stop() call)
+    act(() => mock.onend?.());
+    expect(result.current.listening).toBe(false);
+    expect(result.current.interim).toBe("");
+  });
+});

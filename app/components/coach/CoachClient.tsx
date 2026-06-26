@@ -49,6 +49,7 @@ import styles from "@/app/coach/coach.module.css";
 import Canvas from "./Canvas";
 import GuidePanel from "./GuidePanel";
 import OutlinePanel from "./OutlinePanel";
+import VoicePanel from "./VoicePanel";
 import BottomSheet, { type SheetPosition } from "./BottomSheet";
 import NudgeCard from "./NudgeCard";
 import GrowthBars, { GrowthRow } from "./GrowthBars";
@@ -683,6 +684,10 @@ export default function CoachClient({
     }
   };
 
+  // ── 음성 삽입 핸들러 — VoicePanel onInsert 콜백. 에디터 doc에 직접 paragraph append.
+  //   기존 서식(heading/bold/font-size) 보존 + stale closure 없음. ──
+  const handleVoiceInsert = (text: string) => { editorRef.current?.insertBlock(text); };
+
   // ── 시트 위치 결정 ──
   const sheetPosition: SheetPosition = useMemo(() => {
     if (state.phase === "done") return "hidden";
@@ -801,6 +806,13 @@ export default function CoachClient({
             </div>
           </div>
 
+          {/* 음성 패널 — mode=voice + done 아님. Canvas 위에 배치해 BottomSheet 겹침 방지. busy 중에도 마운트 유지(전사 보존). */}
+          {mode === "voice" && state.phase !== "done" && (
+            <div className="px-[18px] pt-2">
+              <VoicePanel onInsert={handleVoiceInsert} disabled={busy} />
+            </div>
+          )}
+
           {/* 캔버스 */}
           <Canvas
             valueHtml={bodyHtml}
@@ -813,14 +825,14 @@ export default function CoachClient({
 
           {/* 가이드 패널 — mode=guide + write 단계일 때만. 직교 패널(reducer 무수정). */}
           {mode === "guide" && state.phase === "write" && (
-            <div className="px-[18px] pb-2">
+            <div className="px-[18px] pb-[64px]">
               <GuidePanel genre={assignment.genre} />
             </div>
           )}
 
           {/* 개요 패널 — mode=outline + write 단계 + 패널 미접힘일 때만. 직교 패널(reducer 무수정). */}
           {mode === "outline" && state.phase === "write" && !outlineCollapsed && (
-            <div className="px-[18px] pb-2">
+            <div className="px-[18px] pb-[64px]">
               <OutlinePanel
                 genre={assignment.genre}
                 onStartBody={() => {
@@ -833,7 +845,7 @@ export default function CoachClient({
 
           {/* 접은 뒤 재오픈 affordance — '개요를 계속 참고하며 쓰기'를 보장(한 번 보고 숨김 회귀 방지). */}
           {mode === "outline" && state.phase === "write" && outlineCollapsed && (
-            <div className="px-[18px] pb-2">
+            <div className="px-[18px] pb-[64px]">
               <button
                 type="button"
                 onClick={() => setOutlineCollapsed(false)}
