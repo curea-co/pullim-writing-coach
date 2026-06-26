@@ -46,6 +46,7 @@ import {
 import type { CoachAssignment, WritingMode } from "@/app/lib/coach-setup";
 import { DEMO_TOKEN_KEY } from "@/app/components/TokenGate";
 import styles from "@/app/coach/coach.module.css";
+import { loadDoneCount, bumpDoneCount } from "@/app/lib/storage";
 import Canvas from "./Canvas";
 import GuidePanel from "./GuidePanel";
 import OutlinePanel from "./OutlinePanel";
@@ -54,6 +55,7 @@ import BottomSheet, { type SheetPosition } from "./BottomSheet";
 import NudgeCard from "./NudgeCard";
 import GrowthBars, { GrowthRow } from "./GrowthBars";
 import BreakthroughBadge from "./BreakthroughBadge";
+import PersistDots from "./PersistDots";
 import { BlockIcon, MastGlyph } from "./icons";
 
 // ── 데모 기본 과제 — prop 미주입(직접 마운트·테스트) 시 폴백 ──────────
@@ -514,12 +516,16 @@ export default function CoachClient({
   const [outlineCollapsed, setOutlineCollapsed] = useState(false); // outline 패널 접기(로컬 UI state)
   const [bodyHtml, setBodyHtml] = useState(""); // 리치 에디터 HTML(reducer 외부 — body는 계속 평문)
   const [coachSpellcheck, setCoachSpellcheck] = useState(false);
+  // 끈기 스트릭 — 완료 시 bumpDoneCount() 결과로 갱신(reducer 외부).
+  const [doneStreak, setDoneStreak] = useState(() => loadDoneCount());
   const editorRef = useRef<RichEditorHandle>(null);
 
   // 라이브 세션(순수 CoachSession 모델) — 반복 갱신은 항상 새 객체로 교체(불변). 부수효과는 영속 헬퍼.
   const sessionRef = useRef<CoachSession | null>(null);
   // 교사 루브릭 직렬화 텍스트(마운트 시 1회 읽음). 있으면 /api/coach rubric 필드로 전송.
   const rubricRef = useRef<string | undefined>(undefined);
+  // 완료 카운트 중복 방지 ref — 과제당 1회만 bumpDoneCount() 호출(effect 재실행 방어).
+  const doneCountedRef = useRef(false);
 
   const assignment = assignmentProp ?? DEMO_ASSIGNMENT;
   const assignmentTitle = assignment.title ?? assignment.prompt_text.slice(0, 24);
@@ -574,6 +580,16 @@ export default function CoachClient({
     }
     // 마운트 1회(루브릭 읽기 + 세션 복원). dispatch는 안정적이라 deps 불필요.
   }, []);
+
+  // ── 완료 시 끈기 스트릭 1회 증가 ──
+  // reducer 외부(ref 가드): done phase 진입 시 과제당 1번만 bumpDoneCount().
+  // effect 재실행(StrictMode 등) 대비 doneCountedRef로 중복 차단.
+  useEffect(() => {
+    if (state.phase === "done" && !doneCountedRef.current) {
+      doneCountedRef.current = true;
+      setDoneStreak(bumpDoneCount());
+    }
+  }, [state.phase]);
 
   // ── 첫 점검 (봐줘) ──
   // 매 렌더 새 클로저 — 호출 시점의 최신 state.body를 캡처(stale 방지). 의존성 추적 불필요.
@@ -714,11 +730,14 @@ export default function CoachClient({
     sessionRef.current = null;
     clearSession();
     clearProcessLog();
+    // 새 과제는 다시 카운트 가능(끈기 스트릭 중복 방지 ref 초기화).
+    doneCountedRef.current = false;
     dispatch({ type: "RESET" });
   };
 
   const handleNewAssignment = () => {
     // 기존 reset()으로 세션·과정 로그·상태 초기화 후, 가이드 메모도 제거하고 onNewAssignment 콜백 호출.
+    // reset() 내부에서 doneCountedRef.current = false 처리됨 — 새 과제 재카운트 가능.
     reset();
     if (typeof window !== "undefined") {
       try {
@@ -878,7 +897,7 @@ export default function CoachClient({
           </BottomSheet>
 
           {/* 완료화면 */}
-          <CompletionView state={state} onRestart={reset} onNewAssignment={handleNewAssignment} session={sessionRef.current} />
+          <CompletionView state={state} onRestart={reset} onNewAssignment={handleNewAssignment} session={sessionRef.current} doneStreak={doneStreak} />
         </div>
       </div>
 
@@ -1007,11 +1026,13 @@ function CompletionView({
   onRestart,
   onNewAssignment,
   session,
+  doneStreak,
 }: {
   state: State;
   onRestart: () => void;
   onNewAssignment: () => void;
   session: CoachSession | null;
+  doneStreak: number;
 }) {
   const [wedgeOpen, setWedgeOpen] = useState(false);
   const on = state.phase === "done";
@@ -1043,6 +1064,8 @@ function CompletionView({
       <GrowthBars rows={rows} animate={on} />
 
       {session ? <BreakthroughBadge areas={selectBreakthroughs(buildProcessLog(session))} /> : null}
+
+      <PersistDots count={doneStreak} />
 
       {/* 과정 로그 */}
       <div className="mt-[18px] rounded-[var(--r-lg)] border border-[var(--line)] bg-white p-[18px] shadow-[var(--sh-1)]">

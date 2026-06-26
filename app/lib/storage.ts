@@ -638,3 +638,17 @@ export function clearMetaUsage(): void {
     /* swallow */
   }
 }
+
+// ── Done Count (끈기 스트릭) ──────────────────────────────────────────
+// localStorage["pwc_done_count_v1"] = number(정수).
+//   완료(통과)한 과제 누적 수 — 세션 간 끈기 스트릭. 메타데이터(정수 1개)만, 본문/점수 무관.
+
+const DONE_COUNT_KEY = "pwc_done_count_v1";
+export function loadDoneCount(): number {
+  if (typeof window === "undefined") return 0;
+  try { const n = Number(window.localStorage.getItem(DONE_COUNT_KEY)); return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0; } catch { return 0; }
+}
+export function bumpDoneCount(): number {
+  if (typeof window === "undefined") return 0;
+  try { const next = loadDoneCount() + 1; window.localStorage.setItem(DONE_COUNT_KEY, String(next)); return next; } catch { return loadDoneCount(); }
+}
