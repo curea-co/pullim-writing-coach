@@ -36,4 +36,14 @@ describe("ShareStory", () => {
     await act(async () => { fireEvent.click(btn); });
     expect(screen.getByTestId("share-copy")).toHaveTextContent("복사됨 ✓");
   });
+
+  it("clipboard 실패 시 무반응이 아니라 '복사 실패 — 직접 선택' 안내 + 텍스트는 그대로 노출", async () => {
+    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) } });
+    render(<ShareStory text={sampleText} />);
+    const btn = screen.getByTestId("share-copy");
+    await act(async () => { fireEvent.click(btn); });
+    expect(screen.getByTestId("share-copy")).toHaveTextContent(/복사 실패/);
+    // 수동 복사용 텍스트는 계속 보여야 함
+    expect(screen.getByTestId("share-text")).toHaveTextContent("내 손으로 끝까지 다듬었어요");
+  });
 });
