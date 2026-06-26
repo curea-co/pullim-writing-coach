@@ -49,6 +49,7 @@ import styles from "@/app/coach/coach.module.css";
 import Canvas from "./Canvas";
 import GuidePanel from "./GuidePanel";
 import OutlinePanel from "./OutlinePanel";
+import VoicePanel from "./VoicePanel";
 import BottomSheet, { type SheetPosition } from "./BottomSheet";
 import NudgeCard from "./NudgeCard";
 import GrowthBars, { GrowthRow } from "./GrowthBars";
@@ -683,6 +684,15 @@ export default function CoachClient({
     }
   };
 
+  // ── 음성 삽입 핸들러 — VoicePanel onInsert 콜백. reducer 외부(EDIT 디스패치만). ──
+  const handleVoiceInsert = (text: string) => {
+    const next = state.body ? `${state.body}\n${text}` : text;
+    dispatch({ type: "EDIT", body: next });
+    const html = plainToHtml(next);
+    setBodyHtml(html);
+    saveBodyHtml(assignmentSig(assignment), html);
+  };
+
   // ── 시트 위치 결정 ──
   const sheetPosition: SheetPosition = useMemo(() => {
     if (state.phase === "done") return "hidden";
@@ -828,6 +838,13 @@ export default function CoachClient({
                   editorRef.current?.focus();
                 }}
               />
+            </div>
+          )}
+
+          {/* 음성 패널 — mode=voice + write 단계일 때만. 직교 패널(reducer 무수정). */}
+          {mode === "voice" && state.phase === "write" && (
+            <div className="px-[18px] pb-2">
+              <VoicePanel onInsert={handleVoiceInsert} />
             </div>
           )}
 
