@@ -1073,7 +1073,7 @@ function CompletionView({
       <PersistDots count={doneStreak} />
       {session ? <ProcessTimeline nodes={buildTimeline(session)} /> : null}
 
-      {session ? <ShareStory text={formatStoryText({ title: assignment.title ?? assignment.prompt_text, genre: assignment.genre, revisions: state.revisions, breakthroughs: selectBreakthroughs(buildProcessLog(session)) })} /> : null}
+      {session ? <ShareStory text={formatStoryText({ title: assignment.title ?? assignment.prompt_text.slice(0, 24), genre: assignment.genre, revisions: state.revisions, breakthroughs: selectBreakthroughs(buildProcessLog(session)) })} /> : null}
 
       {/* 과정 로그 */}
       <div className="mt-[18px] rounded-[var(--r-lg)] border border-[var(--line)] bg-white p-[18px] shadow-[var(--sh-1)]">

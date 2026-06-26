@@ -9,7 +9,13 @@ export default function ProcessTimeline({ nodes }: { nodes: TimelineNode[] }) {
         <li key={node.n} className="flex items-baseline gap-2 text-[13px] text-[var(--ink-3)]">
           <span className="text-[var(--pullim-blue)] font-semibold">{node.n}번째 글</span>
           <span>{node.charCount.toLocaleString("ko-KR")}자 직접 씀</span>
-          {node.delta > 0 ? <span className="font-bold text-[var(--pullim-ink)]">+{node.delta.toLocaleString("ko-KR")}자 더 채움</span> : null}
+          {node.delta > 0 ? (
+            <span className="font-bold text-[var(--pullim-ink)]">+{node.delta.toLocaleString("ko-KR")}자 더 채움</span>
+          ) : node.delta < 0 ? (
+            <span className="font-bold text-[var(--pullim-ink)]">{Math.abs(node.delta).toLocaleString("ko-KR")}자 줄여 다듬음</span>
+          ) : node.n > 1 ? (
+            <span className="text-[var(--ink-5)]">분량 유지</span>
+          ) : null}
         </li>
       ))}
     </ol>

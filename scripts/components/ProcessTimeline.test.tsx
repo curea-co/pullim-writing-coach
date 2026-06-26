@@ -22,6 +22,16 @@ describe("ProcessTimeline", () => {
     expect(screen.queryByText("+0자 더 채움")).toBeNull();
   });
 
+  it("delta<0 회차 → '줄여 다듬음', delta=0(n>1) → '분량 유지' (증감 모두 노출)", () => {
+    render(<ProcessTimeline nodes={[
+      { n: 1, charCount: 200, delta: 0 },
+      { n: 2, charCount: 150, delta: -50 },
+      { n: 3, charCount: 150, delta: 0 },
+    ]} />);
+    expect(screen.getByText("50자 줄여 다듬음")).toBeInTheDocument();
+    expect(screen.getByText("분량 유지")).toBeInTheDocument();
+  });
+
   it("nodes=[] → null (렌더 안 함)", () => {
     const { container } = render(<ProcessTimeline nodes={[]} />);
     expect(container.firstChild).toBeNull();
