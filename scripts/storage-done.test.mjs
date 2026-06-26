@@ -27,36 +27,27 @@ const storageMock = new MemoryStorage();
 globalThis.window = { localStorage: storageMock };
 
 // 동적 import — window 주입 후라야 storage.ts가 SSR 가드를 통과.
-const { loadDoneCount, bumpDoneCount, hasCountedSession, markCountedSession, loadSessionId, newSessionId, clearSessionId } = await import("../app/lib/storage.ts");
+const { countedSessionCount, hasCountedSession, markCountedSession, loadSessionId, newSessionId, clearSessionId } = await import("../app/lib/storage.ts");
 
 beforeEach(() => storageMock.clear());
 
-test("bumpDoneCount 누적 + load 반영", () => {
-  assert.equal(loadDoneCount(), 0);
-  assert.equal(bumpDoneCount(), 1);
-  assert.equal(bumpDoneCount(), 2);
-  assert.equal(loadDoneCount(), 2);
+test("countedSessionCount — 집계 세션 수(집합 크기)에서 파생, 비면 0", () => {
+  assert.equal(countedSessionCount(), 0);
+  markCountedSession("a");
+  markCountedSession("b");
+  assert.equal(countedSessionCount(), 2);
 });
 
-test("loadDoneCount — 비어 있으면 0", () => {
-  assert.equal(loadDoneCount(), 0);
+test("멱등 집계 — 같은 세션 id 중복 마킹(다중 탭/재통과)은 카운트를 올리지 않음", () => {
+  markCountedSession("same");
+  markCountedSession("same"); // 다른 탭/새로고침 재통과 시뮬
+  markCountedSession("same");
+  assert.equal(countedSessionCount(), 1); // 중복 증가 없음 — race/desync 불가
 });
 
-test("bumpDoneCount — 여러 번 호출 시 순차 증가", () => {
-  for (let i = 1; i <= 5; i++) {
-    assert.equal(bumpDoneCount(), i);
-  }
-  assert.equal(loadDoneCount(), 5);
-});
-
-test("loadDoneCount — 손상된 값(비정수) 시 0 반환", () => {
-  storageMock.setItem("pwc_done_count_v1", "abc");
-  assert.equal(loadDoneCount(), 0);
-});
-
-test("loadDoneCount — 음수 값 시 0 반환", () => {
-  storageMock.setItem("pwc_done_count_v1", "-3");
-  assert.equal(loadDoneCount(), 0);
+test("countedSessionCount — 손상된 값이면 0(방어)", () => {
+  storageMock.setItem("pwc_done_ids_v1", "not-json");
+  assert.equal(countedSessionCount(), 0);
 });
 
 test("세션 id — 발급마다 고유, 복원은 동일값, 충돌 없음(완료 집계 식별값)", () => {

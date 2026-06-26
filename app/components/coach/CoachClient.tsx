@@ -46,7 +46,7 @@ import {
 import type { CoachAssignment, WritingMode } from "@/app/lib/coach-setup";
 import { DEMO_TOKEN_KEY } from "@/app/components/TokenGate";
 import styles from "@/app/coach/coach.module.css";
-import { loadDoneCount, bumpDoneCount, hasCountedSession, markCountedSession, loadSessionId, newSessionId, clearSessionId } from "@/app/lib/storage";
+import { countedSessionCount, markCountedSession, loadSessionId, newSessionId, clearSessionId } from "@/app/lib/storage";
 import Canvas from "./Canvas";
 import GuidePanel from "./GuidePanel";
 import OutlinePanel from "./OutlinePanel";
@@ -519,7 +519,7 @@ export default function CoachClient({
   const [outlineCollapsed, setOutlineCollapsed] = useState(false); // outline 패널 접기(로컬 UI state)
   const [bodyHtml, setBodyHtml] = useState(""); // 리치 에디터 HTML(reducer 외부 — body는 계속 평문)
   const [coachSpellcheck, setCoachSpellcheck] = useState(false);
-  // 끈기 스트릭 — 완료 시 bumpDoneCount() 결과로 갱신(reducer 외부).
+  // 끈기 스트릭 — 완료 시 집계 세션 집합 크기(countedSessionCount)로 갱신(reducer 외부).
   //   초기값은 0(서버/클라 첫 렌더 일치 — hydration mismatch 방지); 마운트 후 effect에서 실제 값 주입.
   const [doneStreak, setDoneStreak] = useState(0);
   const editorRef = useRef<RichEditorHandle>(null);
@@ -590,19 +590,20 @@ export default function CoachClient({
 
   // ── 완료 시 끈기 스트릭 1회 증가 ──
   // 마운트 후 끈기 스트릭 실제값 주입(SSR 0 → 클라 localStorage). hydration 이후라 mismatch 없음.
-  useEffect(() => { setDoneStreak(loadDoneCount()); }, []);
+  useEffect(() => { setDoneStreak(countedSessionCount()); }, []);
 
-  // reducer 외부: done phase 진입 시 '완료 1건'을 1번만 집계.
-  //   doneCountedRef = 같은 마운트 내 effect 재실행 방어. 세션 id로 영속 중복집계 방어 — 새로고침 후 같은
-  //   세션 재통과는 id가 같아 재집계 안 되고, 같은 과제를 다시 써서 끝내면(reset→새 세션→새 id) 새 완료로
-  //   집계된다. id는 길이/회차 충돌이 없는 세션 단위 unique 값이며 본문/과제문은 저장하지 않는다.
+  // reducer 외부: done phase 진입 시 현재 세션 id를 '집계한 세션 집합'에 넣고, 스트릭 = 집합 크기로 갱신.
+  //   markCountedSession은 멱등 — 같은 세션이 새로고침/과제전환/다중 탭으로 다시 done 돼도 집합에 1번만
+  //   들어가므로 별도 카운터 없이 중복증가·desync가 구조적으로 불가능. 같은 과제를 다시 써서 끝내면
+  //   (reset→새 세션→새 id) 새 완료로 +1. id는 충돌 없는 세션 단위 값, 본문/과제문은 저장하지 않는다.
+  //   doneCountedRef = 같은 마운트 내 effect 재실행을 줄이는 가벼운 가드(정확성은 집합 멱등성이 보장).
   useEffect(() => {
     if (state.phase === "done" && !doneCountedRef.current) {
       doneCountedRef.current = true;
       let id = sessionIdRef.current;
       if (!id) { id = newSessionId(); sessionIdRef.current = id; } // 방어: id 미발급 경로 — 발급 후 집계
-      if (!hasCountedSession(id)) { markCountedSession(id); setDoneStreak(bumpDoneCount()); }
-      else setDoneStreak(loadDoneCount());
+      markCountedSession(id);
+      setDoneStreak(countedSessionCount());
     }
   }, [state.phase]);
 
