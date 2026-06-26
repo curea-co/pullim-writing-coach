@@ -82,10 +82,17 @@ test("parseSetup — outline 모드 정상 과제 round-trip 복원 성공", () 
   assert.deepEqual(round, setup);
 });
 
-test("parseSetup — voice 비활성: 저장된 voice 셋업은 거부(null)", () => {
-  // voice 비활성화 → 지원 브라우저에서 저장한 voice 셋업을 어떤 브라우저에서 복원해도 거부(데드엔드 방지).
-  const setup = { assignment: { school_level: "중2", subject: "과학", genre: "설명문", target_char_count: null, prompt_text: "화산의 형성을 설명하라" }, mode: "voice" };
-  assert.equal(parseSetup(JSON.stringify(setup)), null);
+test("parseSetup — voice 비활성: 과제 보존 + 모드만 기본(free)으로 다운그레이드", () => {
+  // 저장된 voice 셋업을 복원하면 과제는 유지하되 voice→free로 떨어뜨린다(데이터 손실·미지원 데드엔드 동시 방지).
+  const assignment = { school_level: "중2", subject: "과학", genre: "설명문", target_char_count: null, prompt_text: "화산의 형성을 설명하라" };
+  const round = parseSetup(JSON.stringify({ assignment, mode: "voice" }));
+  assert.deepEqual(round, { assignment, mode: "free" });
+});
+
+test("parseSetup — 알 수 없는 모드(rap)는 여전히 null(다운그레이드 아님)", () => {
+  // 비활성-이지만-유효한 모드(voice)와 달리, WritingMode 자체가 아닌 값은 거부.
+  const bad = JSON.stringify({ assignment: { school_level: "중2", subject: "과학", genre: "설명문", target_char_count: null, prompt_text: "화산의 형성을 설명하라" }, mode: "rap" });
+  assert.equal(parseSetup(bad), null);
 });
 
 test("parseSetup — validateAssignment 위반 과제(짧은 prompt·enum 밖)는 null", () => {

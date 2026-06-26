@@ -14,7 +14,7 @@ import {
   charCount,
   normalizeBody,
 } from "../../lib/grading";
-import { type WritingMode, ALL_MODES } from "../../lib/coach-setup";
+import { type WritingMode, isModeEnabled } from "../../lib/coach-setup";
 
 // ── 본문 길이 정책 (route:54-55에서 이동 — validateCoachRequest에서만 사용) ──
 export const COACH_BODY_MIN = 10; // 막 시작한 초안도 코치 가능. 빈 글만 막는다.
@@ -77,12 +77,11 @@ export function validateCoachRequest(raw: unknown): CoachValidation {
   if (len < COACH_BODY_MIN) return { ok: false, code: "E2", message: "본문을 10자 이상 입력해 주세요." };
   if (len > COACH_BODY_MAX) return { ok: false, code: "E3", message: "4,000자까지 코치할 수 있어요." };
 
-  // mode 파싱: 알려진 모드이면 그대로, 아니면 "free" 폴백 (하위호환 — 거부하지 않음).
+  // mode 파싱: 활성 모드이면 그대로, 아니면 "free" 폴백. 비활성 모드(예: voice 준비 중)도 "free"로
+  //   떨어뜨려 가드를 일원화 — parseSetup뿐 아니라 API 경계에서도 비활성 모드를 수용하지 않는다.
   const m = raw.mode;
   const mode: WritingMode =
-    typeof m === "string" && (ALL_MODES as readonly string[]).includes(m)
-      ? (m as WritingMode)
-      : "free";
+    typeof m === "string" && isModeEnabled(m as WritingMode) ? (m as WritingMode) : "free";
 
   return {
     ok: true,
