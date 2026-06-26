@@ -30,7 +30,7 @@
 - **RichEditor**(TipTap, #86) · **PUDS 대시보드 셸 + OS 스타일 홈**(#81~#85)
 - **안내서 추출 UI/API**(UniversalCapture·AssignmentCard·ConfidenceChip·`/api/extract`, #69·#70) — 구현됨, 단 **현재 `/coach` 동선에는 미배선**(별도). 실제 `/coach`는 AssignmentStep(MetaForm)→ModeSelectStep→CoachClient (README.md 명시)
 - **5영역 rubric 채점**(rubric v0.5) · 결과 뷰·본문 주석·수정 전후 비교·내보내기
-- 인프라: 토큰 게이트·rate limit(2단 user10·IP60)·Sentry·테스트(unit·components·e2e CI 4잡)
+- 인프라: 토큰 게이트·rate limit(`middleware.ts` 2단 user/IP, 분당: `/api/score`·`/api/extract` 10/60 · `/api/coach` 20/120)·Sentry·테스트(unit·components·e2e CI 4잡)
 - 데모: 5종 학생 글 anchor
 - 누적: **머지 PR 94건**
 
@@ -100,5 +100,5 @@
 
 ## 부록 — 검증 방법
 - 라이브: `curl -s -o /dev/null -w "%{http_code}" https://writing.pullim.ai/`(200) · `https://dev-writing.pullim.ai/`(302 SSO 보호).
-- 인증 방식 확인: 인증 근거는 `app/lib/server/anthropic.ts`의 `isAuthorized`(`DEMO_ACCESS_TOKEN` ↔ `x-demo-token` 비교)뿐 — cookie SSO·EntitlementGuard 없음. (`middleware.ts`는 rate limit만 담당, 인증 아님.)
+- 인증 방식 확인: 세 라우트 모두 **자체 `DEMO_ACCESS_TOKEN` ↔ `x-demo-token` 게이트**(`isAuthorized` — `/api/score`=`app/lib/server/anthropic.ts`, `/api/coach`=`app/api/coach/route.ts`, `/api/extract`=`app/api/extract/helpers.ts`). cookie SSO·EntitlementGuard 없음. (`middleware.ts`는 rate limit만, 인증 아님.)
 - OS 통합 검증(미연동): pullim-api(외부 레포) `POST /auth/dev/seed-member`로 `writing` flag 계정 발급 → dev-os 로그인 → writing-coach 진입 — **현재 경로 없음**.
