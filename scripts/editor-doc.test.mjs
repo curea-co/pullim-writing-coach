@@ -32,6 +32,16 @@ test("숫자·16진 엔티티 디코드(클립보드 HTML 대비)", () => {
   assert.equal(htmlToPlain("<p>R&D &bogus;</p>"), "R&D &bogus;");
 });
 
+test("숫자·16진 nbsp 엔티티 → 일반 공백(named &nbsp; 경로와 동일)", () => {
+  // &#160; 와 &#xA0; 는 non-breaking space(U+00A0) — named &nbsp; 처럼 일반 공백으로 변환돼야 한다.
+  assert.equal(htmlToPlain("<p>a&#160;b</p>"), "a b", "&#160; should become regular space");
+  assert.equal(htmlToPlain("<p>a&#xA0;b</p>"), "a b", "&#xA0; should become regular space");
+  assert.equal(htmlToPlain("<p>a&nbsp;b</p>"), "a b", "&nbsp; still works");
+  // 세 경로 모두 동일한 결과
+  assert.equal(htmlToPlain("<p>a&#160;b</p>"), htmlToPlain("<p>a&nbsp;b</p>"));
+  assert.equal(htmlToPlain("<p>a&#xA0;b</p>"), htmlToPlain("<p>a&nbsp;b</p>"));
+});
+
 // plainToHtml 테스트
 test("plainToHtml: 빈 입력 → <p></p>", () => {
   assert.equal(plainToHtml(""), "<p></p>");

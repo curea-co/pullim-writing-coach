@@ -18,7 +18,9 @@ export function htmlToPlain(html: string): string {
         body[1] === "x" || body[1] === "X" ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10);
       if (Number.isFinite(code) && code >= 0 && code <= 0x10ffff) {
         try {
-          return String.fromCodePoint(code);
+          const ch = String.fromCodePoint(code);
+          // &#160; / &#xA0; (non-breaking space) → 일반 공백으로 정규화 (named &nbsp; → " " 와 동일).
+          return ch === " " ? " " : ch;
         } catch {
           return m;
         }
