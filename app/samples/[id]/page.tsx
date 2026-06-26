@@ -39,7 +39,7 @@ export default async function SampleDetailPage({
   const isCited = ["a", "b", "c"].includes(sample.id);
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-5 py-8 md:py-12">
+    <main className="w-full max-w-4xl px-5 py-8 md:py-12">
       <Breadcrumb
         items={[
           { label: "홈", href: "/" },

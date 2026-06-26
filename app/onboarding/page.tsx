@@ -100,7 +100,7 @@ function OnboardingInner() {
   };
 
   return (
-    <main className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col px-5 py-8">
+    <main className="flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col px-5 py-8">
       <div className="mb-8 flex items-center justify-between">
         <ProgressDots total={TOTAL_STEPS} current={step} />
         {step > 1 && (
@@ -185,7 +185,7 @@ function Step1({ onNext }: { onNext: () => void }) {
       >
         시작하기
       </button>
-      <p className="text-subtle-foreground break-keep text-center text-[11px]">
+      <p className="text-subtle-foreground break-keep text-left text-[11px]">
         잠깐의 정보 입력 후 바로 채점받을 수 있어요.
       </p>
     </div>
@@ -396,7 +396,7 @@ function Step3({ profile }: { profile: Profile | null }) {
         </button>
       </div>
 
-      <p className="text-subtle-foreground break-keep text-center text-[11px]">
+      <p className="text-subtle-foreground break-keep text-left text-[11px]">
         언제든 [내 정보]에서 프로필을 바꾸거나 데이터를 지울 수 있어요.
       </p>
     </div>

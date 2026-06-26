@@ -66,7 +66,7 @@ export default function MePage() {
     //   대신 데이터 삭제 동선을 노출 → 이전 사용자 흔적을 "보지 않고도" 지울 수 있음.
     //   (학습 이력 자체는 prefill 우선순위 profile > LRU에서 여전히 활용 — UI 노출만 차단.)
     return (
-      <main className="mx-auto w-full max-w-md px-5 py-8">
+      <main className="w-full max-w-md px-5 py-8">
         <h1 className="text-foreground text-2xl font-bold">내 정보</h1>
         <div className="border-border bg-surface mt-6 rounded-xl border p-5">
           <h2 className="text-foreground break-keep text-base font-semibold">
@@ -122,7 +122,7 @@ export default function MePage() {
   };
 
   return (
-    <main className="mx-auto w-full max-w-md px-5 py-8">
+    <main className="w-full max-w-md px-5 py-8">
       <header className="mb-6">
         <h1 className="text-foreground text-2xl font-bold">내 정보</h1>
         <p className="text-muted-foreground mt-1 text-sm">

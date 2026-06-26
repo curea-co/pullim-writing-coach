@@ -13,7 +13,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { cn } from "@/app/lib/utils";
-import ScoreForm from "./ScoreForm";
+import ScoreWizard from "./ScoreWizard";
 
 export const DEMO_TOKEN_KEY = "pwc-demo-token"; // sessionStorage 키 — ScoreForm 제출(P3.2)과 공유
 
@@ -95,8 +95,8 @@ export default function TokenGate({
 
   if (!showForm) {
     return (
-      <section className="border-border bg-surface rounded-xl border p-6">
-        <h2 className="text-foreground text-base font-semibold">🔒 데모 접근</h2>
+      <section className="border-border bg-surface rounded-2xl border p-6 shadow-sm">
+        <h2 className="text-foreground text-base font-semibold">🔒 데모 접근 코드</h2>
         <p className="text-muted-foreground mt-1.5 text-sm leading-relaxed">
           이 입력 화면은 비공개 데모예요. 전달받은 <b>데모 비밀번호</b>를 입력해
           주세요.
@@ -106,6 +106,7 @@ export default function TokenGate({
             type="password"
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            aria-label="데모 비밀번호"
             placeholder="데모 비밀번호"
             autoComplete="off"
             className={cn(
@@ -141,7 +142,7 @@ export default function TokenGate({
 
   return (
     <div className="space-y-4">
-      <div className="border-border text-muted-foreground flex items-center justify-between rounded-lg border px-3 py-2 text-xs">
+      <div className="border-border text-muted-foreground flex items-center justify-between rounded-lg border px-3 py-2 text-xs font-medium">
         <span>🔓 데모 접근됨</span>
         <button
           type="button"
@@ -167,6 +168,7 @@ export default function TokenGate({
               type="password"
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              aria-label="데모 비밀번호"
               placeholder="데모 비밀번호"
               autoComplete="off"
               className="border-band-warn bg-background text-foreground flex-1 rounded-lg border px-3 py-2.5 text-sm"
@@ -187,7 +189,7 @@ export default function TokenGate({
       {children ? (
         children(handleAuthExpired)
       ) : (
-        <ScoreForm defaults={defaults} onAuthExpired={handleAuthExpired} />
+        <ScoreWizard defaults={defaults} onAuthExpired={handleAuthExpired} />
       )}
     </div>
   );

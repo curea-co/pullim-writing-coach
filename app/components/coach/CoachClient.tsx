@@ -38,7 +38,7 @@ import {
   createSession,
   recordRevision,
 } from "@/app/lib/coach-session";
-import { buildProcessLog } from "@/app/lib/process-log";
+import { buildProcessLog, buildTimeline, selectBreakthroughs } from "@/app/lib/process-log";
 import {
   type TeacherRubric,
   serializeRubricForPrompt,
@@ -49,10 +49,15 @@ import styles from "@/app/coach/coach.module.css";
 import Canvas from "./Canvas";
 import GuidePanel from "./GuidePanel";
 import OutlinePanel from "./OutlinePanel";
+import VoicePanel from "./VoicePanel";
 import BottomSheet, { type SheetPosition } from "./BottomSheet";
 import NudgeCard from "./NudgeCard";
 import GrowthBars, { GrowthRow } from "./GrowthBars";
+import BreakthroughBadge from "./BreakthroughBadge";
+import ProcessTimeline from "./ProcessTimeline";
 import { BlockIcon, MastGlyph } from "./icons";
+import ShareStory from "./ShareStory";
+import { formatStoryText } from "@/app/lib/story";
 
 // ── 데모 기본 과제 — prop 미주입(직접 마운트·테스트) 시 폴백 ──────────
 // 실서비스는 CoachSetupFlow에서 CoachAssignment prop으로 주입.
@@ -683,6 +688,10 @@ export default function CoachClient({
     }
   };
 
+  // ── 음성 삽입 핸들러 — VoicePanel onInsert 콜백. 에디터 doc에 직접 paragraph append.
+  //   기존 서식(heading/bold/font-size) 보존 + stale closure 없음. ──
+  const handleVoiceInsert = (text: string) => { editorRef.current?.insertBlock(text); };
+
   // ── 시트 위치 결정 ──
   const sheetPosition: SheetPosition = useMemo(() => {
     if (state.phase === "done") return "hidden";
@@ -801,6 +810,13 @@ export default function CoachClient({
             </div>
           </div>
 
+          {/* 음성 패널 — mode=voice + done 아님. Canvas 위에 배치해 BottomSheet 겹침 방지. busy 중에도 마운트 유지(전사 보존). */}
+          {mode === "voice" && state.phase !== "done" && (
+            <div className="px-[18px] pt-2">
+              <VoicePanel onInsert={handleVoiceInsert} disabled={busy} />
+            </div>
+          )}
+
           {/* 캔버스 */}
           <Canvas
             valueHtml={bodyHtml}
@@ -813,14 +829,14 @@ export default function CoachClient({
 
           {/* 가이드 패널 — mode=guide + write 단계일 때만. 직교 패널(reducer 무수정). */}
           {mode === "guide" && state.phase === "write" && (
-            <div className="px-[18px] pb-2">
+            <div className="px-[18px] pb-[64px]">
               <GuidePanel genre={assignment.genre} />
             </div>
           )}
 
           {/* 개요 패널 — mode=outline + write 단계 + 패널 미접힘일 때만. 직교 패널(reducer 무수정). */}
           {mode === "outline" && state.phase === "write" && !outlineCollapsed && (
-            <div className="px-[18px] pb-2">
+            <div className="px-[18px] pb-[64px]">
               <OutlinePanel
                 genre={assignment.genre}
                 onStartBody={() => {
@@ -833,7 +849,7 @@ export default function CoachClient({
 
           {/* 접은 뒤 재오픈 affordance — '개요를 계속 참고하며 쓰기'를 보장(한 번 보고 숨김 회귀 방지). */}
           {mode === "outline" && state.phase === "write" && outlineCollapsed && (
-            <div className="px-[18px] pb-2">
+            <div className="px-[18px] pb-[64px]">
               <button
                 type="button"
                 onClick={() => setOutlineCollapsed(false)}
@@ -865,7 +881,7 @@ export default function CoachClient({
           </BottomSheet>
 
           {/* 완료화면 */}
-          <CompletionView state={state} onRestart={reset} onNewAssignment={handleNewAssignment} />
+          <CompletionView state={state} onRestart={reset} onNewAssignment={handleNewAssignment} session={sessionRef.current} assignment={assignment} />
         </div>
       </div>
 
@@ -993,10 +1009,14 @@ function CompletionView({
   state,
   onRestart,
   onNewAssignment,
+  session,
+  assignment,
 }: {
   state: State;
   onRestart: () => void;
   onNewAssignment: () => void;
+  session: CoachSession | null;
+  assignment: CoachAssignment;
 }) {
   const [wedgeOpen, setWedgeOpen] = useState(false);
   const on = state.phase === "done";
@@ -1026,6 +1046,13 @@ function CompletionView({
       </p>
 
       <GrowthBars rows={rows} animate={on} />
+
+      {session ? <BreakthroughBadge areas={selectBreakthroughs(buildProcessLog(session))} /> : null}
+
+      {session ? <ProcessTimeline nodes={buildTimeline(session)} /> : null}
+
+      {/* 공유 카드 title은 검증된 과제명만 — 없으면 자유입력 prompt_text가 아니라 안전한 장르 기반 일반명 사용. */}
+      {session ? <ShareStory text={formatStoryText({ title: assignment.title ?? `${assignment.genre} 글`, genre: assignment.genre, revisions: state.revisions, breakthroughs: selectBreakthroughs(buildProcessLog(session)) })} /> : null}
 
       {/* 과정 로그 */}
       <div className="mt-[18px] rounded-[var(--r-lg)] border border-[var(--line)] bg-white p-[18px] shadow-[var(--sh-1)]">

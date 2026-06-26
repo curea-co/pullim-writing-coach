@@ -50,6 +50,7 @@ function BarRow({
           <i
             key={i}
             className={cls}
+            aria-hidden="true"
             {...(isGain ? { "data-testid": "coach-growth-gain" } : {})}
           />
         );
