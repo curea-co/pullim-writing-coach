@@ -41,6 +41,7 @@ export function useSpeechRecognition(opts: { lang?: string; onResult: (finalText
   const [error, setError] = useState<string | null>(null);
   const recRef = useRef<SpeechRecognition | null>(null);
   const onResultRef = useRef(onResult);
+  const listeningRef = useRef(false);
   onResultRef.current = onResult;
 
   const stop = useCallback(() => { recRef.current?.stop(); }, []);
@@ -48,6 +49,7 @@ export function useSpeechRecognition(opts: { lang?: string; onResult: (finalText
   const start = useCallback(() => {
     const C = getCtor();
     if (!C) { setError("unsupported"); return; }
+    if (listeningRef.current) return;
     setError(null);
     const rec = new C();
     rec.lang = lang; rec.continuous = true; rec.interimResults = true;
@@ -60,10 +62,16 @@ export function useSpeechRecognition(opts: { lang?: string; onResult: (finalText
       }
       setInterim(it);
     };
-    rec.onerror = (e: SpeechRecognitionErrorEvent) => setError(e.error);
-    rec.onend = () => { setListening(false); setInterim(""); };
+    rec.onerror = (e: SpeechRecognitionErrorEvent) => {
+      setError(e.error);
+      setListening(false);
+      setInterim("");
+      listeningRef.current = false;
+    };
+    rec.onend = () => { setListening(false); setInterim(""); listeningRef.current = false; };
     recRef.current = rec;
     rec.start();
+    listeningRef.current = true;
     setListening(true);
   }, [lang]);
 

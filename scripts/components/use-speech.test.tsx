@@ -44,4 +44,18 @@ describe("useSpeechRecognition", () => {
     const { result } = renderHook(() => useSpeechRecognition({ onResult: () => {} }));
     expect(result.current.supported).toBe(false);
   });
+  it("spontaneous onend resets listening and interim", () => {
+    const { result } = renderHook(() => useSpeechRecognition({ onResult: () => {} }));
+    act(() => result.current.start());
+    expect(result.current.listening).toBe(true);
+    // inject some interim text first
+    act(() => mock.onresult?.({ resultIndex: 0, results: [
+      { 0: { transcript: "임시 텍스트" }, isFinal: false, length: 1 },
+    ] }));
+    expect(result.current.interim).toBe("임시 텍스트");
+    // browser ends recognition spontaneously (no stop() call)
+    act(() => mock.onend?.());
+    expect(result.current.listening).toBe(false);
+    expect(result.current.interim).toBe("");
+  });
 });
