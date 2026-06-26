@@ -38,7 +38,7 @@ import {
   createSession,
   recordRevision,
 } from "@/app/lib/coach-session";
-import { buildProcessLog } from "@/app/lib/process-log";
+import { buildProcessLog, selectBreakthroughs } from "@/app/lib/process-log";
 import {
   type TeacherRubric,
   serializeRubricForPrompt,
@@ -53,6 +53,7 @@ import VoicePanel from "./VoicePanel";
 import BottomSheet, { type SheetPosition } from "./BottomSheet";
 import NudgeCard from "./NudgeCard";
 import GrowthBars, { GrowthRow } from "./GrowthBars";
+import BreakthroughBadge from "./BreakthroughBadge";
 import { BlockIcon, MastGlyph } from "./icons";
 
 // ── 데모 기본 과제 — prop 미주입(직접 마운트·테스트) 시 폴백 ──────────
@@ -877,7 +878,7 @@ export default function CoachClient({
           </BottomSheet>
 
           {/* 완료화면 */}
-          <CompletionView state={state} onRestart={reset} onNewAssignment={handleNewAssignment} />
+          <CompletionView state={state} onRestart={reset} onNewAssignment={handleNewAssignment} session={sessionRef.current} />
         </div>
       </div>
 
@@ -1005,10 +1006,12 @@ function CompletionView({
   state,
   onRestart,
   onNewAssignment,
+  session,
 }: {
   state: State;
   onRestart: () => void;
   onNewAssignment: () => void;
+  session: CoachSession | null;
 }) {
   const [wedgeOpen, setWedgeOpen] = useState(false);
   const on = state.phase === "done";
@@ -1038,6 +1041,8 @@ function CompletionView({
       </p>
 
       <GrowthBars rows={rows} animate={on} />
+
+      {session ? <BreakthroughBadge areas={selectBreakthroughs(buildProcessLog(session))} /> : null}
 
       {/* 과정 로그 */}
       <div className="mt-[18px] rounded-[var(--r-lg)] border border-[var(--line)] bg-white p-[18px] shadow-[var(--sh-1)]">
