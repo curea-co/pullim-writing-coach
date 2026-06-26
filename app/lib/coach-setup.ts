@@ -76,6 +76,13 @@ export function parseSetup(raw: string | null): CoachSetup | null {
     if (!(a.target_char_count === null || (typeof a.target_char_count === "number" && Number.isInteger(a.target_char_count)))) return null;
     // 규칙 위반 과제는 null로 떨어뜨려 /coach가 곧장 ready로 진입해 UI 가드를 우회하는 걸 막는다.
     const setup = o as CoachSetup;
+    // title은 선택 필드 — 손상된 localStorage가 문자열 아닌 title(예: 숫자·객체)을 담고 있으면 버린다.
+    //   나머지 과제는 보존하되, 완료 화면 formatStoryText의 oneLine(title).replace(...)가 TypeError로
+    //   터지는 걸 방지(방어적 파싱).
+    const rawTitle = (a as { title?: unknown }).title;
+    if (rawTitle !== undefined && typeof rawTitle !== "string") {
+      setup.assignment = { ...setup.assignment, title: undefined };
+    }
     if (validateAssignment(setup.assignment).length > 0) return null;
     // 비활성 모드(예: voice 준비 중)면 과제는 보존하고 모드만 기본 활성 모드로 다운그레이드 —
     //   저장된 voice 셋업이 통째로 null이 돼 과제 입력을 잃거나(마이그레이션 손실) 미지원 브라우저에서
