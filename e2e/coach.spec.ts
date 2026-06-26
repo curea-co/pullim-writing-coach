@@ -292,23 +292,15 @@ test.describe("/coach voice 모드 e2e (목 STT)", () => {
     await page.getByTestId("mode-voice").click();
 
     // ── 5) 마이크 버튼 클릭 → FakeRec.start() 호출 → 10ms 후 onresult 발화 ──
-    //   BottomSheet가 peek 위치에서 bottom-0 absolute로 화면 아래쪽을 덮으므로
-    //   voice-mic 버튼이 시트 뒤에 가릴 수 있다. evaluate 로 DOM click 직접 발화.
+    //   VoicePanel은 Canvas 위(BottomSheet 밖)에 배치되므로 일반 .click()으로 동작한다.
     await page.getByTestId("voice-mic").waitFor({ state: "attached" });
-    await page.evaluate(() => {
-      const btn = document.querySelector<HTMLButtonElement>("[data-testid='voice-mic']");
-      btn?.click();
-    });
+    await page.getByTestId("voice-mic").click();
 
     // ── 6) 전사 줄 + "본문에 넣기" 버튼 노출 확인 ──
     await expect(page.getByTestId("voice-insert-0")).toBeVisible({ timeout: 10_000 });
 
     // ── 7) "본문에 넣기" 클릭 → handleVoiceInsert → EDIT dispatch → 캔버스 반영 ──
-    //   BottomSheet 동일한 이유로 evaluate 로 DOM click 직접 발화.
-    await page.evaluate(() => {
-      const btn = document.querySelector<HTMLButtonElement>("[data-testid='voice-insert-0']");
-      btn?.click();
-    });
+    await page.getByTestId("voice-insert-0").click();
 
     // ── 8) 캔버스(TipTap contenteditable)에 전사 텍스트 반영 확인 ──
     await expect(page.locator("[data-testid=coach-canvas]")).toContainText("화산은 위험하다", { timeout: 5_000 });

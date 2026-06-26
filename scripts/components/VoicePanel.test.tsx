@@ -59,4 +59,18 @@ describe("VoicePanel", () => {
     expect(screen.queryByText(/지원하지 않아요/)).not.toBeInTheDocument();
     expect(screen.queryByTestId("voice-mic")).not.toBeInTheDocument();
   });
+  it("disabled=true — 마이크 버튼과 '본문에 넣기' 버튼이 disabled, 전사 텍스트는 여전히 노출", async () => {
+    const user = userEvent.setup();
+    render(<VoicePanel onInsert={() => {}} disabled={true} />);
+    // Inject a transcript line first
+    const voiceOnResult = (globalThis as unknown as { __voiceOnResult: (t: string) => void }).__voiceOnResult;
+    act(() => voiceOnResult("화산은 위험하다"));
+    // mic button disabled
+    expect(screen.getByTestId("voice-mic")).toBeDisabled();
+    // insert button disabled
+    const insertBtn = await screen.findByTestId("voice-insert-0");
+    expect(insertBtn).toBeDisabled();
+    // transcript text still visible
+    expect(screen.getByText("화산은 위험하다")).toBeInTheDocument();
+  });
 });

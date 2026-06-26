@@ -806,6 +806,13 @@ export default function CoachClient({
             </div>
           </div>
 
+          {/* 음성 패널 — mode=voice + done 아님. Canvas 위에 배치해 BottomSheet 겹침 방지. busy 중에도 마운트 유지(전사 보존). */}
+          {mode === "voice" && state.phase !== "done" && (
+            <div className="px-[18px] pt-2">
+              <VoicePanel onInsert={handleVoiceInsert} disabled={busy} />
+            </div>
+          )}
+
           {/* 캔버스 */}
           <Canvas
             valueHtml={bodyHtml}
@@ -833,13 +840,6 @@ export default function CoachClient({
                   editorRef.current?.focus();
                 }}
               />
-            </div>
-          )}
-
-          {/* 음성 패널 — mode=voice + 캔버스 편집 가능 상태(busy 아님 + done 아님). 직교 패널(reducer 무수정). */}
-          {mode === "voice" && !busy && state.phase !== "done" && (
-            <div className="px-[18px] pb-[64px]">
-              <VoicePanel onInsert={handleVoiceInsert} />
             </div>
           )}
 

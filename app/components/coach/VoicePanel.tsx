@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useSpeechRecognition } from "@/app/lib/use-speech";
 
-export default function VoicePanel({ onInsert }: { onInsert: (text: string) => void }) {
+export default function VoicePanel({ onInsert, disabled = false }: { onInsert: (text: string) => void; disabled?: boolean }) {
   const [lines, setLines] = useState<string[]>([]);
   const { supported, listening, interim, error, start, stop } = useSpeechRecognition({
     onResult: (t) => setLines((prev) => [...prev, t]),
@@ -33,6 +33,7 @@ export default function VoicePanel({ onInsert }: { onInsert: (text: string) => v
         data-testid="voice-mic"
         aria-pressed={listening}
         onClick={listening ? stop : start}
+        disabled={disabled}
         className="bg-primary text-primary-foreground rounded-lg px-4 py-2 text-sm font-semibold"
       >
         {listening ? "■ 멈추기" : "🎤 말하기 시작"}
@@ -68,6 +69,7 @@ export default function VoicePanel({ onInsert }: { onInsert: (text: string) => v
                   type="button"
                   data-testid={`voice-insert-${i}`}
                   onClick={() => onInsert(line)}
+                  disabled={disabled}
                   className="text-primary shrink-0 text-xs font-medium underline underline-offset-2"
                 >
                   본문에 넣기 →

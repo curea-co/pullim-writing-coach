@@ -129,4 +129,34 @@ describe("CoachClient voice 분기", () => {
     expect(capturedInsertBlock).toHaveBeenNthCalledWith(1, "첫 번째 줄");
     expect(capturedInsertBlock).toHaveBeenNthCalledWith(2, "두 번째 줄");
   });
+
+  it("checking 단계(busy)에서도 VoicePanel이 마운트 유지된다 (전사 데이터 손실 없음)", async () => {
+    // Mock fetch to never resolve (keeps phase in 'checking')
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    // Stub sessionStorage to return a demo token
+    vi.stubGlobal("sessionStorage", {
+      getItem: (k: string) => k === "pwc-demo-token" ? "test-token" : null,
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    });
+
+    render(<CoachClient assignment={DEMO_ASSIGNMENT} mode="voice" />);
+    // Panel present before busy
+    expect(screen.getByTestId("voice-panel-stub")).toBeInTheDocument();
+
+    // Trigger CHECK_START (봐줘) by simulating a canvas input then clicking ask
+    act(() => {
+      // Use canvas stub to set body text so runCheck doesn't guard
+      const trigger = screen.getByTestId("canvas-trigger-insert");
+      trigger.click();
+    });
+    // Find and click coach-ask button (inside BottomSheet stub)
+    const askBtn = screen.getByTestId("coach-ask");
+    await act(async () => { askBtn.click(); });
+
+    // Phase is now 'checking' (busy=true) — panel must still be mounted
+    expect(screen.getByTestId("voice-panel-stub")).toBeInTheDocument();
+
+    vi.unstubAllGlobals();
+  });
 });
