@@ -47,7 +47,11 @@ export default function ModeSelectStep({
               type="button"
               data-testid={`mode-${c.mode}`}
               disabled={!enabled}
-              onClick={() => enabled && onSelect(c.mode)}
+              onClick={() => {
+                // 클릭 시점 재확인 — null(판정 전) 낙관 활성에서도 미지원 브라우저의 voice 진입을 차단(레이스 방지).
+                if (c.mode === "voice" && !isSpeechSupported()) return;
+                if (enabled) onSelect(c.mode);
+              }}
               className="border-border bg-surface relative flex flex-col rounded-2xl border p-5 text-left transition hover:border-primary disabled:cursor-not-allowed disabled:opacity-50"
             >
               <span className="text-foreground text-base font-semibold">{c.title}</span>
