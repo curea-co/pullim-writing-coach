@@ -58,6 +58,8 @@ import BreakthroughBadge from "./BreakthroughBadge";
 import PersistDots from "./PersistDots";
 import ProcessTimeline from "./ProcessTimeline";
 import { BlockIcon, MastGlyph } from "./icons";
+import ShareStory from "./ShareStory";
+import { formatStoryText } from "@/app/lib/story";
 
 // ── 데모 기본 과제 — prop 미주입(직접 마운트·테스트) 시 폴백 ──────────
 // 실서비스는 CoachSetupFlow에서 CoachAssignment prop으로 주입.
@@ -898,7 +900,7 @@ export default function CoachClient({
           </BottomSheet>
 
           {/* 완료화면 */}
-          <CompletionView state={state} onRestart={reset} onNewAssignment={handleNewAssignment} session={sessionRef.current} doneStreak={doneStreak} />
+          <CompletionView state={state} onRestart={reset} onNewAssignment={handleNewAssignment} session={sessionRef.current} doneStreak={doneStreak} assignment={assignment} />
         </div>
       </div>
 
@@ -1028,12 +1030,14 @@ function CompletionView({
   onNewAssignment,
   session,
   doneStreak,
+  assignment,
 }: {
   state: State;
   onRestart: () => void;
   onNewAssignment: () => void;
   session: CoachSession | null;
   doneStreak: number;
+  assignment: CoachAssignment;
 }) {
   const [wedgeOpen, setWedgeOpen] = useState(false);
   const on = state.phase === "done";
@@ -1068,6 +1072,8 @@ function CompletionView({
 
       <PersistDots count={doneStreak} />
       {session ? <ProcessTimeline nodes={buildTimeline(session)} /> : null}
+
+      {session ? <ShareStory text={formatStoryText({ title: assignment.title ?? assignment.prompt_text, genre: assignment.genre, revisions: state.revisions, breakthroughs: selectBreakthroughs(buildProcessLog(session)) })} /> : null}
 
       {/* 과정 로그 */}
       <div className="mt-[18px] rounded-[var(--r-lg)] border border-[var(--line)] bg-white p-[18px] shadow-[var(--sh-1)]">
