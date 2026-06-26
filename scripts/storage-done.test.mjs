@@ -27,7 +27,7 @@ const storageMock = new MemoryStorage();
 globalThis.window = { localStorage: storageMock };
 
 // 동적 import — window 주입 후라야 storage.ts가 SSR 가드를 통과.
-const { loadDoneCount, bumpDoneCount, loadLastDoneFingerprint, setLastDoneFingerprint } = await import("../app/lib/storage.ts");
+const { loadDoneCount, bumpDoneCount, loadLastDoneFingerprint, setLastDoneFingerprint, loadSessionId, newSessionId, clearSessionId } = await import("../app/lib/storage.ts");
 
 beforeEach(() => storageMock.clear());
 
@@ -59,15 +59,30 @@ test("loadDoneCount — 음수 값 시 0 반환", () => {
   assert.equal(loadDoneCount(), 0);
 });
 
-test("완료 지문(fingerprint) 1개만 보관 — 같은 글 재통과는 재집계 안 함, 다른 글은 집계", () => {
-  assert.equal(loadLastDoneFingerprint(), ""); // 초기엔 없음
-  setLastDoneFingerprint("3:412");
-  assert.equal(loadLastDoneFingerprint(), "3:412");
-  // 같은 지문이면 호스트 로직이 재집계를 건너뜀(여기선 저장값 동일 확인)
-  assert.equal(loadLastDoneFingerprint() === "3:412", true);
-  // 다른 완료(고쳐쓰기수/글자수 변화) → 다른 지문 → 새 완료로 갱신
-  setLastDoneFingerprint("5:530");
-  assert.equal(loadLastDoneFingerprint(), "5:530");
-  // 자유입력(과제문/본문)은 저장되지 않음 — 값은 비내용 메타뿐
-  assert.equal(/[가-힣]/.test(loadLastDoneFingerprint()), false);
+test("세션 id — 발급마다 고유, 복원은 동일값, 충돌 없음(완료 집계 식별값)", () => {
+  assert.equal(loadSessionId(), ""); // 초기엔 없음
+  const a = newSessionId();
+  assert.ok(a.length > 0);
+  assert.equal(loadSessionId(), a); // 새로고침 복원과 동일
+  const b = newSessionId(); // 새 세션 발급
+  assert.notEqual(a, b); // 길이/회차와 무관하게 고유 — 충돌 없음
+  assert.equal(loadSessionId(), b);
+  clearSessionId();
+  assert.equal(loadSessionId(), "");
+  // 자유입력(과제문/본문)은 저장하지 않음 — id는 불투명 비내용 값
+  assert.equal(/[가-힣]/.test(b), false);
+});
+
+test("끈기 스트릭 집계 식별값(세션 id) — 다른 세션이면 갱신, 같으면 유지", () => {
+  assert.equal(loadLastDoneFingerprint(), "");
+  const s1 = newSessionId();
+  setLastDoneFingerprint(s1);
+  assert.equal(loadLastDoneFingerprint(), s1); // s1 완료 집계됨
+  // 새로고침: 같은 세션 → 같은 id → 호스트는 재집계 건너뜀(저장값 불변 확인)
+  assert.equal(loadLastDoneFingerprint() === s1, true);
+  // 재시도(reset→새 세션) → 다른 id → 새 완료로 갱신
+  const s2 = newSessionId();
+  assert.notEqual(s2, s1);
+  setLastDoneFingerprint(s2);
+  assert.equal(loadLastDoneFingerprint(), s2);
 });

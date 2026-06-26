@@ -46,7 +46,7 @@ import {
 import type { CoachAssignment, WritingMode } from "@/app/lib/coach-setup";
 import { DEMO_TOKEN_KEY } from "@/app/components/TokenGate";
 import styles from "@/app/coach/coach.module.css";
-import { loadDoneCount, bumpDoneCount, loadLastDoneFingerprint, setLastDoneFingerprint } from "@/app/lib/storage";
+import { loadDoneCount, bumpDoneCount, loadLastDoneFingerprint, setLastDoneFingerprint, loadSessionId, newSessionId, clearSessionId } from "@/app/lib/storage";
 import Canvas from "./Canvas";
 import GuidePanel from "./GuidePanel";
 import OutlinePanel from "./OutlinePanel";
@@ -528,8 +528,10 @@ export default function CoachClient({
   const sessionRef = useRef<CoachSession | null>(null);
   // 교사 루브릭 직렬화 텍스트(마운트 시 1회 읽음). 있으면 /api/coach rubric 필드로 전송.
   const rubricRef = useRef<string | undefined>(undefined);
-  // 완료 카운트 중복 방지 ref — 과제당 1회만 bumpDoneCount() 호출(effect 재실행 방어).
+  // 완료 카운트 중복 방지 ref — 같은 마운트 내 effect 재실행 방어.
   const doneCountedRef = useRef(false);
+  // 현재 세션의 비내용 고유 id — 완료 집계의 안정적 식별값(길이/회차 충돌 없음). 새 세션 발급·복원·리셋.
+  const sessionIdRef = useRef("");
 
   const assignment = assignmentProp ?? DEMO_ASSIGNMENT;
   const assignmentTitle = assignment.title ?? assignment.prompt_text.slice(0, 24);
@@ -553,6 +555,7 @@ export default function CoachClient({
       sa.prompt_text === assignment.prompt_text;
     if (saved && sameAssignment) {
       sessionRef.current = saved;
+      sessionIdRef.current = loadSessionId(); // 같은 세션 복원 — 발급된 id 복원(없으면 done effect가 발급)
       const lastDraft = saved.draftHistory[saved.draftHistory.length - 1];
       // 본문·점수·기준선·회차를 write 단계로 복원(다음 [봐줘]로 라이브 루프 재개).
       dispatch({
@@ -590,14 +593,15 @@ export default function CoachClient({
   useEffect(() => { setDoneStreak(loadDoneCount()); }, []);
 
   // reducer 외부: done phase 진입 시 '완료 1건'을 1번만 집계.
-  //   doneCountedRef = 같은 마운트 내 effect 재실행 방어. 완료 지문(고쳐쓰기수:최종글자수)으로 영속 중복집계
-  //   방어 — 새로고침 후 같은 글 재통과는 지문이 같아 재집계 안 되고, 같은 과제를 다시 써서 끝내면(지문이
-  //   달라짐) 새 완료로 집계된다. 본문/과제문 같은 자유입력은 저장하지 않는다(데이터 최소화).
+  //   doneCountedRef = 같은 마운트 내 effect 재실행 방어. 세션 id로 영속 중복집계 방어 — 새로고침 후 같은
+  //   세션 재통과는 id가 같아 재집계 안 되고, 같은 과제를 다시 써서 끝내면(reset→새 세션→새 id) 새 완료로
+  //   집계된다. id는 길이/회차 충돌이 없는 세션 단위 unique 값이며 본문/과제문은 저장하지 않는다.
   useEffect(() => {
     if (state.phase === "done" && !doneCountedRef.current) {
       doneCountedRef.current = true;
-      const fp = `${state.revisions}:${Array.from(state.body.trim()).length}`;
-      if (loadLastDoneFingerprint() !== fp) { setLastDoneFingerprint(fp); setDoneStreak(bumpDoneCount()); }
+      let id = sessionIdRef.current;
+      if (!id) { id = newSessionId(); sessionIdRef.current = id; } // 방어: id 미발급 경로 — 발급 후 집계
+      if (loadLastDoneFingerprint() !== id) { setLastDoneFingerprint(id); setDoneStreak(bumpDoneCount()); }
       else setDoneStreak(loadDoneCount());
     }
   }, [state.phase]);
@@ -632,6 +636,7 @@ export default function CoachClient({
     let revisionTracked = false;
     if (!sess) {
       sessionRef.current = createSession(sessionAssignment(assignment), state.body, areaScores, rubricRef.current);
+      sessionIdRef.current = newSessionId(); // 새 세션 발급 — 완료 집계 식별값
     } else {
       const lastBody = sess.draftHistory[sess.draftHistory.length - 1]?.body ?? "";
       if (state.body !== lastBody) {
@@ -682,6 +687,7 @@ export default function CoachClient({
     if (!sessionRef.current) {
       // 이론상 RECHECK 전 CHECK 필수라 발생 불가지만 방어적으로 세션 생성.
       sessionRef.current = createSession(sessionAssignment(assignment), state.body, areaScores, rubricRef.current);
+      sessionIdRef.current = newSessionId();
     } else if (wasRevised) {
       sessionRef.current = recordRevision(sessionRef.current, state.body, areaScores, area, before, after);
     } else {
@@ -741,7 +747,10 @@ export default function CoachClient({
     sessionRef.current = null;
     clearSession();
     clearProcessLog();
-    // 새 과제는 다시 카운트 가능(끈기 스트릭 중복 방지 ref 초기화).
+    // 새 라운드는 새 세션 id를 발급받도록 초기화 — 다음 완료는 새 완료로 집계됨.
+    sessionIdRef.current = "";
+    clearSessionId();
+    // 새 과제는 다시 카운트 가능(같은 마운트 중복 방지 ref 초기화).
     doneCountedRef.current = false;
     dispatch({ type: "RESET" });
   };

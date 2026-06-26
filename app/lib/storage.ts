@@ -653,9 +653,8 @@ export function bumpDoneCount(): number {
   try { const next = loadDoneCount() + 1; window.localStorage.setItem(DONE_COUNT_KEY, String(next)); return next; } catch { return loadDoneCount(); }
 }
 
-// 마지막으로 집계한 '완료 지문'(비내용 메타: 고쳐쓰기수:최종글자수) 1개만 보관.
-//   새로고침 후 같은 글을 재통과하면 지문이 같아 재집계 안 됨; 같은 과제를 다시 써서 끝내면(고쳐쓰기수·
-//   글자수가 달라짐) 새 완료로 집계됨. 본문/과제문 같은 자유입력은 저장하지 않는다(데이터 최소화).
+// 마지막으로 끈기 스트릭에 집계한 '세션 id' 1개만 보관(비내용 불투명 식별값).
+//   현재 세션 id와 다르면 새 완료로 집계, 같으면(새로고침 후 같은 세션) 재집계 안 함.
 const DONE_FP_KEY = "pwc_done_fp_v1";
 export function loadLastDoneFingerprint(): string {
   if (typeof window === "undefined") return "";
@@ -664,4 +663,26 @@ export function loadLastDoneFingerprint(): string {
 export function setLastDoneFingerprint(fp: string): void {
   if (typeof window === "undefined") return;
   try { window.localStorage.setItem(DONE_FP_KEY, fp); } catch { /* quota/denied — best-effort */ }
+}
+
+// 현재 코치 세션의 비내용 고유 id — 새 세션 생성 시 발급(newSessionId)·새로고침 시 복원(loadSessionId).
+//   완료 집계의 안정적 식별값: 길이/회차 충돌이 없는 세션 단위 unique id. 본문/과제문은 저장하지 않는다.
+const SESSION_ID_KEY = "pwc_session_id_v1";
+export function loadSessionId(): string {
+  if (typeof window === "undefined") return "";
+  try { return window.localStorage.getItem(SESSION_ID_KEY) ?? ""; } catch { return ""; }
+}
+export function newSessionId(): string {
+  const id =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `s-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
+  if (typeof window !== "undefined") {
+    try { window.localStorage.setItem(SESSION_ID_KEY, id); } catch { /* best-effort */ }
+  }
+  return id;
+}
+export function clearSessionId(): void {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.removeItem(SESSION_ID_KEY); } catch { /* best-effort */ }
 }
