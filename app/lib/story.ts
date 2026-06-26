@@ -3,7 +3,8 @@ import type { AreaName } from "@/app/data/scoring";
 // 자유입력(과제명·장르)을 한 줄 라벨로 정규화 — 줄바꿈/공백 폭주를 단일 공백으로 접고 40자로 절단.
 //   호출부 신뢰가 아니라 이 함수가 직접 '한 줄 토큰' 불변식을 보장(임의 문구/줄바꿈이 카드를 깨지 못함).
 function oneLine(s: string, max = 40): string {
-  const t = (s ?? "").replace(/\s+/g, " ").trim();
+  // String()로 강제 — 호출부 신뢰가 아니라 비문자열 입력(손상 데이터)에도 안전하게 정규화(방어 심층).
+  const t = String(s ?? "").replace(/\s+/g, " ").trim();
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
 
