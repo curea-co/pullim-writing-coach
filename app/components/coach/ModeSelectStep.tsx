@@ -1,6 +1,6 @@
 "use client";
 
-// 코치 진입 — 작성 모드 선택. 자유/가이드 활성, 개요/말하기 '준비 중'(isModeEnabled=false).
+// 코치 진입 — 작성 모드 선택. 자유/가이드/개요/말하기 4개 모두 활성(isModeEnabled=true).
 
 import { type WritingMode, isModeEnabled } from "@/app/lib/coach-setup";
 

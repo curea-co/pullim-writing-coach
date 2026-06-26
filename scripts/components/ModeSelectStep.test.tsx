@@ -29,12 +29,12 @@ describe("ModeSelectStep", () => {
     expect(onSelect).toHaveBeenCalledWith("outline");
   });
 
-  it("말하기 카드는 비활성(클릭해도 onSelect 미호출)", async () => {
+  it("말하기 카드 활성 — 클릭 시 onSelect('voice') 호출", async () => {
     const onSelect = vi.fn();
     const user = userEvent.setup();
     render(<ModeSelectStep onSelect={onSelect} onBack={() => {}} />);
-    expect(screen.getByTestId("mode-voice")).toBeDisabled();
+    expect(screen.getByTestId("mode-voice")).not.toBeDisabled();
     await user.click(screen.getByTestId("mode-voice"));
-    expect(onSelect).not.toHaveBeenCalled();
+    expect(onSelect).toHaveBeenCalledWith("voice");
   });
 });

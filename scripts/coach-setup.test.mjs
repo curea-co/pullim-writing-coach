@@ -50,14 +50,11 @@ test("validateAssignment — 정상 과제 통과", () => {
   assert.equal(validateAssignment(a).length, 0);
 });
 
-test("isModeEnabled — free·guide·outline 활성", () => {
+test("isModeEnabled — free·guide·outline·voice 모두 활성", () => {
   assert.equal(isModeEnabled("free"), true);
   assert.equal(isModeEnabled("guide"), true);
   assert.equal(isModeEnabled("outline"), true);
-});
-
-test("isModeEnabled — voice 비활성(별도 보존)", () => {
-  assert.equal(isModeEnabled("voice"), false);
+  assert.equal(isModeEnabled("voice"), true);
 });
 
 test("serializeSetup/parseSetup — 왕복", () => {
@@ -85,10 +82,11 @@ test("parseSetup — outline 모드 정상 과제 round-trip 복원 성공", () 
   assert.deepEqual(round, setup);
 });
 
-test("parseSetup — voice 비활성 모드 저장값은 null(별도 보존)", () => {
-  // voice는 여전히 비활성이므로 UI 가드 우회 방지를 위해 null.
-  const voice = JSON.stringify({ assignment: { school_level: "중2", subject: "과학", genre: "설명문", target_char_count: null, prompt_text: "화산의 형성을 설명하라" }, mode: "voice" });
-  assert.equal(parseSetup(voice), null);
+test("parseSetup — voice 활성 모드 저장값 round-trip 복원 성공", () => {
+  // voice가 활성화됐으므로 구조+내용이 맞으면 parseSetup이 값을 반환해야 함.
+  const setup = { assignment: { school_level: "중2", subject: "과학", genre: "설명문", target_char_count: null, prompt_text: "화산의 형성을 설명하라" }, mode: "voice" };
+  const round = parseSetup(JSON.stringify(setup));
+  assert.deepEqual(round, setup);
 });
 
 test("parseSetup — validateAssignment 위반 과제(짧은 prompt·enum 밖)는 null", () => {
