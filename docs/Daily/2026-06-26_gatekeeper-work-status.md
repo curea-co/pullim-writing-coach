@@ -69,7 +69,7 @@
 ### 3-2. writing-coach 자체 갭
 - **중앙 로그인 랜딩 + 공통 헤더** — 로그인 클릭 → 중앙 로그인 랜딩 + 쿼리 리다이렉트, 상단 헤더 공통화. 현재 자체 TokenGate.
   - 랜딩 URL은 설계 SoT(`docs/design/_platform/plan.md`)가 이미 정리: apex `pullim.ai`도 로그인 UI 노출 가능 + 미인증 서비스 리다이렉트 **canonical 진입 = `os.pullim.ai/login?next=`**. writing-coach는 이 canonical 진입을 따르면 됨(본 문서는 SoT 인용만, 결정 아님).
-- **사용자 크레딧·결제·계정**(Phase 2) — 유료(크레딧 구매) 모델. 현재 데모 토큰 게이트만. 인증·원장·결제 미구축.
+- **결제·크레딧 = writing-coach 범위 밖** — 결제·엔타이틀먼트 발급은 중앙(pullim-api `billing` + OS) 소관. writing-coach는 발급된 `writing` flag로 **인가(게이팅)만** 수행, 결제 UI·원장 미구축(불필요).
 - **잔여 PR**: #99(dev←main sync) 머지 후 dev/main 정합.
 - 과정 코치 mock 구간 고도화(coach-mock 등 ⚪) · `/try` 레거시 정리.
 
@@ -90,9 +90,10 @@
 | 5 | 운영 배포 + **사용자 오픈** | **2026-07-09** | `writing.pullim.ai` 통합 로그인 동작 |
 | — | (완료) writing-coach 자체 채점 배포 | 완료 (6/25) | `writing.pullim.ai` 200 |
 | — | (완료/진행) dev←main 동기화 #99 | 6/29까지 | 오픈 PR |
-| P2 | 크레딧·결제·계정 | **오픈 후 별도(Phase 2)** | 7/9 오픈 범위 = OS-SSO+엔타이틀먼트 게이팅까지. 유료 결제는 후속 |
 
-> ⚠ **리스크/전제**: ① ★0 아키텍처 결정(6/29~30)이 7/9 전체를 좌우 — OS-SSO 구현·검증(2·4)이 임계경로 ② pullim-api claim/flag(1)는 게이트키퍼 소유라 협업 일정 의존 ③ **7/9 오픈 범위에 결제 포함 여부 확정 필요**(현 제안 = OS-SSO 게이팅까지, 결제 Phase 2) ④ 휴일(6/26~28)로 실착수는 6/29부터.
+> **결제 제외**: 결제·크레딧은 **writing-coach 범위 밖**(중앙 pullim-api billing + OS 소관). writing-coach는 발급된 `writing` flag로 **인가(게이팅)만** 수행 — 7/9 오픈 범위 = OS-SSO + 엔타이틀먼트 게이팅까지.
+
+> ⚠ **리스크/전제**: ① ★0 아키텍처 결정(6/29~30)이 7/9 전체를 좌우 — OS-SSO 구현·검증(2·4)이 임계경로 ② pullim-api claim/flag(1)는 게이트키퍼 소유라 협업 일정 의존 ③ 휴일(6/26~28)로 실착수는 6/29부터.
 
 ---
 
