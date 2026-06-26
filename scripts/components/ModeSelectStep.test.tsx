@@ -34,14 +34,15 @@ describe("ModeSelectStep", () => {
     expect(onSelect).toHaveBeenCalledWith("outline");
   });
 
-  it("말하기 카드 활성(지원 브라우저) — 클릭 시 onSelect('voice') 호출", async () => {
-    speech.supported = true;
+  it("말하기 카드 비활성(준비 중) — 지원 브라우저라도 flag off라 클릭해도 onSelect 미호출", async () => {
+    speech.supported = true; // 브라우저는 지원하지만 기능 플래그가 off
     const onSelect = vi.fn();
     const user = userEvent.setup();
     render(<ModeSelectStep onSelect={onSelect} onBack={() => {}} />);
-    expect(screen.getByTestId("mode-voice")).not.toBeDisabled();
+    expect(screen.getByTestId("mode-voice")).toBeDisabled();
+    expect(screen.getByText(/준비 중/)).toBeInTheDocument();
     await user.click(screen.getByTestId("mode-voice"));
-    expect(onSelect).toHaveBeenCalledWith("voice");
+    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it("말하기 카드 비활성(미지원 브라우저) — 클릭해도 onSelect 미호출 + '미지원' 표시", async () => {

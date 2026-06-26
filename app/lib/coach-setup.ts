@@ -25,8 +25,9 @@ export type CoachAssignment = {
 
 export type CoachSetup = { assignment: CoachAssignment; mode: WritingMode };
 
-// 이번 물결에 실제 동작하는 모드 화이트리스트. 4개 모드 모두 활성.
-const ENABLED_MODES: readonly WritingMode[] = ["free", "guide", "outline", "voice"];
+// 실제 동작하는 모드 화이트리스트. voice(말하기)는 실마이크 QA·미성년자 동의 정책 전까지 비활성("준비 중").
+//   voice를 빼면 parseSetup이 저장된 voice 셋업도 거부하므로(미지원 브라우저 복원 데드엔드 방지) 가드가 일원화된다.
+const ENABLED_MODES: readonly WritingMode[] = ["free", "guide", "outline"];
 /** 형태 가드용 전체 모드 화이트리스트 — 활성화 여부가 아님(활성화는 isModeEnabled/ENABLED_MODES). */
 export const ALL_MODES: readonly WritingMode[] = ["free", "guide", "outline", "voice"];
 

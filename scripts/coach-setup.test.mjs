@@ -50,11 +50,11 @@ test("validateAssignment — 정상 과제 통과", () => {
   assert.equal(validateAssignment(a).length, 0);
 });
 
-test("isModeEnabled — free·guide·outline·voice 모두 활성", () => {
+test("isModeEnabled — free·guide·outline 활성, voice는 비활성(준비 중)", () => {
   assert.equal(isModeEnabled("free"), true);
   assert.equal(isModeEnabled("guide"), true);
   assert.equal(isModeEnabled("outline"), true);
-  assert.equal(isModeEnabled("voice"), true);
+  assert.equal(isModeEnabled("voice"), false); // 실마이크 QA·동의 정책 전까지 비활성
 });
 
 test("serializeSetup/parseSetup — 왕복", () => {
@@ -82,11 +82,10 @@ test("parseSetup — outline 모드 정상 과제 round-trip 복원 성공", () 
   assert.deepEqual(round, setup);
 });
 
-test("parseSetup — voice 활성 모드 저장값 round-trip 복원 성공", () => {
-  // voice가 활성화됐으므로 구조+내용이 맞으면 parseSetup이 값을 반환해야 함.
+test("parseSetup — voice 비활성: 저장된 voice 셋업은 거부(null)", () => {
+  // voice 비활성화 → 지원 브라우저에서 저장한 voice 셋업을 어떤 브라우저에서 복원해도 거부(데드엔드 방지).
   const setup = { assignment: { school_level: "중2", subject: "과학", genre: "설명문", target_char_count: null, prompt_text: "화산의 형성을 설명하라" }, mode: "voice" };
-  const round = parseSetup(JSON.stringify(setup));
-  assert.deepEqual(round, setup);
+  assert.equal(parseSetup(JSON.stringify(setup)), null);
 });
 
 test("parseSetup — validateAssignment 위반 과제(짧은 prompt·enum 밖)는 null", () => {
