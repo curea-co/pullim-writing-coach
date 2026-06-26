@@ -2,6 +2,7 @@
 
 > 작성: PM · 범위: **pullim-writing-coach 단일 서비스(포트 3006)**
 > **완료 판정 원칙**: "2번(서버환경 구성 + 로그인 동작)이 0%면 개발 완료 0%." → 코드가 있어도 `dev-os.pullim.ai` 로그인 → writing-coach 인가 동작이 **서버환경에서 검증**돼야 '완료'.
+> ※ 이 기준은 **게이트키퍼의 OS 통합 관점**이다. writing-coach **standalone 데모 출시**(부모인증·billing 미통합, 데모 토큰+rate limit) 결정은 별개 맥락([docs/29_decisions_intake_2026-06-08.md](../29_decisions_intake_2026-06-08.md))이며, 본 보고서가 그 결정을 덮어쓰지는 않는다 — OS 통합 완료도를 별도 측정.
 > **역할 분담**: 1번 = 에이전트 작성(완료) · 2~4번 = 사람 검수(근거기반 초안 + ⚠검증필요).
 > 라이브 상태 2026-06-26 curl 실측. 머지 PR 94건 / 오픈 PR #99(dev sync)뿐.
 > ⚠ **SoT 주의**: 본 문서는 **writing-coach 상태 스냅샷(비권위)**이다. 풀림 플랫폼 서비스별 구현·인가·갭의 권위는 **외부 레포 [curea-co/pullim-api](https://github.com/curea-co/pullim-api)의 `docs/design/`(ADR-021 체계)**에 있으며, 본 문서의 pullim-api 관련 서술은 그 외부 SoT 인용·관측이다(본 레포에서 검증 불가, 드리프트 시 외부 SoT 우선).
@@ -69,7 +70,7 @@
 
 ### 3-2. writing-coach 자체 갭
 - **중앙 로그인 랜딩 + 공통 헤더** — 로그인 클릭 → 중앙 로그인 랜딩 + 쿼리 리다이렉트, 상단 헤더 공통화. 현재 자체 TokenGate.
-  - 랜딩 URL은 **외부 SoT**(pullim-api 레포 `docs/design/_platform/plan.md`)에서 확정 — apex `pullim.ai`도 로그인 UI 가능 + 미인증 서비스 리다이렉트 canonical 진입 `os.pullim.ai/login?next=`로 정리된 것으로 관측(본 레포 검증 불가, **외부 SoT 확인 필요**). writing-coach는 그 canonical 진입을 따르면 됨 — 본 문서는 결정 아님.
+  - 랜딩 URL: **외부 문서에서 이렇게 관측됨(본 레포 미검증 — 착수 전 확인 필요)** — pullim-api 레포 `docs/design/_platform/plan.md`상 apex `pullim.ai`도 로그인 UI 가능 + 미인증 서비스 리다이렉트 canonical 진입 `os.pullim.ai/login?next=`. 확정 권한은 그 외부 SoT이며 본 문서는 결정 아님.
 - **결제·크레딧 = writing-coach 범위 밖** — 결제·엔타이틀먼트 발급은 중앙(pullim-api `billing` + OS) 소관. writing-coach는 발급된 `writing` flag로 **인가(게이팅)만** 수행, 결제 UI·원장 미구축(불필요).
 - **잔여 PR**: #99(dev←main sync) 머지 후 dev/main 정합.
 - 과정 코치 mock 구간 고도화(coach-mock 등 ⚪) · `/try` 레거시 정리.
@@ -99,6 +100,6 @@
 ---
 
 ## 부록 — 검증 방법
-- 라이브: `curl -s -o /dev/null -w "%{http_code}" https://writing.pullim.ai/`(200) · `https://dev-writing.pullim.ai/`(302 SSO 보호).
+- 라이브: `curl -s -o /dev/null -w "%{http_code}" https://writing.pullim.ai/`(200) · `https://dev-writing.pullim.ai/`(302 — **Vercel Deployment Protection**이며 OS-SSO 아님, smoke_2026-06-25.md 참조).
 - 인증 방식 확인: 세 라우트 모두 **자체 `DEMO_ACCESS_TOKEN` ↔ `x-demo-token` 게이트**(`isAuthorized` — `/api/score`=`app/lib/server/anthropic.ts`, `/api/coach`=`app/api/coach/route.ts`, `/api/extract`=`app/api/extract/helpers.ts`). cookie SSO·EntitlementGuard 없음. (`middleware.ts`는 rate limit만, 인증 아님.)
 - OS 통합 검증(미연동): pullim-api(외부 레포) `POST /auth/dev/seed-member`로 `writing` flag 계정 발급 → dev-os 로그인 → writing-coach 진입 — **현재 경로 없음**.
