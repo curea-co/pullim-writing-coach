@@ -25,8 +25,9 @@ export type CoachAssignment = {
 
 export type CoachSetup = { assignment: CoachAssignment; mode: WritingMode };
 
-// 이번 물결에 실제 동작하는 모드 화이트리스트. 4개 모드 모두 활성.
-const ENABLED_MODES: readonly WritingMode[] = ["free", "guide", "outline", "voice"];
+// 실제 동작하는 모드 화이트리스트. voice(말하기)는 실마이크 QA·미성년자 동의 정책 전까지 비활성("준비 중").
+//   voice를 빼면 parseSetup이 저장된 voice 셋업도 거부하므로(미지원 브라우저 복원 데드엔드 방지) 가드가 일원화된다.
+const ENABLED_MODES: readonly WritingMode[] = ["free", "guide", "outline"];
 /** 형태 가드용 전체 모드 화이트리스트 — 활성화 여부가 아님(활성화는 isModeEnabled/ENABLED_MODES). */
 export const ALL_MODES: readonly WritingMode[] = ["free", "guide", "outline", "voice"];
 
@@ -73,11 +74,13 @@ export function parseSetup(raw: string | null): CoachSetup | null {
     if (typeof a.school_level !== "string" || typeof a.subject !== "string") return null;
     if (typeof a.genre !== "string" || typeof a.prompt_text !== "string") return null;
     if (!(a.target_char_count === null || (typeof a.target_char_count === "number" && Number.isInteger(a.target_char_count)))) return null;
-    // 구조뿐 아니라 의미까지 검증(curea-review-ai 지적): 비활성 모드나 규칙을 어긴
-    // 과제가 저장돼 있으면 null로 떨어뜨려 /coach가 곧장 ready로 진입해 UI 가드를 우회하는 걸 막는다.
+    // 규칙 위반 과제는 null로 떨어뜨려 /coach가 곧장 ready로 진입해 UI 가드를 우회하는 걸 막는다.
     const setup = o as CoachSetup;
-    if (!isModeEnabled(setup.mode)) return null;
     if (validateAssignment(setup.assignment).length > 0) return null;
+    // 비활성 모드(예: voice 준비 중)면 과제는 보존하고 모드만 기본 활성 모드로 다운그레이드 —
+    //   저장된 voice 셋업이 통째로 null이 돼 과제 입력을 잃거나(마이그레이션 손실) 미지원 브라우저에서
+    //   voice로 직행하는 데드엔드를 동시에 막는다.
+    if (!isModeEnabled(setup.mode)) return { ...setup, mode: ENABLED_MODES[0] };
     return setup;
   } catch {
     return null;

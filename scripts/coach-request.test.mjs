@@ -59,10 +59,10 @@ test("mode='outline' 전송 → value.mode === 'outline' (ALL_MODES 화이트리
   assert.equal(result.value.mode, "outline");
 });
 
-test("mode='voice' 전송 → value.mode === 'voice' (ALL_MODES 화이트리스트)", () => {
+test("mode='voice'(비활성) 전송 → 'free' 폴백 (가드 일원화 — API도 비활성 모드 미수용)", () => {
   const result = validateCoachRequest(makeRaw({ mode: "voice" }));
   assert.equal(result.ok, true);
-  assert.equal(result.value.mode, "voice");
+  assert.equal(result.value.mode, "free");
 });
 
 test("mode='free' 명시 전송 → value.mode === 'free'", () => {
