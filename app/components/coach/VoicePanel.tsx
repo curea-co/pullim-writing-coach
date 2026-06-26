@@ -8,7 +8,15 @@ export default function VoicePanel({ onInsert }: { onInsert: (text: string) => v
     onResult: (t) => setLines((prev) => [...prev, t]),
   });
 
-  if (!supported) {
+  // 판정 전(null): 중립 표시 — '미지원' 안내도 마이크도 그리지 않아 SSR/CSR 첫 렌더 일치 + 깜빡임 방지.
+  if (supported === null) {
+    return (
+      <div className="border-border bg-surface text-subtle-foreground rounded-lg border p-3 text-sm" role="note" data-testid="voice-checking">
+        음성 입력 준비 중…
+      </div>
+    );
+  }
+  if (supported === false) {
     return (
       <div className="border-border bg-surface text-muted-foreground rounded-lg border p-3 text-sm" role="note">
         이 브라우저는 음성 입력을 지원하지 않아요 — 직접 타이핑하거나 다른 모드를 써 주세요.

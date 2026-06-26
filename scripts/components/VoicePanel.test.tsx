@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-const mockHook = { supported: true, listening: false, interim: "", error: null as string | null, start: vi.fn(), stop: vi.fn() };
+const mockHook = { supported: true as boolean | null, listening: false, interim: "", error: null as string | null, start: vi.fn(), stop: vi.fn() };
 vi.mock("@/app/lib/use-speech", () => ({
   useSpeechRecognition: (opts: { onResult: (t: string) => void }) => { (globalThis as Record<string, unknown>).__voiceOnResult = opts.onResult; return mockHook; },
 }));
@@ -50,6 +50,13 @@ describe("VoicePanel", () => {
     mockHook.supported = false;
     render(<VoicePanel onInsert={() => {}} />);
     expect(screen.getByText(/지원하지 않아요/)).toBeInTheDocument();
+    expect(screen.queryByTestId("voice-mic")).not.toBeInTheDocument();
+  });
+  it("판정 전(supported=null) — 중립 표시(미지원 안내·마이크 둘 다 없음)", () => {
+    mockHook.supported = null;
+    render(<VoicePanel onInsert={() => {}} />);
+    expect(screen.getByTestId("voice-checking")).toBeInTheDocument();
+    expect(screen.queryByText(/지원하지 않아요/)).not.toBeInTheDocument();
     expect(screen.queryByTestId("voice-mic")).not.toBeInTheDocument();
   });
 });

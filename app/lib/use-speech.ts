@@ -29,13 +29,14 @@ function getCtor(): Ctor | null {
 }
 
 export interface UseSpeechRecognition {
-  supported: boolean; listening: boolean; interim: string; error: string | null;
+  // null = 아직 판정 전(첫 렌더). SSR/CSR 첫 렌더 일치 + '미지원' 깜빡임 방지 — 호스트는 null이면 중립 표시.
+  supported: boolean | null; listening: boolean; interim: string; error: string | null;
   start: () => void; stop: () => void;
 }
 
 export function useSpeechRecognition(opts: { lang?: string; onResult: (finalText: string) => void }): UseSpeechRecognition {
   const { lang = "ko-KR", onResult } = opts;
-  const [supported, setSupported] = useState(false);
+  const [supported, setSupported] = useState<boolean | null>(null);
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState("");
   const [error, setError] = useState<string | null>(null);
