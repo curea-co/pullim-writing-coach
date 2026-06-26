@@ -120,8 +120,7 @@ describe("CoachClient voice 분기", () => {
     const raw = window.localStorage.getItem("pwc-coach-body-html-v1");
     expect(raw).not.toBeNull();
     const parsed = JSON.parse(raw!) as { sig: string; html: string };
-    // 두 줄이 모두 html에 반영되어 있어야 함
-    expect(parsed.html).toContain("첫 번째 줄");
-    expect(parsed.html).toContain("두 번째 줄");
+    // 두 줄이 별개 문단으로 반영(= \n 구분자 보존) — 구분자 누락 회귀를 잡는다.
+    expect(parsed.html).toContain("<p>첫 번째 줄</p><p>두 번째 줄</p>");
   });
 });
