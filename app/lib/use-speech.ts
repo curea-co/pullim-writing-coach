@@ -28,6 +28,11 @@ function getCtor(): Ctor | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
+// 브라우저가 Web Speech를 지원하는지(클라이언트 전용). 모드 선택에서 voice 카드 게이팅에 사용.
+export function isSpeechSupported(): boolean {
+  return getCtor() !== null;
+}
+
 export interface UseSpeechRecognition {
   // null = 아직 판정 전(첫 렌더). SSR/CSR 첫 렌더 일치 + '미지원' 깜빡임 방지 — 호스트는 null이면 중립 표시.
   supported: boolean | null; listening: boolean; interim: string; error: string | null;

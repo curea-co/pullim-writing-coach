@@ -1,8 +1,10 @@
 "use client";
 
-// 코치 진입 — 작성 모드 선택. 자유/가이드/개요/말하기 4개 모두 활성(isModeEnabled=true).
+// 코치 진입 — 작성 모드 선택. 자유/가이드/개요 활성. 말하기는 Web Speech 미지원 브라우저에서 비활성(데드엔드 방지).
 
+import { useEffect, useState } from "react";
 import { type WritingMode, isModeEnabled } from "@/app/lib/coach-setup";
+import { isSpeechSupported } from "@/app/lib/use-speech";
 
 type Card = { mode: WritingMode; title: string; body: string };
 
@@ -20,6 +22,11 @@ export default function ModeSelectStep({
   onSelect: (mode: WritingMode) => void;
   onBack: () => void;
 }) {
+  // Web Speech 지원 여부 — 마운트 후 판정(SSR/CSR 첫 렌더 일치). 판정 전(null)엔 낙관적으로 활성.
+  const [speechSupported, setSpeechSupported] = useState<boolean | null>(null);
+  useEffect(() => {
+    setSpeechSupported(isSpeechSupported());
+  }, []);
   return (
     <main className="mx-auto w-full max-w-2xl px-5 py-8 md:py-12">
       <button type="button" onClick={onBack} className="text-muted-foreground hover:text-foreground mb-6 text-sm">
@@ -31,7 +38,9 @@ export default function ModeSelectStep({
       </header>
       <div className="grid gap-3 sm:grid-cols-2">
         {CARDS.map((c) => {
-          const enabled = isModeEnabled(c.mode);
+          // voice는 Web Speech 미지원이 '판정된' 경우에만 비활성(판정 전 null은 낙관적 활성 — 다수인 지원 브라우저 깜빡임 방지).
+          const voiceUnsupported = c.mode === "voice" && speechSupported === false;
+          const enabled = isModeEnabled(c.mode) && !voiceUnsupported;
           return (
             <button
               key={c.mode}
@@ -43,11 +52,15 @@ export default function ModeSelectStep({
             >
               <span className="text-foreground text-base font-semibold">{c.title}</span>
               <span className="text-muted-foreground mt-1.5 text-sm leading-relaxed">{c.body}</span>
-              {!enabled && (
+              {voiceUnsupported ? (
+                <span className="bg-muted text-subtle-foreground absolute right-3 top-3 rounded-full px-2 py-0.5 text-[10px] font-semibold">
+                  이 브라우저 미지원
+                </span>
+              ) : !enabled ? (
                 <span className="bg-muted text-subtle-foreground absolute right-3 top-3 rounded-full px-2 py-0.5 text-[10px] font-semibold">
                   준비 중
                 </span>
-              )}
+              ) : null}
             </button>
           );
         })}
