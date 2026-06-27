@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { forwardToPullim, rewriteSetCookie, mapLoginError, CSRF_HEADER, isInsecureRequest } from "@/app/lib/server/pullim-auth";
+import { forwardToPullim, rewriteSetCookie, mapLoginError, CSRF_HEADER, COOKIE_CSRF, isInsecureRequest } from "@/app/lib/server/pullim-auth";
 
 
 export const runtime = "nodejs";
@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
     method: "POST",
     jsonBody: { email, password },
     cookie: req.headers.get("cookie"),
+    cookieNames: [COOKIE_CSRF], // 로그인은 CSRF 쿠키만 — 이전 세션 쿠키 혼입 방지
     csrf: req.headers.get(CSRF_HEADER),
   });
   if (status >= 400) return NextResponse.json({ message: mapLoginError(status) }, { status });

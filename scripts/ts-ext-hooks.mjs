@@ -11,17 +11,25 @@ import { createRequire } from "node:module";
 
 const EXTS = [".ts", ".tsx", ".mts", ".js", ".mjs"];
 
-// server-only 패키지의 empty.js 경로 (no-op, react-server 조건 동등물)
-// 주: server-only/package.json "exports"가 empty.js를 노출하지 않으므로 fs 직접 경로 사용.
-// _require.resolve("server-only") → …/server-only/index.js → 같은 디렉토리의 empty.js로.
+// server-only no-op 경로를 **지연 계산** — 미설치/빈 의존성에서도 훅 로드가 죽지 않게(top-level resolve 금지).
+//   server-only가 import될 때만 해소하고, 실패하면 합성 빈 모듈(data:)로 폴백.
 const _require = createRequire(import.meta.url);
-const _serverOnlyIndex = pathToFileURL(_require.resolve("server-only"));
-const SERVER_ONLY_EMPTY = new URL("./empty.js", _serverOnlyIndex).href;
+let _serverOnlyEmpty;
+function serverOnlyEmpty() {
+  if (_serverOnlyEmpty !== undefined) return _serverOnlyEmpty;
+  try {
+    const idx = pathToFileURL(_require.resolve("server-only")); // …/server-only/index.js
+    _serverOnlyEmpty = new URL("./empty.js", idx).href;         // 같은 디렉토리 empty.js(react-server 동등물)
+  } catch {
+    _serverOnlyEmpty = "data:text/javascript,export%20%7B%7D"; // 미설치 — no-op 합성 모듈
+  }
+  return _serverOnlyEmpty;
+}
 
 export async function resolve(specifier, context, next) {
-  // `server-only`를 node 테스트 환경에서 no-op(empty.js)로 단락.
+  // `server-only`를 node 테스트 환경에서 no-op로 단락(지연 해소).
   if (specifier === "server-only") {
-    return { url: SERVER_ONLY_EMPTY, shortCircuit: true };
+    return { url: serverOnlyEmpty(), shortCircuit: true };
   }
 
   const hasExt = /\.[mc]?[jt]sx?$/.test(specifier);

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { rewriteSetCookie, mapLoginError, filterCookies } from "../app/lib/server/pullim-auth.ts";
+import { rewriteSetCookie, mapLoginError, filterCookies, isInsecureRequest } from "../app/lib/server/pullim-auth.ts";
 
 test("rewriteSetCookie: Domain 제거 + refresh Path /auth→/api/auth + httpOnly 보존", () => {
   const at = rewriteSetCookie("dev-pullim-at=abc; Path=/; Domain=dev-api.pullim.ai; HttpOnly; Secure; SameSite=Lax");
@@ -22,9 +22,20 @@ test("mapLoginError: 401→자격불일치, 403→CSRF, 그외→일반", () => 
   assert.match(mapLoginError(403), /보안|다시/);
   assert.match(mapLoginError(500), /실패|잠시/);
 });
-test("filterCookies: dev-pullim-* 세션·CSRF만 통과, 임의 쿠키 제거", () => {
-  const out = filterCookies("dev-pullim-at=a; analytics=zzz; dev-pullim-rt=b; pwc-demo-token=t; dev-pullim-csrf=c");
-  assert.ok(/dev-pullim-at=a/.test(out) && /dev-pullim-rt=b/.test(out) && /dev-pullim-csrf=c/.test(out));
-  assert.equal(/analytics|pwc-demo-token/.test(out), false); // 외부 백엔드로 유출 안 됨
+test("filterCookies: dev-pullim-* 세션·CSRF만 통과, 임의 쿠키 제거 + 엔드포인트별 좁히기", () => {
+  const header = "dev-pullim-at=a; analytics=zzz; dev-pullim-rt=b; pwc-demo-token=t; dev-pullim-csrf=c";
+  const all = filterCookies(header);
+  assert.ok(/dev-pullim-at=a/.test(all) && /dev-pullim-rt=b/.test(all) && /dev-pullim-csrf=c/.test(all));
+  assert.equal(/analytics|pwc-demo-token/.test(all), false); // 외부 백엔드로 유출 안 됨
+  // 엔드포인트별 scope: 로그인은 CSRF만
+  const onlyCsrf = filterCookies(header, ["dev-pullim-csrf"]);
+  assert.equal(onlyCsrf, "dev-pullim-csrf=c");
   assert.equal(filterCookies(null), "");
+});
+test("isInsecureRequest: xfp 권위 + 프록시 뒤 https 다운그레이드 방지", () => {
+  const req = (url, xfp) => ({ url, headers: { get: (n) => (n === "x-forwarded-proto" ? xfp : null) } });
+  assert.equal(isInsecureRequest(req("http://x/", "https")), false); // xfp=https → secure 유지(프록시 뒤 https)
+  assert.equal(isInsecureRequest(req("https://x/", "http")), true);  // xfp=http → insecure
+  assert.equal(isInsecureRequest(req("http://localhost:3000/", null)), true);   // xfp 없음 + localhost http → insecure
+  assert.equal(isInsecureRequest(req("http://192.168.0.5/", null)), false);     // xfp 없음 + 비localhost → secure 유지(다운그레이드 방지)
 });

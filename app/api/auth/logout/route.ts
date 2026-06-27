@@ -1,12 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { forwardToPullim, rewriteSetCookie, CSRF_HEADER, COOKIE_AT, COOKIE_RT, isInsecureRequest } from "@/app/lib/server/pullim-auth";
+import { forwardToPullim, rewriteSetCookie, CSRF_HEADER, COOKIE_AT, COOKIE_RT, COOKIE_CSRF, isInsecureRequest } from "@/app/lib/server/pullim-auth";
 
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   const { status, setCookies } = await forwardToPullim("/auth/logout", {
-    method: "POST", cookie: req.headers.get("cookie"), csrf: req.headers.get(CSRF_HEADER),
+    method: "POST", cookie: req.headers.get("cookie"), cookieNames: [COOKIE_RT, COOKIE_CSRF], csrf: req.headers.get(CSRF_HEADER),
   });
   // all-or-nothing: dev-api logout이 성공(2xx, 멱등 204 포함)했을 때만 로컬 쿠키를 만료하고 ok 반환.
   //   403(CSRF)·5xx면 서버 세션이 revoke되지 않았으므로 성공으로 위장하지 않고 상태를 전달(쿠키 유지 → 재시도 가능).

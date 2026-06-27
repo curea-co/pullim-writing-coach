@@ -19,13 +19,14 @@ export const COOKIE_RT = "dev-pullim-rt";
 export const COOKIE_CSRF = "dev-pullim-csrf";
 export const CSRF_HEADER = "x-csrf-token"; // 라이브 실측 확정
 
-// dev-api로 전달할 쿠키 허용목록 — 우리 origin의 임의 쿠키가 외부 백엔드로 유출되지 않게 세션·CSRF만 골라 전달.
+// dev-api로 전달할 쿠키 허용목록(기본) — 우리 origin의 임의 쿠키가 외부 백엔드로 유출되지 않게.
+//   엔드포인트별로 필요한 쿠키만 좁혀 전달(login=CSRF만, /me=access만 …)해 세션 쿠키 혼입을 막는다.
 const ALLOWED_COOKIES = [COOKIE_AT, COOKIE_RT, COOKIE_CSRF];
-export function filterCookies(cookieHeader: string | null | undefined): string {
+export function filterCookies(cookieHeader: string | null | undefined, names: readonly string[] = ALLOWED_COOKIES): string {
   if (!cookieHeader) return "";
   return cookieHeader
     .split(/;\s*/)
-    .filter((c) => ALLOWED_COOKIES.some((n) => c.startsWith(n + "=")))
+    .filter((c) => names.some((n) => c.startsWith(n + "=")))
     .join("; ");
 }
 
@@ -40,10 +41,14 @@ export function rewriteSetCookie(line: string, opts: { insecure?: boolean } = {}
 }
 
 // 현재 요청이 비프로덕션 + HTTP origin인지 — 그렇다면 relay 쿠키에서 Secure를 떼야 브라우저가 저장한다.
+//   TLS 종료 프록시(Vercel 등) 뒤에서는 내부 req.url이 http여도 외부는 https일 수 있다 → x-forwarded-proto를
+//   권위로 신뢰하고, 그게 없을 때만 localhost http에 한해 insecure로 본다(프록시 뒤 HTTPS Secure 다운그레이드 방지).
 export function isInsecureRequest(req: { url: string; headers: { get(name: string): string | null } }): boolean {
   if (process.env.NODE_ENV === "production") return false;
-  const proto = req.headers.get("x-forwarded-proto") ?? new URL(req.url).protocol.replace(/:$/, "");
-  return proto === "http";
+  const xfp = req.headers.get("x-forwarded-proto");
+  if (xfp) return xfp.split(",")[0]!.trim() === "http";
+  const url = new URL(req.url);
+  return url.protocol === "http:" && (url.hostname === "localhost" || url.hostname === "127.0.0.1");
 }
 
 export function mapLoginError(status: number): string {
@@ -56,11 +61,11 @@ export function mapLoginError(status: number): string {
 // 서버→dev-api 프록시. 브라우저 쿠키를 forward, dev-api Set-Cookie 회수. credentials는 수동 Cookie 헤더.
 export async function forwardToPullim(
   path: string,
-  opts: { method?: string; jsonBody?: unknown; cookie?: string | null; csrf?: string | null } = {},
+  opts: { method?: string; jsonBody?: unknown; cookie?: string | null; csrf?: string | null; cookieNames?: readonly string[] } = {},
 ): Promise<{ status: number; body: unknown; setCookies: string[] }> {
   const headers: Record<string, string> = { accept: "application/json" };
   if (opts.jsonBody !== undefined) headers["content-type"] = "application/json";
-  const cookie = filterCookies(opts.cookie); // 세션·CSRF 쿠키만 전달(임의 쿠키 유출 방지)
+  const cookie = filterCookies(opts.cookie, opts.cookieNames); // 엔드포인트별 필요한 쿠키만 전달
   if (cookie) headers["cookie"] = cookie;
   if (opts.csrf) headers[CSRF_HEADER] = opts.csrf;
   // dev-api CSRF Origin 검증 통과 — BFF 서버 발 요청이라 허용 origin을 명시(실측 확정값).
