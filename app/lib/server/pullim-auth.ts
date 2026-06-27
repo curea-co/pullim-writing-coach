@@ -1,13 +1,15 @@
 import "server-only";
 
-// dev-api 계약(§dev-api 계약). 실측으로 확정 — 미상 항목은 보수적 기본값 + 라이브 검증.
+// dev-api 계약(라이브 실측 확정, 2026-06-27).
 // CSRF 쿠키 = dev-pullim-csrf (NOT httpOnly, Domain=.pullim.ai, SameSite=Lax) — double-submit.
-// 세션 쿠키 = dev-pullim-at(access) · dev-pullim-rt(refresh, Path=/auth).
-// CSRF 헤더 = x-csrf-token (csrf-csrf 기본값 가정 — login 403 없으면 확정).
+// 세션 쿠키 = dev-pullim-at(access, Max-Age 900) · dev-pullim-rt(refresh, Path=/auth).
+// CSRF 헤더 = x-csrf-token (확정). CSRF Origin 검증 = dev-api 허용 origin(dev: https://dev.pullim.ai)만 통과 — 확정.
 export const PULLIM_API_URL = process.env.PULLIM_API_URL ?? "https://dev-api.pullim.ai";
+// BFF가 dev-api로 보낼 Origin — dev-api CSRF Origin 허용목록 값(dev 확정: https://dev.pullim.ai). prod는 env로 교체.
+export const PULLIM_ORIGIN = process.env.PULLIM_ORIGIN ?? "https://dev.pullim.ai";
 export const COOKIE_AT = "dev-pullim-at";
 export const COOKIE_RT = "dev-pullim-rt";
-export const CSRF_HEADER = "x-csrf-token"; // T1 실측으로 확정
+export const CSRF_HEADER = "x-csrf-token"; // 라이브 실측 확정
 
 // dev-api Set-Cookie를 우리 origin용으로 재기록: Domain 제거(host-only), refresh Path /auth→/api/auth,
 //   HttpOnly·Secure·SameSite 보존(토큰 httpOnly 유지).
@@ -33,8 +35,8 @@ export async function forwardToPullim(
   if (opts.jsonBody !== undefined) headers["content-type"] = "application/json";
   if (opts.cookie) headers["cookie"] = opts.cookie;
   if (opts.csrf) headers[CSRF_HEADER] = opts.csrf;
-  // dev-api CSRF Origin 검증 통과용 — 서버 발 요청이라 Origin을 명시(허용값은 T1 실측으로 확정).
-  headers["origin"] = PULLIM_API_URL;
+  // dev-api CSRF Origin 검증 통과 — BFF 서버 발 요청이라 허용 origin을 명시(실측 확정값).
+  headers["origin"] = PULLIM_ORIGIN;
   const res = await fetch(`${PULLIM_API_URL}${path}`, {
     method: opts.method ?? "GET",
     headers,
