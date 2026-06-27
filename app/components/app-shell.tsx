@@ -24,7 +24,7 @@ function AuthActions() {
     );
   return (
     <div className="flex items-center gap-2 text-sm">
-      <span className="text-[var(--text-secondary)]">{user?.displayName ?? user?.email}</span>
+      <span className="text-[var(--text-secondary)]">{user?.displayName ?? user?.email ?? user?.name}</span>
       <button
         type="button"
         onClick={() => void logout()}

@@ -4,12 +4,30 @@ import "server-only";
 // CSRF 쿠키 = dev-pullim-csrf (NOT httpOnly, Domain=.pullim.ai, SameSite=Lax) — double-submit.
 // 세션 쿠키 = dev-pullim-at(access, Max-Age 900) · dev-pullim-rt(refresh, Path=/auth).
 // CSRF 헤더 = x-csrf-token (확정). CSRF Origin 검증 = dev-api 허용 origin(dev: https://dev.pullim.ai)만 통과 — 확정.
-export const PULLIM_API_URL = process.env.PULLIM_API_URL ?? "https://dev-api.pullim.ai";
-// BFF가 dev-api로 보낼 Origin — dev-api CSRF Origin 허용목록 값(dev 확정: https://dev.pullim.ai). prod는 env로 교체.
-export const PULLIM_ORIGIN = process.env.PULLIM_ORIGIN ?? "https://dev.pullim.ai";
+// env 해석 — 프로덕션에서 미설정 시 dev 기본값으로 조용히 fallback 금지(실자격증명이 dev-api로 가는 위험).
+//   prod는 명시 설정 강제(미설정이면 throw → fail-loud). dev/test는 기본값 허용.
+function resolveEnv(name: "PULLIM_API_URL" | "PULLIM_ORIGIN", devDefault: string): string {
+  const v = process.env[name];
+  if (v) return v;
+  if (process.env.NODE_ENV === "production") throw new Error(`[pullim-auth] ${name} 미설정 — 프로덕션에서 dev 기본값 fallback 금지`);
+  return devDefault;
+}
+export function pullimApiUrl(): string { return resolveEnv("PULLIM_API_URL", "https://dev-api.pullim.ai"); }
+export function pullimOrigin(): string { return resolveEnv("PULLIM_ORIGIN", "https://dev.pullim.ai"); }
 export const COOKIE_AT = "dev-pullim-at";
 export const COOKIE_RT = "dev-pullim-rt";
+export const COOKIE_CSRF = "dev-pullim-csrf";
 export const CSRF_HEADER = "x-csrf-token"; // 라이브 실측 확정
+
+// dev-api로 전달할 쿠키 허용목록 — 우리 origin의 임의 쿠키가 외부 백엔드로 유출되지 않게 세션·CSRF만 골라 전달.
+const ALLOWED_COOKIES = [COOKIE_AT, COOKIE_RT, COOKIE_CSRF];
+export function filterCookies(cookieHeader: string | null | undefined): string {
+  if (!cookieHeader) return "";
+  return cookieHeader
+    .split(/;\s*/)
+    .filter((c) => ALLOWED_COOKIES.some((n) => c.startsWith(n + "=")))
+    .join("; ");
+}
 
 // dev-api Set-Cookie를 우리 origin용으로 재기록: Domain 제거(host-only), refresh Path /auth→/api/auth,
 //   HttpOnly·Secure·SameSite 보존(토큰 httpOnly 유지).
@@ -33,11 +51,12 @@ export async function forwardToPullim(
 ): Promise<{ status: number; body: unknown; setCookies: string[] }> {
   const headers: Record<string, string> = { accept: "application/json" };
   if (opts.jsonBody !== undefined) headers["content-type"] = "application/json";
-  if (opts.cookie) headers["cookie"] = opts.cookie;
+  const cookie = filterCookies(opts.cookie); // 세션·CSRF 쿠키만 전달(임의 쿠키 유출 방지)
+  if (cookie) headers["cookie"] = cookie;
   if (opts.csrf) headers[CSRF_HEADER] = opts.csrf;
   // dev-api CSRF Origin 검증 통과 — BFF 서버 발 요청이라 허용 origin을 명시(실측 확정값).
-  headers["origin"] = PULLIM_ORIGIN;
-  const res = await fetch(`${PULLIM_API_URL}${path}`, {
+  headers["origin"] = pullimOrigin();
+  const res = await fetch(`${pullimApiUrl()}${path}`, {
     method: opts.method ?? "GET",
     headers,
     body: opts.jsonBody !== undefined ? JSON.stringify(opts.jsonBody) : undefined,
