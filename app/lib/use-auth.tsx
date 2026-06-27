@@ -53,19 +53,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => { void refreshMe(); }, [refreshMe]);
 
   const login = useCallback(async (email: string, password: string) => {
-    // 매 시도마다 fresh CSRF 부트스트랩 — 403(토큰 만료/회전) 시 csrf 재부트스트랩 후 1회 재시도(설계 §에러처리).
+    const csrfFail = { ok: false as const, message: "보안 토큰을 받지 못했어요. 잠시 후 다시 시도해 주세요." };
+    // 매 시도마다 fresh CSRF 부트스트랩. 토큰을 못 받으면 자격증명을 보내지 않고 연결 오류로 반환(403 위장·불필요 전송 방지).
     const attempt = async () => {
       const token = await csrfToken();
+      if (!token) return null;
       return fetch("/api/auth/login", {
         method: "POST",
-        headers: { "content-type": "application/json", ...(token ? { "x-csrf-token": token } : {}) },
+        headers: { "content-type": "application/json", "x-csrf-token": token },
         body: JSON.stringify({ email, password }),
       });
     };
     // 네트워크 reject를 잡아 항상 {ok,message} 반환 — 호출부 버튼이 영구 disabled로 남지 않게.
     try {
       let r = await attempt();
-      if (r.status === 403) r = await attempt(); // CSRF 일시 실패 — 재부트스트랩 후 1회 재시도
+      if (r && r.status === 403) r = await attempt(); // CSRF 일시 실패 — 재부트스트랩 후 1회 재시도
+      if (!r) return csrfFail; // csrf 부트스트랩 자체 실패 → 자격증명 미전송, 연결 오류 안내
       if (r.ok) { await refreshMe(); return { ok: true }; }
       const j = await r.json().catch(() => ({}));
       return { ok: false, message: j?.message ?? "로그인에 실패했어요." };
@@ -75,12 +78,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refreshMe]);
 
   const logout = useCallback(async () => {
-    // 네트워크 실패해도 reject하지 않고 로컬 세션 상태는 항상 정리(자주 누르는 액션).
+    // BFF에 도달해 응답을 받았을 때만 게스트로 — BFF logout 라우트가 우리 쿠키를 항상 만료시키므로 정리 보장.
+    //   네트워크 실패(BFF 미도달)면 쿠키가 남아 새로고침 시 재인증될 수 있어, 로그아웃 성공으로 단정하지 않는다(error).
     try {
       const token = await csrfToken();
-      await fetch("/api/auth/logout", { method: "POST", headers: token ? { "x-csrf-token": token } : {} });
-    } catch { /* noop — 아래에서 상태 정리 */ }
-    setUser(null); setStatus("guest");
+      const r = await fetch("/api/auth/logout", { method: "POST", headers: token ? { "x-csrf-token": token } : {} });
+      if (r.ok) { setUser(null); setStatus("guest"); return; }
+      setStatus("error"); // BFF 비정상(드묾) — 쿠키 정리 불확실
+    } catch { setStatus("error"); } // 네트워크 실패 — 쿠키 잔존 가능, 로그아웃 성공 단정 안 함
+    return;
   }, []);
 
   return <Ctx.Provider value={{ user, status, login, logout, refreshMe }}>{children}</Ctx.Provider>;
