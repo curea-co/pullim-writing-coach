@@ -1,6 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { forwardToPullim, rewriteSetCookie, CSRF_HEADER, isInsecureRequest } from "@/app/lib/server/pullim-auth";
 
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   const { status, setCookies } = await forwardToPullim("/auth/refresh", {
     method: "POST", cookie: req.headers.get("cookie"), csrf: req.headers.get(CSRF_HEADER),

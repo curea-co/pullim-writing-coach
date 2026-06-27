@@ -70,6 +70,7 @@ export async function forwardToPullim(
     headers,
     body: opts.jsonBody !== undefined ? JSON.stringify(opts.jsonBody) : undefined,
     redirect: "manual",
+    cache: "no-store", // 인증 프록시 — Next fetch 캐시에 CSRF 토큰·타 사용자 /me 응답이 남지 않게.
   });
   // Next/undici: 다중 Set-Cookie는 getSetCookie()로 수집.
   const setCookies = typeof res.headers.getSetCookie === "function" ? res.headers.getSetCookie() : [];

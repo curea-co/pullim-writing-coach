@@ -1,6 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { forwardToPullim, rewriteSetCookie, mapLoginError, CSRF_HEADER, isInsecureRequest } from "@/app/lib/server/pullim-auth";
 
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 // email/pw 로그인 프록시. 브라우저 쿠키(CSRF 쿠키 포함)+CSRF 헤더를 dev-api로 forward, 세션 쿠키 relay.
 //   자격증명은 로깅하지 않는다.
 export async function POST(req: NextRequest) {
