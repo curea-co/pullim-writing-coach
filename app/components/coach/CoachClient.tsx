@@ -773,7 +773,9 @@ export default function CoachClient({
 
       {/* 디바이스 */}
       <div className="relative mx-auto mb-[26px] mt-[18px] w-full max-w-[432px] overflow-hidden rounded-[var(--r-xl)] border border-[var(--line)] bg-white shadow-[var(--sh-3)]">
-        <div className="relative flex h-[min(76vh,690px)] min-h-[560px] flex-col overflow-hidden bg-white">
+        {/* 모바일은 76vh가 헤더+고정 탭바 공간을 비례 확보하도록 min-h 바닥을 낮춤(440). min-h-560을 강제하면
+            짧은 폰에서 프레임이 고정 OsTabbar 영역까지 내려가 BottomSheet '봐줘' CTA가 가려짐 → 데스크톱만 560. */}
+        <div className="relative flex h-[min(76dvh,690px)] min-h-[400px] flex-col overflow-hidden bg-white md:min-h-[560px]">
           {/* 과제 헤더 */}
           <div className="border-b border-[var(--line-2)] bg-gradient-to-b from-[var(--pb-1)] to-white px-[18px] pb-[13px] pt-4">
             <div className="flex items-center gap-[11px]">
