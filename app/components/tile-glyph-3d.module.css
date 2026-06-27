@@ -30,4 +30,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .glyph { transition: none; transform: none; }
+  /* 호버 규칙(.group:hover .glyph)이 specificity가 더 높아 reduced-motion에서도 적용되므로 동일 셀렉터로 무력화. */
+  :global(.group):hover .glyph { transform: none; }
 }
