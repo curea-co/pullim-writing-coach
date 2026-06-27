@@ -1,6 +1,7 @@
 import Link from "next/link";
 import HomeWelcomeBanner from "./components/HomeWelcomeBanner";
 import HeroMotion3D from "./components/HeroMotion3D";
+import TileGlyph3D from "./components/TileGlyph3D";
 import { ServiceHero } from "@/components/ui/service-hero";
 import { ServiceIcon } from "@/components/ui/service-icon";
 import { SectionHead } from "@/components/ui/section-head";
@@ -52,22 +53,26 @@ const TILES = [
     description: "글 붙여넣고 1분 안에 5영역 채점·첨삭",
     href: "/try",
     cta: "실시간",
+    glyph: "✍️",
   },
   {
     title: "과정 코치",
     description: "개요→본문 단계별 코칭",
     href: "/coach",
     cta: "베타",
+    glyph: "🧭",
   },
   {
     title: "샘플 채점 결과",
     description: "점수대 5케이스 미리보기",
     href: "/samples",
+    glyph: "📊",
   },
   {
     title: "채점 결과 조회",
     description: "저장된 채점 결과 다시 보기",
     href: "/results",
+    glyph: "🗂️",
   },
 ];
 
@@ -104,6 +109,7 @@ export default function Home() {
             description={tile.description}
             href={tile.href}
             cta={tile.cta}
+            glyph={<TileGlyph3D glyph={tile.glyph} />}
           />
         ))}
       </div>
