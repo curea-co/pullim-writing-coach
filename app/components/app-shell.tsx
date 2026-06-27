@@ -12,7 +12,11 @@ import { AuthProvider, useAuth } from "@/app/lib/use-auth";
 
 function AuthActions() {
   const { status, user, logout } = useAuth();
-  if (status !== "authed")
+  // guest만 로그인 링크. loading은 표시 없음(깜빡임 방지), error(인증서버 장애)는 로그아웃처럼 보이지 않게 중립 표시.
+  if (status === "loading") return null;
+  if (status === "error")
+    return <span className="text-[var(--text-tertiary)] text-sm" title="인증 서버 연결 오류 — 잠시 후 다시 시도해 주세요">연결 오류</span>;
+  if (status === "guest")
     return (
       <Link href="/login" className="text-sm font-semibold text-[var(--color-action-primary)]">
         로그인

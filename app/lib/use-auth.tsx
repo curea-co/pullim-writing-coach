@@ -28,25 +28,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (first.ok && isUser(first.j)) { setUser(first.j); setStatus("authed"); return; }
     if (!first.ok) { setUser(null); setStatus("error"); return; } // 5xx/네트워크 — 게스트로 단정·은폐하지 않음
     // 200 + 게스트 body(논리적 미인증) → access 만료 가능 → refresh 회전 후 1회 재시도.
+    //   refresh가 401/403이면 진짜 로그아웃(→guest), 5xx/네트워크면 장애(→error, 게스트 단정·은폐 안 함).
     try {
       const token = await csrfToken();
       const rr = await fetch("/api/auth/refresh", { method: "POST", headers: token ? { "x-csrf-token": token } : {} });
-      if (rr.ok) { const retry = await fetchMe(); if (retry.ok && isUser(retry.j)) { setUser(retry.j); setStatus("authed"); return; } }
-    } catch { /* noop */ }
+      if (rr.ok) {
+        const retry = await fetchMe();
+        if (retry.ok && isUser(retry.j)) { setUser(retry.j); setStatus("authed"); return; }
+        if (!retry.ok) { setUser(null); setStatus("error"); return; } // 재조회 장애
+        // retry 200 + 게스트 → 진짜 로그아웃 → 아래 guest
+      } else if (rr.status !== 401 && rr.status !== 403) {
+        setUser(null); setStatus("error"); return; // refresh 5xx 등 → 장애
+      }
+      // rr 401/403 → 진짜 로그아웃 → 아래 guest
+    } catch { setUser(null); setStatus("error"); return; } // 네트워크 → 장애
     setUser(null); setStatus("guest");
   }, []);
 
   useEffect(() => { void refreshMe(); }, [refreshMe]);
 
   const login = useCallback(async (email: string, password: string) => {
-    // 네트워크 reject를 잡아 항상 {ok,message} 반환 — 호출부 버튼이 영구 disabled로 남지 않게.
-    try {
+    // 매 시도마다 fresh CSRF 부트스트랩 — 403(토큰 만료/회전) 시 csrf 재부트스트랩 후 1회 재시도(설계 §에러처리).
+    const attempt = async () => {
       const token = await csrfToken();
-      const r = await fetch("/api/auth/login", {
+      return fetch("/api/auth/login", {
         method: "POST",
         headers: { "content-type": "application/json", ...(token ? { "x-csrf-token": token } : {}) },
         body: JSON.stringify({ email, password }),
       });
+    };
+    // 네트워크 reject를 잡아 항상 {ok,message} 반환 — 호출부 버튼이 영구 disabled로 남지 않게.
+    try {
+      let r = await attempt();
+      if (r.status === 403) r = await attempt(); // CSRF 일시 실패 — 재부트스트랩 후 1회 재시도
       if (r.ok) { await refreshMe(); return { ok: true }; }
       const j = await r.json().catch(() => ({}));
       return { ok: false, message: j?.message ?? "로그인에 실패했어요." };
