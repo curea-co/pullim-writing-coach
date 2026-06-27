@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { forwardToPullim, rewriteSetCookie, mapLoginError, CSRF_HEADER } from "@/app/lib/server/pullim-auth";
+import { forwardToPullim, rewriteSetCookie, mapLoginError, CSRF_HEADER, isInsecureRequest } from "@/app/lib/server/pullim-auth";
 
 // email/pw 로그인 프록시. 브라우저 쿠키(CSRF 쿠키 포함)+CSRF 헤더를 dev-api로 forward, 세션 쿠키 relay.
 //   자격증명은 로깅하지 않는다.
@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
   });
   if (status >= 400) return NextResponse.json({ message: mapLoginError(status) }, { status });
   const res = NextResponse.json({ ok: true }, { status: 200 });
-  for (const c of setCookies) res.headers.append("set-cookie", rewriteSetCookie(c));
+  const insecure = isInsecureRequest(req);
+  for (const c of setCookies) res.headers.append("set-cookie", rewriteSetCookie(c, { insecure }));
   return res;
 }

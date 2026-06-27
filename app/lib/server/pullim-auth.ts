@@ -31,10 +31,19 @@ export function filterCookies(cookieHeader: string | null | undefined): string {
 
 // dev-api Set-Cookie를 우리 origin용으로 재기록: Domain 제거(host-only), refresh Path /auth→/api/auth,
 //   HttpOnly·Secure·SameSite 보존(토큰 httpOnly 유지).
-export function rewriteSetCookie(line: string): string {
+export function rewriteSetCookie(line: string, opts: { insecure?: boolean } = {}): string {
   let out = line.replace(/;\s*Domain=[^;]*/i, "");
   out = out.replace(/;\s*Path=\/auth\b/i, "; Path=/api/auth");
+  // 비프로덕션 HTTP origin(localhost 외 HTTP dev 포함)에서는 Secure를 제거해 쿠키가 저장되게.
+  if (opts.insecure) out = out.replace(/;\s*Secure\b/i, "");
   return out;
+}
+
+// 현재 요청이 비프로덕션 + HTTP origin인지 — 그렇다면 relay 쿠키에서 Secure를 떼야 브라우저가 저장한다.
+export function isInsecureRequest(req: { url: string; headers: { get(name: string): string | null } }): boolean {
+  if (process.env.NODE_ENV === "production") return false;
+  const proto = req.headers.get("x-forwarded-proto") ?? new URL(req.url).protocol.replace(/:$/, "");
+  return proto === "http";
 }
 
 export function mapLoginError(status: number): string {
