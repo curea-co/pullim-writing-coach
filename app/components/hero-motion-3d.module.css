@@ -17,8 +17,8 @@
 /* 시트 묶음 — 전체가 천천히 좌우로 기울며(rotateY) 살짝 끄덕(rotateX). */
 .stack {
   position: relative;
-  width: clamp(120px, 30vw, 240px);
-  height: clamp(150px, 34vw, 280px);
+  width: clamp(82px, 19vw, 156px);
+  height: clamp(104px, 22vw, 190px);
   transform-style: preserve-3d;
   animation: heroTilt 9s ease-in-out infinite;
   will-change: transform;
