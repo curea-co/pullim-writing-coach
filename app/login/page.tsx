@@ -14,10 +14,13 @@ export default function LoginPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true); setError(null);
-    const r = await login(email, password);
-    setBusy(false);
-    if (r.ok) router.push("/");
-    else setError(r.message ?? "로그인에 실패했어요.");
+    try {
+      const r = await login(email, password);
+      if (r.ok) router.push("/");
+      else setError(r.message ?? "로그인에 실패했어요.");
+    } finally {
+      setBusy(false); // 예외/네트워크 실패에도 버튼이 영구 disabled로 남지 않게.
+    }
   };
 
   return (

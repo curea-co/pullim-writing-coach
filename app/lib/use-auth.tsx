@@ -2,7 +2,8 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
 type User = { email?: string; displayName?: string; name?: string };
-type Status = "loading" | "authed" | "guest";
+// error = /me가 5xx/네트워크 실패 — 게스트로 단정하지 않음(인증서버 장애를 로그아웃으로 은폐하지 않기 위함).
+type Status = "loading" | "authed" | "guest" | "error";
 type AuthCtx = { user: User | null; status: Status; login: (email: string, password: string) => Promise<{ ok: boolean; message?: string }>; logout: () => Promise<void>; refreshMe: () => Promise<void> };
 
 const Ctx = createContext<AuthCtx | null>(null);
@@ -18,16 +19,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshMe = useCallback(async () => {
     const isUser = (j: { authenticated?: boolean; email?: string; displayName?: string } | null) =>
       !!j && j.authenticated !== false && !!(j.email || j.displayName);
+    // me 라우트: 200(사용자|authenticated:false) · 5xx는 그대로 전달. r.ok로 게스트(논리적)와 장애(5xx)를 구분.
     const fetchMe = async () => {
-      try { const r = await fetch("/api/auth/me"); return await r.json().catch(() => null); } catch { return null; }
+      try { const r = await fetch("/api/auth/me"); return { ok: r.ok, j: (await r.json().catch(() => null)) as { authenticated?: boolean; email?: string; displayName?: string } | null }; }
+      catch { return { ok: false, j: null }; }
     };
-    let j = await fetchMe();
-    if (isUser(j)) { setUser(j); setStatus("authed"); return; }
-    // /me가 게스트(access 만료 가능) → refresh 회전 후 1회 재시도(refresh cookie 없으면 빠르게 401).
+    const first = await fetchMe();
+    if (first.ok && isUser(first.j)) { setUser(first.j); setStatus("authed"); return; }
+    if (!first.ok) { setUser(null); setStatus("error"); return; } // 5xx/네트워크 — 게스트로 단정·은폐하지 않음
+    // 200 + 게스트 body(논리적 미인증) → access 만료 가능 → refresh 회전 후 1회 재시도.
     try {
       const token = await csrfToken();
       const rr = await fetch("/api/auth/refresh", { method: "POST", headers: token ? { "x-csrf-token": token } : {} });
-      if (rr.ok) { j = await fetchMe(); if (isUser(j)) { setUser(j); setStatus("authed"); return; } }
+      if (rr.ok) { const retry = await fetchMe(); if (retry.ok && isUser(retry.j)) { setUser(retry.j); setStatus("authed"); return; } }
     } catch { /* noop */ }
     setUser(null); setStatus("guest");
   }, []);
@@ -35,20 +39,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => { void refreshMe(); }, [refreshMe]);
 
   const login = useCallback(async (email: string, password: string) => {
-    const token = await csrfToken();
-    const r = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "content-type": "application/json", ...(token ? { "x-csrf-token": token } : {}) },
-      body: JSON.stringify({ email, password }),
-    });
-    if (r.ok) { await refreshMe(); return { ok: true }; }
-    const j = await r.json().catch(() => ({}));
-    return { ok: false, message: j?.message ?? "로그인에 실패했어요." };
+    // 네트워크 reject를 잡아 항상 {ok,message} 반환 — 호출부 버튼이 영구 disabled로 남지 않게.
+    try {
+      const token = await csrfToken();
+      const r = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json", ...(token ? { "x-csrf-token": token } : {}) },
+        body: JSON.stringify({ email, password }),
+      });
+      if (r.ok) { await refreshMe(); return { ok: true }; }
+      const j = await r.json().catch(() => ({}));
+      return { ok: false, message: j?.message ?? "로그인에 실패했어요." };
+    } catch {
+      return { ok: false, message: "네트워크 오류로 로그인하지 못했어요. 잠시 후 다시 시도해 주세요." };
+    }
   }, [refreshMe]);
 
   const logout = useCallback(async () => {
-    const token = await csrfToken();
-    await fetch("/api/auth/logout", { method: "POST", headers: token ? { "x-csrf-token": token } : {} });
+    // 네트워크 실패해도 reject하지 않고 로컬 세션 상태는 항상 정리(자주 누르는 액션).
+    try {
+      const token = await csrfToken();
+      await fetch("/api/auth/logout", { method: "POST", headers: token ? { "x-csrf-token": token } : {} });
+    } catch { /* noop — 아래에서 상태 정리 */ }
     setUser(null); setStatus("guest");
   }, []);
 
