@@ -132,7 +132,9 @@ export default function AboutPage() {
           <li><strong className="text-foreground">표현·문장</strong> — 문장 호흡·어휘·맞춤법·표현 다양성이 적절한가</li>
           <li><strong className="text-foreground">성장 가능성</strong> — 한 번의 수정으로 완성도가 오를 수 있는 상태인가</li>
         </ul>
-        <p className="text-subtle-foreground mt-3 text-sm">각 영역 0~20점, 총 100점. 색상: 0~9 주의 / 10~14 보통 / 15~20 양호.</p>
+        <p className="text-subtle-foreground mt-3 text-sm">
+          각 영역 0~20점, 총 100점. 구간: 18~20 우수 · 15~17 양호 · 10~14 보통 · 5~9 미흡 · 0~4 매우 미흡.
+        </p>
       </Section>
 
       <Section title="데이터는 어떻게 다뤄지나요?">
