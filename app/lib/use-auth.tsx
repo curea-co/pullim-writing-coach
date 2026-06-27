@@ -34,7 +34,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     //   refresh가 401/403이면 진짜 로그아웃(→guest), 5xx/네트워크면 장애(→error, 게스트 단정·은폐 안 함).
     try {
       const token = await csrfToken();
-      const rr = await fetch("/api/auth/refresh", { method: "POST", headers: token ? { "x-csrf-token": token } : {} });
+      // csrf 부트스트랩 실패 → 유효한 refresh 불가 → 게스트로 단정 못 함(일시 장애 → error).
+      if (!token) { setUser(null); setStatus("error"); return; }
+      const rr = await fetch("/api/auth/refresh", { method: "POST", headers: { "x-csrf-token": token } });
       if (rr.ok) {
         const retry = await fetchMe();
         if (retry.ok && isUser(retry.j)) { setUser(retry.j); setStatus("authed"); return; }

@@ -1,11 +1,13 @@
 "use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/app/lib/use-auth";
+import { safeReturnTo } from "@/app/lib/safe-return-to";
 
-export default function LoginPage() {
+function LoginForm() {
   const { login } = useAuth();
   const router = useRouter();
+  const params = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -16,7 +18,7 @@ export default function LoginPage() {
     setBusy(true); setError(null);
     try {
       const r = await login(email, password);
-      if (r.ok) router.push("/");
+      if (r.ok) router.push(safeReturnTo(params.get("returnTo"))); // same-origin returnTo(또는 홈)
       else setError(r.message ?? "로그인에 실패했어요.");
     } finally {
       setBusy(false); // 예외/네트워크 실패에도 버튼이 영구 disabled로 남지 않게.
@@ -44,5 +46,14 @@ export default function LoginPage() {
         </button>
       </form>
     </main>
+  );
+}
+
+// useSearchParams는 Suspense 경계가 필요(Next 정적분석) — 폼을 Suspense로 감싼다.
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

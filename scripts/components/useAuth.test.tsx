@@ -16,10 +16,24 @@ it("me name만 있어도 authed (email·displayName 없음)", async () => {
   render(<AuthProvider><Probe /></AuthProvider>);
   await waitFor(() => expect(screen.getByText(/^authed:/)).toBeInTheDocument());
 });
-it("me authenticated=false → guest", async () => {
-  (globalThis.fetch as any).mockResolvedValue({ ok: true, json: async () => ({ authenticated: false }) });
+it("me authenticated=false → (csrf ok·refresh 401=진짜 로그아웃) → guest", async () => {
+  (globalThis.fetch as any).mockImplementation((url: string) => {
+    if (String(url).includes("/api/auth/me")) return Promise.resolve({ ok: true, json: async () => ({ authenticated: false }) });
+    if (String(url).includes("/api/auth/csrf")) return Promise.resolve({ ok: true, json: async () => ({ csrfToken: "t" }) });
+    if (String(url).includes("/api/auth/refresh")) return Promise.resolve({ ok: false, status: 401, json: async () => ({}) }); // rt 없음 → 진짜 로그아웃
+    return Promise.resolve({ ok: true, json: async () => ({}) });
+  });
   render(<AuthProvider><Probe /></AuthProvider>);
   await waitFor(() => expect(screen.getByText(/guest:-/)).toBeInTheDocument());
+});
+it("me 게스트 → csrf 실패(토큰 없음) → error (게스트로 단정 안 함)", async () => {
+  (globalThis.fetch as any).mockImplementation((url: string) => {
+    if (String(url).includes("/api/auth/me")) return Promise.resolve({ ok: true, json: async () => ({ authenticated: false }) });
+    if (String(url).includes("/api/auth/csrf")) return Promise.resolve({ ok: false, status: 500, json: async () => ({}) }); // csrf 장애 → 토큰 없음
+    return Promise.resolve({ ok: true, json: async () => ({}) });
+  });
+  render(<AuthProvider><Probe /></AuthProvider>);
+  await waitFor(() => expect(screen.getByText(/^error:-/)).toBeInTheDocument());
 });
 it("me 게스트(200) → refresh 성공 → 재시도 me authed (세션 복구)", async () => {
   let meCall = 0;
