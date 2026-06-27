@@ -1,35 +1,33 @@
-/* 바로시작 타일용 순수 CSS 3D 아이콘 — 의존성 0. 46×46 배지 안에서 글리프가 원근으로 떠 기울고,
-   타일(.group) 호버 시 정면으로 돌며 살짝 솟는다. GPU transform만, reduced-motion 시 정지. */
+/* 바로시작 타일 라인 아이콘의 절제된 3D — 의존성 0. 정적은 살짝 기운 평면, 타일(.group) 호버 시 정면으로
+   돌며 앞으로 솟는다(깊이감). 모던하게 상시 부유는 제거하고 호버 마이크로 인터랙션만. reduced-motion 정지. */
 
 .wrap {
   display: grid;
   place-items: center;
   width: 100%;
   height: 100%;
-  perspective: 240px;
+  perspective: 360px;
 }
 
 .glyph {
-  font-size: 23px;
-  line-height: 1;
-  transform-style: preserve-3d;
-  transform: rotateX(14deg) rotateY(-16deg) translateZ(0);
+  display: grid;
+  place-items: center;
+  transform: rotateY(-10deg);
   transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
-  animation: tileFloat 5s ease-in-out infinite;
-  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.4));
   will-change: transform;
 }
 
-/* Tailwind의 group 마커(.group) 호버에 반응 — 글리프가 정면 쪽으로 회전 + 앞으로 솟음. */
-:global(.group):hover .glyph {
-  transform: rotateX(2deg) rotateY(18deg) translateZ(12px) scale(1.1);
+.glyph svg {
+  display: block;
+  width: 24px;
+  height: 24px;
 }
 
-@keyframes tileFloat {
-  0%, 100% { translate: 0 0; }
-  50% { translate: 0 -3px; }
+/* Tailwind group 마커(.group) 호버 — 정면으로 돌며 앞으로 솟음(깊이). */
+:global(.group):hover .glyph {
+  transform: rotateY(8deg) translateZ(10px) scale(1.06);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .glyph { animation: none; transform: rotateX(8deg) rotateY(-10deg); }
+  .glyph { transition: none; transform: none; }
 }
