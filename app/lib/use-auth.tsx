@@ -9,7 +9,8 @@ type AuthCtx = { user: User | null; status: Status; login: (email: string, passw
 const Ctx = createContext<AuthCtx | null>(null);
 
 async function csrfToken(): Promise<string | undefined> {
-  try { const r = await fetch("/api/auth/csrf"); const j = await r.json(); return j?.csrfToken ?? j?.token; } catch { return undefined; }
+  // no-store — 매 시도 fresh CSRF(캐시된 응답 재사용 시 403 재시도가 같은 stale 토큰을 보내 영구 실패).
+  try { const r = await fetch("/api/auth/csrf", { cache: "no-store" }); const j = await r.json(); return j?.csrfToken ?? j?.token; } catch { return undefined; }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -17,11 +18,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
 
   const refreshMe = useCallback(async () => {
-    const isUser = (j: { authenticated?: boolean; email?: string; displayName?: string } | null) =>
-      !!j && j.authenticated !== false && !!(j.email || j.displayName);
+    // name만 내려오는 정상 응답({authenticated:true, name})도 사용자로 인정(설계상 /me는 email·displayName·name).
+    const isUser = (j: { authenticated?: boolean; email?: string; displayName?: string; name?: string } | null) =>
+      !!j && j.authenticated !== false && !!(j.email || j.displayName || j.name);
     // me 라우트: 200(사용자|authenticated:false) · 5xx는 그대로 전달. r.ok로 게스트(논리적)와 장애(5xx)를 구분.
+    //   no-store — 로그인/로그아웃 직후 stale 응답에 상태가 묶이지 않게.
     const fetchMe = async () => {
-      try { const r = await fetch("/api/auth/me"); return { ok: r.ok, j: (await r.json().catch(() => null)) as { authenticated?: boolean; email?: string; displayName?: string } | null }; }
+      try { const r = await fetch("/api/auth/me", { cache: "no-store" }); return { ok: r.ok, j: (await r.json().catch(() => null)) as { authenticated?: boolean; email?: string; displayName?: string; name?: string } | null }; }
       catch { return { ok: false, j: null }; }
     };
     const first = await fetchMe();
