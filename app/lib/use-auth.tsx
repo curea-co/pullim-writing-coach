@@ -16,12 +16,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
 
   const refreshMe = useCallback(async () => {
+    const isUser = (j: { authenticated?: boolean; email?: string; displayName?: string } | null) =>
+      !!j && j.authenticated !== false && !!(j.email || j.displayName);
+    const fetchMe = async () => {
+      try { const r = await fetch("/api/auth/me"); return await r.json().catch(() => null); } catch { return null; }
+    };
+    let j = await fetchMe();
+    if (isUser(j)) { setUser(j); setStatus("authed"); return; }
+    // /me가 게스트(access 만료 가능) → refresh 회전 후 1회 재시도(refresh cookie 없으면 빠르게 401).
     try {
-      const r = await fetch("/api/auth/me");
-      const j = await r.json();
-      if (j && j.authenticated !== false && (j.email || j.displayName)) { setUser(j); setStatus("authed"); }
-      else { setUser(null); setStatus("guest"); }
-    } catch { setUser(null); setStatus("guest"); }
+      const token = await csrfToken();
+      const rr = await fetch("/api/auth/refresh", { method: "POST", headers: token ? { "x-csrf-token": token } : {} });
+      if (rr.ok) { j = await fetchMe(); if (isUser(j)) { setUser(j); setStatus("authed"); return; } }
+    } catch { /* noop */ }
+    setUser(null); setStatus("guest");
   }, []);
 
   useEffect(() => { void refreshMe(); }, [refreshMe]);
