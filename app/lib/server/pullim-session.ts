@@ -87,3 +87,40 @@ export async function verifyWritingAccess(req: Request): Promise<boolean> {
   }
   return false;
 }
+
+/**
+ * 세션 sub(/me) 획득 — 계정 데이터 store의 안정 신원 키.
+ *  1) access 쿠키 있으면 {API}/me 를 cookie relay + redirect:manual + no-store 로 호출.
+ *     200 이고 본문에 sub(string)가 있으면 sub 반환.
+ *  2) /me 비200·sub 없음·fetch 실패·쿠키 없음:
+ *     - 비production: 데모토큰 일치 시 DEMO_SESSION_SUB(기본 "demo-sub") — 로컬 e2e 안정 키.
+ *     - production: null (fail-closed, 데모 fallback 없음).
+ *  자격증명/토큰/쿠키값은 로깅하지 않는다.
+ */
+export async function getSessionSub(req: Request): Promise<string | null> {
+  const cookieHeader = req.headers.get("cookie");
+
+  if (hasAccessCookie(cookieHeader)) {
+    try {
+      const origin = req.headers.get("origin") ?? process.env.NEXT_PUBLIC_WEB_URL ?? "";
+      const res = await fetch(`${apiBase()}/me`, {
+        headers: { cookie: cookieHeader as string, ...(origin ? { origin } : {}) },
+        cache: "no-store",
+        redirect: "manual",
+      });
+      if (res.status === 200) {
+        const body = (await res.json().catch(() => null)) as { sub?: unknown } | null;
+        if (body && typeof body.sub === "string" && body.sub.length > 0) return body.sub;
+        // 200이지만 sub 없음 — 사실만 로깅(값 금지). null로 낙하.
+        console.warn("[pullim-session] /me 200 but sub 미반환 — 계정 store 비활성");
+      }
+    } catch {
+      // 네트워크/CORS 실패 → fallback/거부로 낙하(자격증명 로깅 금지).
+    }
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    if (demoTokenAuthorized(req)) return process.env.DEMO_SESSION_SUB ?? "demo-sub";
+  }
+  return null;
+}
