@@ -137,35 +137,38 @@ describe("useScoreForm", () => {
     expect(result.current.submitState.phase).toBe("idle");
   });
 
-  it("draft in LS → restoredDraft set on mount, body stays empty", () => {
+  it("draft in LS → restoredDraft set on mount, body stays empty", async () => {
     localStorage.setItem("pwc_draft_v1", JSON.stringify({
       body: "이전에 작성한 글입니다. 충분히 길어요.", school_level: "중2",
       subject: "국어", genre: "논설문·주장하는 글", saved_at: "2026-06-02T10:00:00+09:00"
     }));
     const { result } = renderHook(() => useScoreForm({}));
-    expect(result.current.restoredDraft).not.toBeNull();
+    // loadDraft가 async — 복원은 마운트 effect 완료 후.
+    await waitFor(() => expect(result.current.restoredDraft).not.toBeNull());
     expect(result.current.body).toBe("");
   });
 
-  it("applyRestore → body filled, restoredDraft null", () => {
+  it("applyRestore → body filled, restoredDraft null", async () => {
     const draftBody = "이전에 작성한 글입니다. 충분히 길어요.";
     localStorage.setItem("pwc_draft_v1", JSON.stringify({
       body: draftBody, saved_at: "2026-06-02T10:00:00+09:00"
     }));
     const { result } = renderHook(() => useScoreForm({}));
+    await waitFor(() => expect(result.current.restoredDraft).not.toBeNull());
     act(() => { result.current.applyRestore(); });
     expect(result.current.body).toBe(draftBody);
     expect(result.current.restoredDraft).toBeNull();
   });
 
-  it("dismissRestore → restoredDraft null, LS cleared", () => {
+  it("dismissRestore → restoredDraft null, LS cleared", async () => {
     localStorage.setItem("pwc_draft_v1", JSON.stringify({
       body: "이전 글.", saved_at: "2026-06-02T10:00:00+09:00"
     }));
     const { result } = renderHook(() => useScoreForm({}));
+    await waitFor(() => expect(result.current.restoredDraft).not.toBeNull());
     act(() => { result.current.dismissRestore(); });
     expect(result.current.restoredDraft).toBeNull();
-    expect(localStorage.getItem("pwc_draft_v1")).toBeNull();
+    await waitFor(() => expect(localStorage.getItem("pwc_draft_v1")).toBeNull());
   });
 
   it("retryable error → retry() re-calls fetch with same payload", async () => {

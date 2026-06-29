@@ -12,7 +12,14 @@ export default function HomeWelcomeBanner() {
   const [profile, setProfile] = useState<Profile | null | "loading">("loading");
 
   useEffect(() => {
-    setProfile(loadProfile());
+    let alive = true;
+    void (async () => {
+      const p = await loadProfile();
+      if (alive) setProfile(p);
+    })();
+    return () => {
+      alive = false;
+    };
   }, []);
 
   if (profile === "loading") {

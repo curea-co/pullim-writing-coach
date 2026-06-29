@@ -27,7 +27,14 @@ export default function MetaUsageCard() {
   const [usage, setUsage] = useState<MetaUsage | null>(null);
 
   useEffect(() => {
-    setUsage(loadValidatedMetaUsage());
+    let alive = true;
+    void (async () => {
+      const u = await loadValidatedMetaUsage();
+      if (alive) setUsage(u);
+    })();
+    return () => {
+      alive = false;
+    };
   }, []);
 
   // 마운트 전(SSR snapshot)에는 안 그림 — hydration mismatch 방지.

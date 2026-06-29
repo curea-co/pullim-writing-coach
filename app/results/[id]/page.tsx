@@ -24,13 +24,20 @@ export default function ResultDetailPage({
   const [entry, setEntry] = useState<ResultEntry | null>(null);
 
   useEffect(() => {
-    const r = getResult(id);
-    if (r) {
-      setEntry(r);
-      setState("loaded");
-    } else {
-      setState("missing");
-    }
+    let alive = true;
+    void (async () => {
+      const r = await getResult(id);
+      if (!alive) return;
+      if (r) {
+        setEntry(r);
+        setState("loaded");
+      } else {
+        setState("missing");
+      }
+    })();
+    return () => {
+      alive = false;
+    };
   }, [id]);
 
   if (state === "loading") {

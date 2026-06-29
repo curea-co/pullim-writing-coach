@@ -50,12 +50,19 @@ function OnboardingInner() {
       setCheckedProfile(true);
       return;
     }
-    const profile = loadProfile();
-    if (profile) {
-      router.replace("/");
-      return;
-    }
-    setCheckedProfile(true);
+    let alive = true;
+    void (async () => {
+      const profile = await loadProfile();
+      if (!alive) return;
+      if (profile) {
+        router.replace("/");
+        return;
+      }
+      setCheckedProfile(true);
+    })();
+    return () => {
+      alive = false;
+    };
   }, [force, router]);
 
   // 프로필 체크 전엔 빈 화면(깜박임 방지) — 짧은 시간이라 스피너 생략.
@@ -66,7 +73,7 @@ function OnboardingInner() {
 
   // Step2 onSubmit — 검증은 ProfileForm 안에서, 여기는 저장+다음 단계 진행.
   //   consentAccepted=true(ProfileForm이 서비스 동의 체크 강제) → 서비스 동의 타임스탬프 기록.
-  const handleProfileSubmit = (draft: ProfileDraft, consentAccepted: boolean) => {
+  const handleProfileSubmit = async (draft: ProfileDraft, consentAccepted: boolean) => {
     // ProfileForm 검증 통과 = 필수 필드 있음. 그래도 type narrowing 위해 가드.
     if (!draft.school_level || !draft.primary_subject || !draft.nickname?.trim()) return;
     if (draft.primary_subject === "기타" && !draft.primary_subject_other?.trim()) return;
@@ -82,12 +89,12 @@ function OnboardingInner() {
       frequent_genre: draft.frequent_genre || undefined,
       consent_at: now,
     };
-    const result = saveProfile(profile);
+    const result = await saveProfile(profile);
     if (result.ok) {
       // 서비스 동의 영속(타임스탬프 주입). 보호자 동의·AI 학습 옵트인은 Step3에서 분기 처리.
       //   기존 consent 로드 후 서비스 동의만 갱신(가산적) — AI 옵트인 등 다른 필드 보존.
-      const base = loadConsent();
-      saveConsent(setServiceConsent(base, consentAccepted, now));
+      const base = await loadConsent();
+      await saveConsent(setServiceConsent(base, consentAccepted, now));
       setSavedProfile(profile);
       next();
     } else {
@@ -289,15 +296,33 @@ function Step3({ profile }: { profile: Profile | null }) {
   const [consent, setConsent] = useState<ConsentState>(emptyConsent());
 
   useEffect(() => {
-    setConsent(loadConsent());
+    let alive = true;
+    void (async () => {
+      const c = await loadConsent();
+      if (alive) setConsent(c);
+    })();
+    return () => {
+      alive = false;
+    };
   }, []);
 
   // 만약 어떤 이유로 step3에 왔는데 profile이 없으면 안전상 step1로 돌아감.
+  const [hasProfile, setHasProfile] = useState<boolean | null>(null);
   useEffect(() => {
-    if (!profile && !loadProfile()) {
+    let alive = true;
+    void (async () => {
+      const has = !!(await loadProfile());
+      if (alive) setHasProfile(has);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (!profile && hasProfile === false) {
       router.replace("/onboarding");
     }
-  }, [profile, router]);
+  }, [profile, hasProfile, router]);
 
   const guardianTrack = needsGuardianConsent(schoolLevel);
   const stillRequired = useMemo(
@@ -306,18 +331,18 @@ function Step3({ profile }: { profile: Profile | null }) {
   );
   const ready = canUseService(consent, schoolLevel);
 
-  // 보호자 동의 토글 — 타임스탬프 주입 + LS 영속(가산적).
+  // 보호자 동의 토글 — 타임스탬프 주입 + 영속(가산적). 낙관적 set 후 저장.
   const handleGuardianChange = (accepted: boolean) => {
     const nextState = setGuardianConsent(consent, accepted, consentNow());
     setConsent(nextState);
-    saveConsent(nextState);
+    void saveConsent(nextState);
   };
 
   // AI 학습 별도 옵트인 토글 — 기본 OFF, 철회 시 null로 되돌림(불변식).
   const handleAiTrainingChange = (accepted: boolean) => {
     const nextState = setAiTrainingOptIn(consent, accepted, consentNow());
     setConsent(nextState);
-    saveConsent(nextState);
+    void saveConsent(nextState);
   };
 
   const go = (path: string) => {
