@@ -12,7 +12,16 @@ type AuthCtx = { user: User | null; status: Status; refresh: () => Promise<void>
 const Ctx = createContext<AuthCtx | null>(null);
 
 // 인증 API 호스트 — local=http://api.pullim.local:3000 · dev=https://dev-api.pullim.ai · prod=https://api.pullim.ai.
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "https://dev-api.pullim.ai").replace(/\/$/, "");
+// 인증 API 호스트. 프로덕션은 NEXT_PUBLIC_API_URL 필수 — 미설정 시 dev로 fallback하면 운영 트래픽이
+//   dev-api로 새므로 fail-loud(throw). dev/local만 기본값 허용.
+const API_BASE = ((): string => {
+  const v = process.env.NEXT_PUBLIC_API_URL;
+  if (v) return v.replace(/\/$/, "");
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("[use-auth] NEXT_PUBLIC_API_URL 미설정 — 프로덕션에서 dev fallback 금지(빌드 env 설정 필수)");
+  }
+  return "https://dev-api.pullim.ai";
+})();
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
