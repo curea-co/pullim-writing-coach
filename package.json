@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --port 3008",
     "build": "next build",
-    "start": "next start",
+    "start": "next start --port 3008",
     "lint": "eslint",
     "test:unit": "node --import ./scripts/register-ts.mjs --test scripts/*.test.mjs",
     "test:components": "vitest run --config vitest.config.ts",

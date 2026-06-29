@@ -46,3 +46,7 @@ next-env.d.ts
 
 .vercel
 .gstack/
+
+# scratch / tooling artifacts
+.playwright-mcp/
+.claude/worktrees/
