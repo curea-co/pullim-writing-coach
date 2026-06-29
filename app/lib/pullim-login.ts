@@ -13,7 +13,17 @@ export function loginUrl(returnTo?: string): string {
   return withRedirect("/login", returnTo, () => (typeof window !== "undefined" ? window.location.href : "/"));
 }
 
+// 회원가입 페이지 URL(pullim-web). 로그인과 동형.
+export function signupUrl(returnTo?: string): string {
+  return withRedirect("/signup", returnTo, () => (typeof window !== "undefined" ? window.location.href : "/"));
+}
+
 // 로그아웃 URL. 공유 세션 쿠키는 중앙(web/api)만 정리 가능하므로 중앙으로 보낸다.
 export function logoutUrl(returnTo?: string): string {
   return withRedirect("/logout", returnTo, () => (typeof window !== "undefined" ? window.location.origin : "/"));
+}
+
+// 풀림 OS 허브 — 앱런처 목적지. local = http://os.pullim.local:3001 · prod = https://os.pullim.ai.
+export function osHubUrl(): string {
+  return (process.env.NEXT_PUBLIC_OS_URL ?? "https://os.pullim.ai").replace(/\/$/, "") + "/";
 }
