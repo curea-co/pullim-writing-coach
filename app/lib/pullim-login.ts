@@ -1,21 +1,19 @@
-// 중앙 로그인(SSO) 진입 URL — pullim SoT(api.md §1·config-catalog §2).
-//   미인증 진입은 LOGIN_HOST + `?next=<돌아올 URL>` 로 리다이렉트한다. apex `pullim.ai` 는 인증쿠키
-//   미발급 호스트(ADR-010)라 제외 — 반드시 os 호스트를 쓴다:
-//     local = http://os.pullim.local:<os-port> · dev = https://dev-os.pullim.ai · prod = https://os.pullim.ai
-//   base 는 환경마다 다르므로 빌드타임 public env 로 주입(미설정 시 dev 호스트 기본).
-const LOGIN_BASE = (process.env.NEXT_PUBLIC_LOGIN_BASE ?? "https://dev-os.pullim.ai").replace(/\/$/, "");
+// 로그인/로그아웃 UI는 pullim-web(apex)이 서빙 — 로컬 SSO 런북(pullim-web docs/common/2026-06-22).
+//   로그인 버튼 → `${WEB}/login?redirect=<복귀 URL>` (로그인 후 redirect 복귀는 web 측에서 처리).
+//   WEB base: local = http://pullim.local:3001 · prod = https://pullim.ai (env로 주입, 미설정 시 prod).
+const WEB_BASE = (process.env.NEXT_PUBLIC_WEB_URL ?? "https://pullim.ai").replace(/\/$/, "");
 
-function withNext(path: string, returnTo: string | undefined, fallback: () => string): string {
-  const next = returnTo ?? fallback();
-  return `${LOGIN_BASE}${path}?next=${encodeURIComponent(next)}`;
+function withRedirect(path: string, returnTo: string | undefined, fallback: () => string): string {
+  const redirect = returnTo ?? fallback();
+  return `${WEB_BASE}${path}?redirect=${encodeURIComponent(redirect)}`;
 }
 
 // 로그인 페이지 URL. returnTo 미지정 시 현재 전체 URL(로그인 후 복귀).
 export function loginUrl(returnTo?: string): string {
-  return withNext("/login", returnTo, () => (typeof window !== "undefined" ? window.location.href : "/"));
+  return withRedirect("/login", returnTo, () => (typeof window !== "undefined" ? window.location.href : "/"));
 }
 
-// 로그아웃 URL. 공유 `.pullim.ai` 쿠키는 중앙 호스트만 정리 가능하므로 중앙으로 보낸다.
+// 로그아웃 URL. 공유 세션 쿠키는 중앙(web/api)만 정리 가능하므로 중앙으로 보낸다.
 export function logoutUrl(returnTo?: string): string {
-  return withNext("/logout", returnTo, () => (typeof window !== "undefined" ? window.location.origin : "/"));
+  return withRedirect("/logout", returnTo, () => (typeof window !== "undefined" ? window.location.origin : "/"));
 }

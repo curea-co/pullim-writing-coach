@@ -2,29 +2,34 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
 type User = { email?: string; displayName?: string; name?: string };
-// 중앙 SSO 세션의 소비자 — 로그인/로그아웃/refresh는 중앙 os 호스트가 담당(공유 .pullim.ai 쿠키).
-//   여기서는 /api/auth/me(공유 access 쿠키 forward)로 현재 사용자만 읽는다.
+// 중앙 SSO 세션의 소비자 — 로그인/로그아웃/refresh는 중앙(web/api)이 담당.
+//   로컬 SSO 런북: 모든 표면이 api 호스트를 브라우저에서 직접 호출(credentials include) + host-only same-site 쿠키.
+//   여기서는 GET ${API}/me 를 직접 호출해 현재 사용자만 읽는다(BFF 아님 — host-only 쿠키는 api 호스트로만 전송됨).
 //   error = /me가 5xx/네트워크 실패 — 게스트로 단정하지 않음(인증서버 장애를 미로그인으로 은폐 안 함).
 type Status = "loading" | "authed" | "guest" | "error";
 type AuthCtx = { user: User | null; status: Status; refresh: () => Promise<void> };
 
 const Ctx = createContext<AuthCtx | null>(null);
 
+// 인증 API 호스트 — local=http://api.pullim.local:3000 · dev=https://dev-api.pullim.ai · prod=https://api.pullim.ai.
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "https://dev-api.pullim.ai").replace(/\/$/, "");
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [status, setStatus] = useState<Status>("loading");
 
   const refresh = useCallback(async () => {
-    // /me 라우트: 200(사용자|authenticated:false) · 5xx는 그대로 전달. name만 있어도 사용자로 인정.
-    const isUser = (j: { authenticated?: boolean; email?: string; displayName?: string; name?: string } | null) =>
-      !!j && j.authenticated !== false && !!(j.email || j.displayName || j.name);
+    const isUser = (j: { email?: string; displayName?: string; name?: string } | null) =>
+      !!j && !!(j.email || j.displayName || j.name);
     try {
-      const r = await fetch("/api/auth/me", { cache: "no-store" });
-      const j = (await r.json().catch(() => null)) as { authenticated?: boolean; email?: string; displayName?: string; name?: string } | null;
-      if (!r.ok) { setUser(null); setStatus("error"); return; } // 5xx/네트워크 — 게스트 단정 안 함
+      // credentials:include — same-site 쿠키(host-only on api) 전송. 게스트는 api가 401/403.
+      const r = await fetch(`${API_BASE}/me`, { credentials: "include", cache: "no-store" });
+      if (r.status === 401 || r.status === 403) { setUser(null); setStatus("guest"); return; }
+      if (!r.ok) { setUser(null); setStatus("error"); return; } // 5xx — 장애(게스트 단정 안 함)
+      const j = (await r.json().catch(() => null)) as { email?: string; displayName?: string; name?: string } | null;
       if (isUser(j)) { setUser(j); setStatus("authed"); return; }
-      setUser(null); setStatus("guest"); // 200 + 미인증(401/403 정규화 포함)
-    } catch { setUser(null); setStatus("error"); }
+      setUser(null); setStatus("guest");
+    } catch { setUser(null); setStatus("error"); } // 네트워크/CORS 실패 — 장애
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
