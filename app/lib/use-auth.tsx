@@ -29,13 +29,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     const isUser = (j: { email?: string; displayName?: string; name?: string } | null) =>
       !!j && !!(j.email || j.displayName || j.name);
+    // /me 응답을 상태로 매핑. authed 시 setUser. 401/403은 호출부가 회전 여부를 결정하므로 null 반환.
+    const applyMe = async (r: Response): Promise<Status> => {
+      const j = (await r.json().catch(() => null)) as { email?: string; displayName?: string; name?: string } | null;
+      if (isUser(j)) { setUser(j); return "authed"; }
+      return "guest";
+    };
     try {
       // credentials:include — same-site 쿠키(host-only on api) 전송. 게스트는 api가 401/403.
       const r = await fetch(`${API_BASE}/me`, { credentials: "include", cache: "no-store" });
-      if (r.status === 401 || r.status === 403) { setUser(null); setStatus("guest"); return; }
+
+      // [ITEM 2] 활성 중 15분 만료(access 쿠키) 대비 — /me 401/403이면 1회 토큰 회전 후 /me 재시도.
+      //   refresh 쿠키 dev-pullim-rt(Path=/auth on api)는 credentials:include로 api/auth/refresh로만 전송.
+      if (r.status === 401 || r.status === 403) {
+        // (a) CSRF 토큰 발급. 못 받으면(!ok 또는 토큰 falsy) 회전하지 않고 게스트.
+        let csrf: string | undefined;
+        try {
+          const cr = await fetch(`${API_BASE}/auth/csrf`, { credentials: "include", cache: "no-store" });
+          if (cr.ok) {
+            const cj = (await cr.json().catch(() => null)) as { csrfToken?: string; token?: string } | null;
+            csrf = cj?.csrfToken ?? cj?.token;
+          }
+        } catch {
+          // csrf 발급 네트워크 실패 — 회전 불가. 아래 csrf falsy 분기로 게스트.
+        }
+        if (!csrf) { setUser(null); setStatus("guest"); return; }
+
+        // (b) refresh — 성공(200)이면 /me 재시도, 401/403이면 게스트, 5xx면 error(장애 은폐 안 함).
+        const rr = await fetch(`${API_BASE}/auth/refresh`, {
+          method: "POST",
+          credentials: "include",
+          cache: "no-store",
+          headers: { "x-csrf-token": csrf },
+        });
+        if (rr.status === 200) {
+          const r2 = await fetch(`${API_BASE}/me`, { credentials: "include", cache: "no-store" });
+          if (r2.status === 401 || r2.status === 403) { setUser(null); setStatus("guest"); return; }
+          if (!r2.ok) { setUser(null); setStatus("error"); return; }
+          const s = await applyMe(r2);
+          if (s === "authed") { setStatus("authed"); return; }
+          setUser(null); setStatus("guest"); return;
+        }
+        if (rr.status === 401 || rr.status === 403) { setUser(null); setStatus("guest"); return; }
+        // refresh 5xx — 인증서버 장애. 게스트로 단정하지 않는다(미로그인 은폐 방지).
+        setUser(null); setStatus("error"); return;
+      }
+
       if (!r.ok) { setUser(null); setStatus("error"); return; } // 5xx — 장애(게스트 단정 안 함)
-      const j = (await r.json().catch(() => null)) as { email?: string; displayName?: string; name?: string } | null;
-      if (isUser(j)) { setUser(j); setStatus("authed"); return; }
+      const s = await applyMe(r);
+      if (s === "authed") { setStatus("authed"); return; }
       setUser(null); setStatus("guest");
     } catch {
       // 응답 자체를 못 받음(네트워크/CORS/미도달) — error로 둔다(미로그인 위장 안 함, "장애를 로그아웃으로 은폐하지 않음" 계약).
