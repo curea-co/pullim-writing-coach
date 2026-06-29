@@ -29,7 +29,10 @@ function HeaderActions() {
       <button type="button" aria-label="알림" title="알림" className={ICON_BTN}>
         <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>
       </button>
-      {status === "loading" ? null : status === "authed" ? (
+      {status === "loading" ? null : status === "error" ? (
+        // 인증 서버가 응답한 5xx(장애) — 미로그인으로 위장하지 않고 중립 표시(로그인 버튼 X).
+        <span className="px-1.5 text-[13px] font-medium text-[var(--text-tertiary)]" title="인증 서버 연결 오류 — 잠시 후 다시 시도해 주세요">연결 오류</span>
+      ) : status === "authed" ? (
         <>
           <span className="px-1.5 text-[13px] font-semibold text-[var(--text-secondary)]">{name}</span>
           <button type="button" onClick={() => { window.location.href = logoutUrl(); }} className="flex h-[42px] items-center rounded-[12px] px-3 text-[13px] font-semibold text-[var(--text-tertiary)] transition-colors hover:bg-[var(--surface-sunken,#eef1f6)]">로그아웃</button>
