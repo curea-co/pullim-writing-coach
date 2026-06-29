@@ -21,7 +21,8 @@ export default async function SignupCompatRedirect({
   const host = h.get("host");
   const proto = h.get("x-forwarded-proto") ?? "https";
   const origin = host ? `${proto}://${host}` : "";
-  const path = safePath(sp.next) ?? safePath(sp.returnTo);
-  const next = path && origin ? `${origin}${path}` : null;
+  // 쿼리 경로가 있으면 그 경로로, 없으면 현재 앱 홈으로 복귀(중앙 가입 후 writing-coach로 돌아오게).
+  const path = safePath(sp.next) ?? safePath(sp.returnTo) ?? "/";
+  const next = origin ? `${origin}${path}` : null;
   redirect(`${WEB_BASE}/signup${next ? `?next=${encodeURIComponent(next)}` : ""}`);
 }

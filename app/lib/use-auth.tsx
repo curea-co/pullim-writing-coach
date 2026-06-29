@@ -12,14 +12,13 @@ type AuthCtx = { user: User | null; status: Status; refresh: () => Promise<void>
 const Ctx = createContext<AuthCtx | null>(null);
 
 // 인증 API 호스트 — local=http://api.pullim.local:3000 · dev=https://dev-api.pullim.ai · prod=https://api.pullim.ai.
-// 인증 API 호스트. 프로덕션은 NEXT_PUBLIC_API_URL 필수 — 미설정 시 dev로 fallback하면 운영 트래픽이
-//   dev-api로 새므로 fail-loud(throw). dev/local만 기본값 허용.
+// 인증 API 호스트. 프로덕션에서 NEXT_PUBLIC_API_URL 미설정 시 dev로 fallback하면 운영 트래픽이
+//   dev-api로 샌다 → 빈 값으로 둔다(=`/me` same-origin 상대요청 → dev 미접속, 404로 무해 실패).
+//   (throw는 Vercel 프리뷰 빌드[NODE_ENV=production·env 미설정]를 깨므로 지양.) dev/local만 기본값 허용.
 const API_BASE = ((): string => {
   const v = process.env.NEXT_PUBLIC_API_URL;
   if (v) return v.replace(/\/$/, "");
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("[use-auth] NEXT_PUBLIC_API_URL 미설정 — 프로덕션에서 dev fallback 금지(빌드 env 설정 필수)");
-  }
+  if (process.env.NODE_ENV === "production") return ""; // dev fallback 금지(유출 방지) — same-origin 상대요청
   return "https://dev-api.pullim.ai";
 })();
 
