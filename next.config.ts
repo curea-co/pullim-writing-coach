@@ -2,7 +2,9 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // 로컬 SSO: *.pullim.local 호스트 접속 시 dev 리소스(HMR·청크) 허용(dev 전용 — prod 무관).
+  //   미설정 시 Next 16이 cross-origin dev 리소스를 차단해 hydrate 실패 → 인증 상태가 loading에 멈춤.
+  allowedDevOrigins: ["writing.pullim.local", "pullim.local", "os.pullim.local", "api.pullim.local"],
 };
 
 export default withSentryConfig(nextConfig, {
