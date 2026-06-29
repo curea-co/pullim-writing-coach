@@ -26,8 +26,12 @@ export async function GET(req: Request, ctx: Ctx): Promise<Response> {
   try {
     const payload = await getUserData(r.sub, r.key);
     return Response.json({ payload }, { status: 200 });
-  } catch (e) {
-    Sentry.captureException(e, { tags: { route: "/api/data/[key]", errorCode: "E8" } });
+  } catch {
+    // Constraint 7: 예외 객체(message·stack)를 Sentry로 보내지 않는다 — 사실(route·errorCode)만 tags로.
+    Sentry.captureMessage("[/api/data/[key]] DB 작업 실패", {
+      level: "error",
+      tags: { route: "/api/data/[key]", errorCode: "E8" },
+    });
     return jsonError("E8");
   }
 }
@@ -44,8 +48,12 @@ export async function PUT(req: Request, ctx: Ctx): Promise<Response> {
   try {
     await setUserData(r.sub, r.key, body.payload ?? null);
     return Response.json({ ok: true }, { status: 200 });
-  } catch (e) {
-    Sentry.captureException(e, { tags: { route: "/api/data/[key]", errorCode: "E8" } });
+  } catch {
+    // Constraint 7: 예외 객체(message·stack)를 Sentry로 보내지 않는다 — 사실(route·errorCode)만 tags로.
+    Sentry.captureMessage("[/api/data/[key]] DB 작업 실패", {
+      level: "error",
+      tags: { route: "/api/data/[key]", errorCode: "E8" },
+    });
     return jsonError("E8");
   }
 }
@@ -56,8 +64,12 @@ export async function DELETE(req: Request, ctx: Ctx): Promise<Response> {
   try {
     await setUserData(r.sub, r.key, null); // 단일 키 비우기(전체 삭제는 /api/data DELETE)
     return Response.json({ ok: true }, { status: 200 });
-  } catch (e) {
-    Sentry.captureException(e, { tags: { route: "/api/data/[key]", errorCode: "E8" } });
+  } catch {
+    // Constraint 7: 예외 객체(message·stack)를 Sentry로 보내지 않는다 — 사실(route·errorCode)만 tags로.
+    Sentry.captureMessage("[/api/data/[key]] DB 작업 실패", {
+      level: "error",
+      tags: { route: "/api/data/[key]", errorCode: "E8" },
+    });
     return jsonError("E8");
   }
 }
