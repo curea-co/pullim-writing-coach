@@ -77,6 +77,15 @@ it("status=loading → 로그인 CTA·폼 모두 미렌더 (깜박임 방지)", 
   expect(screen.queryByTestId("score-wizard")).not.toBeInTheDocument();
 });
 
+it("status=error → 로그인 CTA·폼 모두 미렌더 (인증서버 장애를 미로그인으로 오인 표시 안 함)", () => {
+  // use-auth는 error(/me·refresh 5xx/네트워크)를 guest와 의도적으로 분리한다. 게이트가 error를
+  //   게스트 CTA로 떨어뜨리면 일시적 5xx 동안 실제 로그인 사용자에게 '로그인 필요'를 오인 노출.
+  mockStatus = "error";
+  render(<TokenGate />);
+  expect(screen.queryByRole("button", { name: /로그인/ })).not.toBeInTheDocument();
+  expect(screen.queryByTestId("score-wizard")).not.toBeInTheDocument();
+});
+
 it("로컬 데모: 저장된 토큰 있으면 guest여도 폼 렌더(로그인 CTA 아님)", async () => {
   mockStatus = "guest";
   sessionStorage.setItem("pwc-demo-token", "secret");
