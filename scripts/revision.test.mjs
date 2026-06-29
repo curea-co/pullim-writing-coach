@@ -142,36 +142,36 @@ const sampleEntry = (body = "본문") => ({
   output: sampleScores([10, 10, 10, 10, 10]),
 });
 
-test("addRevision: 새 thread 생성 + version 1", () => {
-  const res = addRevision(null, sampleEntry("초안"));
+test("addRevision: 새 thread 생성 + version 1", async () => {
+  const res = await addRevision(null, sampleEntry("초안"));
   assert.equal(res.ok, true);
   assert.ok(res.thread_id);
-  const t = getThread(res.thread_id);
+  const t = await getThread(res.thread_id);
   assert.equal(t.revisions.length, 1);
   assert.equal(t.revisions[0].version, 1);
   assert.equal(t.revisions[0].submission.body, "초안");
 });
 
-test("addRevision: 동일 thread에 추가 → version 증가", () => {
-  const r1 = addRevision(null, sampleEntry("v1"));
-  const r2 = addRevision(r1.thread_id, sampleEntry("v2"));
-  const r3 = addRevision(r1.thread_id, sampleEntry("v3"));
+test("addRevision: 동일 thread에 추가 → version 증가", async () => {
+  const r1 = await addRevision(null, sampleEntry("v1"));
+  const r2 = await addRevision(r1.thread_id, sampleEntry("v2"));
+  const r3 = await addRevision(r1.thread_id, sampleEntry("v3"));
   assert.equal(r2.thread_id, r1.thread_id);
   assert.equal(r3.thread_id, r1.thread_id);
-  const t = getThread(r1.thread_id);
+  const t = await getThread(r1.thread_id);
   assert.deepEqual(
     t.revisions.map((r) => r.version),
     [1, 2, 3],
   );
 });
 
-test("addRevision: thread 4번째 → 가장 오래된 drop (dropped_oldest_in_thread)", () => {
-  const r1 = addRevision(null, sampleEntry("v1"));
-  addRevision(r1.thread_id, sampleEntry("v2"));
-  addRevision(r1.thread_id, sampleEntry("v3"));
-  const r4 = addRevision(r1.thread_id, sampleEntry("v4"));
+test("addRevision: thread 4번째 → 가장 오래된 drop (dropped_oldest_in_thread)", async () => {
+  const r1 = await addRevision(null, sampleEntry("v1"));
+  await addRevision(r1.thread_id, sampleEntry("v2"));
+  await addRevision(r1.thread_id, sampleEntry("v3"));
+  const r4 = await addRevision(r1.thread_id, sampleEntry("v4"));
   assert.equal(r4.dropped_oldest_in_thread, true);
-  const t = getThread(r1.thread_id);
+  const t = await getThread(r1.thread_id);
   assert.equal(t.revisions.length, MAX_REVISIONS_PER_THREAD);
   // 가장 오래된(v1) drop → v2/v3/v4 남음
   assert.deepEqual(
@@ -180,31 +180,31 @@ test("addRevision: thread 4번째 → 가장 오래된 drop (dropped_oldest_in_t
   );
 });
 
-test("addRevision: 다른 thread 식별·격리", () => {
-  const t1 = addRevision(null, sampleEntry("글A v1"));
-  const t2 = addRevision(null, sampleEntry("글B v1"));
+test("addRevision: 다른 thread 식별·격리", async () => {
+  const t1 = await addRevision(null, sampleEntry("글A v1"));
+  const t2 = await addRevision(null, sampleEntry("글B v1"));
   assert.notEqual(t1.thread_id, t2.thread_id);
-  const threads = loadRevisions();
+  const threads = await loadRevisions();
   assert.equal(threads.length, 2);
 });
 
-test("clearAllRevisions: 전부 삭제", () => {
-  addRevision(null, sampleEntry("x"));
-  assert.equal(loadRevisions().length, 1);
-  clearAllRevisions();
-  assert.equal(loadRevisions().length, 0);
+test("clearAllRevisions: 전부 삭제", async () => {
+  await addRevision(null, sampleEntry("x"));
+  assert.equal((await loadRevisions()).length, 1);
+  await clearAllRevisions();
+  assert.equal((await loadRevisions()).length, 0);
 });
 
-test("loadRevisions: JSON 손상 시 빈 배열 (조용한 폴백)", () => {
+test("loadRevisions: JSON 손상 시 빈 배열 (조용한 폴백)", async () => {
   storageMock.setItem("pwc_revisions_v1", "{not json");
-  assert.deepEqual(loadRevisions(), []);
+  assert.deepEqual(await loadRevisions(), []);
 });
 
-test("loadRevisions: schema 불일치 entry 자동 필터", () => {
+test("loadRevisions: schema 불일치 entry 자동 필터", async () => {
   storageMock.setItem(
     "pwc_revisions_v1",
     JSON.stringify([{ thread_id: "x", revisions: [] }, { random: "bad" }]),
   );
-  const threads = loadRevisions();
+  const threads = await loadRevisions();
   assert.equal(threads.length, 1); // 손상된 두 번째는 isRevisionThread에 걸려 빠짐
 });

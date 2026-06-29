@@ -147,42 +147,42 @@ test("consentNow — ISO 8601 + KST(+09:00)", () => {
 });
 
 // ── save·load·clear round trip ───────────────────────────────
-test("loadProfile — 비어 있으면 null", () => {
-  assert.equal(loadProfile(), null);
+test("loadProfile — 비어 있으면 null", async () => {
+  assert.equal(await loadProfile(), null);
 });
 
-test("save → load round trip", () => {
+test("save → load round trip", async () => {
   const profile = {
     nickname: "선혜",
     school_level: "중2",
     primary_subject: "국어",
     consent_at: "2026-05-28T20:00:00+09:00",
   };
-  const result = saveProfile(profile);
+  const result = await saveProfile(profile);
   assert.deepEqual(result, { ok: true });
-  assert.deepEqual(loadProfile(), profile);
+  assert.deepEqual(await loadProfile(), profile);
 });
 
-test("save — invalid Profile 거부", () => {
+test("save — invalid Profile 거부", async () => {
   // @ts-expect-error — 런타임 검증을 위해 일부러 잘못된 타입 주입
-  const result = saveProfile({ nickname: "선혜" });
+  const result = await saveProfile({ nickname: "선혜" });
   assert.equal(result.ok, false);
   assert.equal(result.reason, "invalid");
 });
 
-test("clear → load = null", () => {
-  saveProfile({
+test("clear → load = null", async () => {
+  await saveProfile({
     nickname: "선혜",
     school_level: "중2",
     primary_subject: "국어",
     consent_at: "x",
   });
-  assert.notEqual(loadProfile(), null);
-  clearProfile();
-  assert.equal(loadProfile(), null);
+  assert.notEqual(await loadProfile(), null);
+  await clearProfile();
+  assert.equal(await loadProfile(), null);
 });
 
-test("saveProfile — 메타 LRU 보존 (자동 초기화 X — 익명 사용자 학습 이력 보호)", () => {
+test("saveProfile — 메타 LRU 보존 (자동 초기화 X — 익명 사용자 학습 이력 보호)", async () => {
   // Codex PR #56 검토 결과 — 자동 메타 초기화는 동일 사용자가 익명으로 사용하다 나중에
   // 온보딩하는 정상 경로에서 본인 학습 이력을 지움(target_raw는 복구 불가). 공용 기기
   // 위험은 /me 명시 삭제 동선으로 처리. saveProfile은 LRU에 손대지 않는다.
@@ -195,7 +195,7 @@ test("saveProfile — 메타 LRU 보존 (자동 초기화 X — 익명 사용자
       target_raw: [{ value: "800", count: 3, last_used_at: "2026-06-02T11:00:00+09:00" }],
     }),
   );
-  saveProfile({
+  await saveProfile({
     nickname: "준호",
     school_level: "중2",
     primary_subject: "국어",
@@ -206,12 +206,12 @@ test("saveProfile — 메타 LRU 보존 (자동 초기화 X — 익명 사용자
   assert.equal(meta.target_raw[0].value, "800");
 });
 
-test("loadProfile — JSON 손상 시 null (조용한 폴백)", () => {
+test("loadProfile — JSON 손상 시 null (조용한 폴백)", async () => {
   storageMock.setItem("pwc_profile_v1", "{not json");
-  assert.equal(loadProfile(), null);
+  assert.equal(await loadProfile(), null);
 });
 
-test("loadProfile — JSON OK이나 schema 불일치 시 null", () => {
+test("loadProfile — JSON OK이나 schema 불일치 시 null", async () => {
   storageMock.setItem("pwc_profile_v1", JSON.stringify({ random: "data" }));
-  assert.equal(loadProfile(), null);
+  assert.equal(await loadProfile(), null);
 });

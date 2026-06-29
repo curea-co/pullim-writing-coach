@@ -90,8 +90,8 @@ test("isDraftSnapshot: 유효 enum 멤버는 정상 통과", () => {
   );
 });
 
-test("save/load roundtrip — 모든 필드 보존 + saved_at 자동 주입", () => {
-  const result = saveDraft({
+test("save/load roundtrip — 모든 필드 보존 + saved_at 자동 주입", async () => {
+  const result = await saveDraft({
     body: "안녕 친구야",
     school_level: "중2",
     subject: "국어",
@@ -102,7 +102,7 @@ test("save/load roundtrip — 모든 필드 보존 + saved_at 자동 주입", ()
   assert.equal(result.ok, true);
   assert.match(result.saved_at, /\+09:00$/);
 
-  const loaded = loadDraft();
+  const loaded = await loadDraft();
   assert.ok(loaded);
   assert.equal(loaded.body, "안녕 친구야");
   assert.equal(loaded.school_level, "중2");
@@ -113,42 +113,42 @@ test("save/load roundtrip — 모든 필드 보존 + saved_at 자동 주입", ()
   assert.equal(loaded.saved_at, result.saved_at);
 });
 
-test("save: 선택 필드 없어도 OK", () => {
-  const result = saveDraft({ body: "혼자 본문만" });
+test("save: 선택 필드 없어도 OK", async () => {
+  const result = await saveDraft({ body: "혼자 본문만" });
   assert.equal(result.ok, true);
-  const loaded = loadDraft();
+  const loaded = await loadDraft();
   assert.ok(loaded);
   assert.equal(loaded.body, "혼자 본문만");
   assert.equal(loaded.school_level, undefined);
 });
 
-test("loadDraft: 손상된 JSON → null (가드 통과)", () => {
+test("loadDraft: 손상된 JSON → null (가드 통과)", async () => {
   mem.set("pwc_draft_v1", "{not-json");
-  assert.equal(loadDraft(), null);
+  assert.equal(await loadDraft(), null);
 });
 
-test("loadDraft: 스키마 위반 → null", () => {
+test("loadDraft: 스키마 위반 → null", async () => {
   mem.set("pwc_draft_v1", JSON.stringify({ wrong: true }));
-  assert.equal(loadDraft(), null);
+  assert.equal(await loadDraft(), null);
 });
 
-test("clearDraft: 저장된 draft 제거", () => {
-  saveDraft({ body: "x" });
-  assert.ok(loadDraft());
-  clearDraft();
-  assert.equal(loadDraft(), null);
+test("clearDraft: 저장된 draft 제거", async () => {
+  await saveDraft({ body: "x" });
+  assert.ok(await loadDraft());
+  await clearDraft();
+  assert.equal(await loadDraft(), null);
 });
 
-test("saveDraft: quota 초과 — quota reason", () => {
+test("saveDraft: quota 초과 — quota reason", async () => {
   mode = "quota";
-  const result = saveDraft({ body: "x" });
+  const result = await saveDraft({ body: "x" });
   assert.equal(result.ok, false);
   assert.equal(result.reason, "quota");
 });
 
-test("saveDraft: 일반 denied — denied reason", () => {
+test("saveDraft: 일반 denied — denied reason", async () => {
   mode = "denied";
-  const result = saveDraft({ body: "x" });
+  const result = await saveDraft({ body: "x" });
   assert.equal(result.ok, false);
   assert.equal(result.reason, "denied");
 });
@@ -168,16 +168,16 @@ test("isDraftSnapshot: body_html 비-string → 거부", () => {
   assert.equal(isDraftSnapshot({ body: "x", saved_at: "x", body_html: [] }), false);
 });
 
-test("saveDraft + loadDraft roundtrip: body_html 보존", () => {
-  saveDraft({ body: "안녕", body_html: "<p>안녕</p>" });
-  const loaded = loadDraft();
+test("saveDraft + loadDraft roundtrip: body_html 보존", async () => {
+  await saveDraft({ body: "안녕", body_html: "<p>안녕</p>" });
+  const loaded = await loadDraft();
   assert.ok(loaded);
   assert.equal(loaded.body_html, "<p>안녕</p>");
 });
 
-test("saveDraft: body_html 없으면 loaded.body_html === undefined", () => {
-  saveDraft({ body: "안녕" });
-  const loaded = loadDraft();
+test("saveDraft: body_html 없으면 loaded.body_html === undefined", async () => {
+  await saveDraft({ body: "안녕" });
+  const loaded = await loadDraft();
   assert.ok(loaded);
   assert.equal(loaded.body_html, undefined);
 });
