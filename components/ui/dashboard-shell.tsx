@@ -37,9 +37,10 @@ function Brand({ brand, linkComponent }: { brand: BrandProp; linkComponent: Reac
   return (
     <Link href={href} className="flex items-center gap-2 text-[var(--text-primary)] no-underline">
       {logo}
-      <span className="text-[15px] font-extrabold tracking-[-.02em]">{title}</span>
+      {/* os.pullim.ai 정합: 풀림 17px extrabold + 서비스명을 중립 pill 배지로 */}
+      <span className="text-[17px] font-extrabold tracking-[-.02em]">{title}</span>
       {sub && (
-        <span className="font-[var(--font-mono)] text-[11px] uppercase tracking-[.1em] text-[var(--text-tertiary)]">
+        <span className="rounded-md bg-[var(--surface-sunken,#eef1f6)] px-2 py-0.5 text-[12px] font-semibold text-[var(--text-secondary)]">
           {sub}
         </span>
       )}
@@ -94,7 +95,7 @@ export function DashboardShell({
           <div className="flex-1" />
           {actions}
         </header>
-        <div className="mx-auto flex w-full max-w-[1400px]">
+        <div className="flex w-full">{/* full-width: 사이드바는 좌측 고정, 중앙 정렬 안 함(os.pullim.ai 정합) */}
           {rail && (
             <aside className="sticky top-[60px] hidden h-[calc(100vh-60px)] shrink-0 border-r border-[var(--border-subtle)] md:block">
               <div className="relative h-full w-max">
@@ -124,7 +125,7 @@ export function DashboardShell({
               </div>
             </aside>
           )}
-          <Content className="min-w-0 flex-1 px-6 py-8 pb-24 md:pb-8">{children}</Content>
+          <Content className="min-w-0 max-w-[1180px] flex-1 px-6 py-8 pb-24 md:pb-8">{children}</Content>
         </div>
         {tabbarNode}
       </div>

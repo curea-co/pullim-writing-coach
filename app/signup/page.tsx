@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 
-// 호환 redirect — 기존 북마크/외부 링크로 /login 직접 진입 시 중앙 SSO 로그인(pullim-web)으로 보낸다.
+// 호환 redirect — 기존 북마크/외부 링크로 /signup 직접 진입 시 중앙 SSO 회원가입(pullim-web)으로 보낸다.
 //   ?next= / ?returnTo= 가 same-origin 경로면 현재 origin 전체 URL로 만들어 중앙 next 로 전달(복귀 보존).
 const WEB_BASE = (process.env.NEXT_PUBLIC_WEB_URL ?? "https://pullim.ai").replace(/\/$/, "");
 
@@ -11,7 +11,7 @@ function safePath(v: string | string[] | undefined): string | null {
   return null;
 }
 
-export default async function LoginCompatRedirect({
+export default async function SignupCompatRedirect({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -21,8 +21,8 @@ export default async function LoginCompatRedirect({
   const host = h.get("host");
   const proto = h.get("x-forwarded-proto") ?? "https";
   const origin = host ? `${proto}://${host}` : "";
-  // 쿼리 경로가 있으면 그 경로로, 없으면 현재 앱 홈으로 복귀(중앙 로그인 후 writing-coach로 돌아오게).
+  // 쿼리 경로가 있으면 그 경로로, 없으면 현재 앱 홈으로 복귀(중앙 가입 후 writing-coach로 돌아오게).
   const path = safePath(sp.next) ?? safePath(sp.returnTo) ?? "/";
   const next = origin ? `${origin}${path}` : null;
-  redirect(`${WEB_BASE}/login${next ? `?next=${encodeURIComponent(next)}` : ""}`);
+  redirect(`${WEB_BASE}/signup${next ? `?next=${encodeURIComponent(next)}` : ""}`);
 }
