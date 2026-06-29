@@ -69,6 +69,7 @@ export async function verifyWritingAccess(req: Request): Promise<boolean> {
           ...(origin ? { origin } : {}),
         },
         cache: "no-store",
+        redirect: "manual", // 302→200 페이지 추종으로 인한 인가 우회(false-positive) 방지 — 비200은 거부.
       });
       if (res.status === 200) return true;
       // 200 아님(401/403/5xx) → fallback/거부로 낙하.
