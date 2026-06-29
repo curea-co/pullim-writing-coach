@@ -75,16 +75,23 @@ function looksLikeExtractedAssignment(v: unknown): v is ExtractedAssignment {
 }
 
 // 안내서 원문 → /api/extract 호출 → 검증된 ExtractedAssignment. 실패는 ExtractError로 throw.
+//   SSO 정합: 인가는 서버 verifyWritingAccess(쿠키/me)가 권위. token은 로컬 데모 fallback 전용이라
+//   선택값이며, 있을 때만 x-demo-token을 부착한다(부재가 곧 차단이 되지 않게 — prod authed 사용자는
+//   데모토큰이 없다). 동일 출처 요청이라 access 쿠키(Domain=.pullim.ai)는 자동 전송된다.
 export async function extractAssignment(
   rawText: string,
   channel: ExtractChannel,
-  token: string,
+  token?: string,
 ): Promise<ExtractedAssignment> {
   let res: Response;
   try {
     res = await fetch("/api/extract", {
       method: "POST",
-      headers: { "content-type": "application/json", "x-demo-token": token },
+      headers: {
+        "content-type": "application/json",
+        ...(token ? { "x-demo-token": token } : {}),
+      },
+      credentials: "include",
       body: JSON.stringify({ raw_text: rawText, channel }),
     });
   } catch {
