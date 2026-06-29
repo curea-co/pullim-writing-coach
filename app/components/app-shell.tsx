@@ -47,7 +47,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <AuthProvider>
       <DashboardShell
-        brand={{ logo: <ServiceIcon name="writing" size={28} />, title: "풀림", sub: "라이팅 코치", href: "/" }}
+        brand={{ logo: <ServiceIcon name="writing" size={32} />, title: "풀림", sub: "라이팅 코치", href: "/" }}
         rail={<OsRail head="둘러보기" items={railItems(pathname)} linkComponent={Link} />}
         tabbar={<OsTabbar items={tabItems(pathname)} linkComponent={Link} />}
         actions={<AuthActions />}

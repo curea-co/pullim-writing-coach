@@ -29,7 +29,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const j = (await r.json().catch(() => null)) as { email?: string; displayName?: string; name?: string } | null;
       if (isUser(j)) { setUser(j); setStatus("authed"); return; }
       setUser(null); setStatus("guest");
-    } catch { setUser(null); setStatus("error"); } // 네트워크/CORS 실패 — 장애
+    } catch {
+      // 응답 자체를 못 받음(네트워크/CORS/미도달) — 가장 흔한 원인은 미구성이라 게스트(→로그인)로 둔다.
+      // (서버가 응답한 5xx는 위 !r.ok 분기에서 error로 구분 — 진짜 장애 은폐 방지)
+      setUser(null); setStatus("guest");
+    }
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
