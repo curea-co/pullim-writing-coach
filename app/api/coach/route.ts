@@ -12,7 +12,6 @@
 // ★ 중대 불변식: 코치는 학생 문장을 대신 쓰지 않는다. 프롬프트가 1차 강제 + runCoachGuards가 권위 백스톱.
 //   가드 위반 → 1회 재호출 → 그래도 위반이면 502류 에러. **생성 문장은 절대 응답에 누출하지 않는다.**
 
-import { createHash, timingSafeEqual } from "node:crypto";
 import * as Sentry from "@sentry/nextjs";
 import {
   ERROR_HTTP,
@@ -30,6 +29,7 @@ import { splitParagraphs } from "@/app/lib/paragraphs";
 import { prioritizeNudges } from "@/app/lib/nudge-priority";
 import { COACH_SYSTEM_PROMPT, buildCoachPrompt } from "@/app/lib/coach-prompt";
 import { runCoachMock } from "@/app/lib/coach-mock";
+import { verifyWritingAccess } from "@/app/lib/server/pullim-session";
 import { validateCoachRequest } from "./request";
 
 // ── 비기능 요구 (score route 정합) ──────────────────────────────────
@@ -45,23 +45,6 @@ const MAX_TOKENS = 3000;
 const TEMPERATURE = 0.3;
 const TOTAL_BUDGET_MS = 55_000;
 const MIN_RETRY_BUDGET_MS = 8_000;
-
-// ── 토큰 게이트 (score route isAuthorized 동일) ──────────────────────
-function timingSafeEqualStr(a: string, b: string): boolean {
-  const ha = createHash("sha256").update(a, "utf8").digest();
-  const hb = createHash("sha256").update(b, "utf8").digest();
-  return timingSafeEqual(ha, hb);
-}
-
-function isAuthorized(req: Request): boolean {
-  const expected = process.env.DEMO_ACCESS_TOKEN;
-  if (!expected) {
-    console.warn("[/api/coach] DEMO_ACCESS_TOKEN 미설정 — 모든 요청 401 처리");
-    return false; // fail-closed
-  }
-  const provided = req.headers.get("x-demo-token") ?? "";
-  return timingSafeEqualStr(provided, expected);
-}
 
 // ── 모델 단일 호출 (score route callModel 이식, coach용 프롬프트/토큰) ──
 type ModelError = { code: Extract<ErrorCode, "E4" | "E8">; detail: string };
@@ -135,8 +118,8 @@ function respondCoach(output: CoachOutput): Response {
 }
 
 export async function POST(req: Request): Promise<Response> {
-  // [G1] 토큰 게이트
-  if (!isAuthorized(req)) return jsonError("E-AUTH");
+  // [G1] 인가 게이트 — SSO 세션(/me) 우선, 비prod 데모토큰 fallback (fail-closed).
+  if (!(await verifyWritingAccess(req))) return jsonError("E-AUTH");
 
   // [G2] 본문 파싱
   let raw: unknown;

@@ -20,7 +20,8 @@ import {
   validateRequest,
 } from "@/app/lib/grading";
 import { SYSTEM_PROMPT, buildUserPrompt } from "@/app/lib/prompt";
-import { callModel, isAuthorized, isModelError } from "@/app/lib/server/anthropic";
+import { callModel, isModelError } from "@/app/lib/server/anthropic";
+import { verifyWritingAccess } from "@/app/lib/server/pullim-session";
 
 // ── 비기능 요구 (12 §9 / critical gap C1) ────────────────────────
 export const runtime = "nodejs";
@@ -47,8 +48,8 @@ function logMetric(event: string, extra: Record<string, unknown> = {}): void {
 }
 
 export async function POST(req: Request): Promise<Response> {
-  // [G1] 토큰 게이트 (공유 헬퍼, fail-closed · 상수시간 비교)
-  if (!isAuthorized(req, "/api/score")) return jsonError("E-AUTH");
+  // [G1] 인가 게이트 — SSO 세션(/me) 우선, 비prod 데모토큰 fallback (fail-closed).
+  if (!(await verifyWritingAccess(req))) return jsonError("E-AUTH");
 
   // [G2] 본문 파싱
   let raw: unknown;
