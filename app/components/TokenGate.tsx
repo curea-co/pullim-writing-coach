@@ -81,8 +81,11 @@ export default function TokenGate({
     );
   }
 
-  // 로딩 중(또는 /me 장애 상태에서 토큰 없음) — 깜박임 방지 위해 CTA/폼 모두 렌더 안 함.
-  if (status === "loading") return null;
+  // 로딩 중, 또는 /me·refresh가 5xx/네트워크 장애로 error인 경우 — CTA/폼 모두 렌더 안 함.
+  //   use-auth는 error를 guest와 의도적으로 분리한다(인증서버 장애를 미로그인으로 은폐 안 함).
+  //   여기서 error를 게스트 CTA로 떨어뜨리면 그 분리를 다시 합쳐, 일시적 5xx 동안 실제 로그인
+  //   사용자에게 '로그인 필요' 화면을 오인 노출한다. loading과 동일하게 null(깜박임/오인 방지).
+  if (status === "loading" || status === "error") return null;
 
   // 게스트 — 중앙 SSO 로그인 CTA.
   return (

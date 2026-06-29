@@ -418,8 +418,11 @@ async function callCoach(
   | { ok: false; auth: true }
   | { ok: false; auth: false; message: string; retryable: boolean }
 > {
+  // SSO 정합: 인가는 서버 verifyWritingAccess(쿠키/me)가 권위. 데모토큰은 로컬 fallback 전용이므로
+  //   토큰 부재가 곧 차단이 되어선 안 된다(prod authed 사용자는 데모토큰이 없다). 토큰이 있을 때만
+  //   x-demo-token을 부착하고, 동일 출처 요청이라 access 쿠키(Domain=.pullim.ai)는 자동 전송된다.
+  //   실제 인가 실패는 서버 401 → 아래 res.status===401 분기에서 { auth: true }로 처리.
   const token = sessionStorage.getItem(DEMO_TOKEN_KEY) ?? "";
-  if (!token) return { ok: false, auth: true };
 
   const payload: CoachRequest = {
     assignment: {
@@ -440,7 +443,11 @@ async function callCoach(
   try {
     res = await fetch("/api/coach", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-demo-token": token },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { "x-demo-token": token } : {}),
+      },
+      credentials: "include",
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(65_000),
     });

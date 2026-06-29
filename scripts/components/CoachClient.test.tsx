@@ -159,4 +159,30 @@ describe("CoachClient voice 분기", () => {
 
     vi.unstubAllGlobals();
   });
+
+  it("SSO authed + 데모토큰 없음 → [봐줘] 시 단락 없이 /api/coach fetch 발생 (x-demo-token 미부착)", async () => {
+    // prod authed 사용자는 데모토큰이 없다(데모토큰은 로컬 전용). 토큰 부재가 곧 차단이 되어선 안 됨 —
+    //   인가는 서버 verifyWritingAccess(쿠키/me)가 권위. fetch 자체는 발생해야 한다.
+    const fetchMock = vi.fn(() => new Promise(() => {})); // never resolves — checking 유지
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("sessionStorage", {
+      getItem: () => null, // 데모토큰 없음
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    });
+
+    render(<CoachClient assignment={DEMO_ASSIGNMENT} mode="voice" />);
+    act(() => { screen.getByTestId("canvas-trigger-insert").click(); });
+    await act(async () => { screen.getByTestId("coach-ask").click(); });
+
+    // 토큰 부재로 단락되지 않고 /api/coach fetch가 발생해야 한다.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, { headers: Record<string, string>; credentials?: string }];
+    expect(url).toBe("/api/coach");
+    expect(init.credentials).toBe("include");
+    // 데모토큰이 없으므로 x-demo-token 헤더는 부착되지 않아야 한다.
+    expect(init.headers["x-demo-token"]).toBeUndefined();
+
+    vi.unstubAllGlobals();
+  });
 });
