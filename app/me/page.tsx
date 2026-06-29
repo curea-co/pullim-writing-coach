@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import MetaUsageCard from "../components/MetaUsageCard";
 import ProfileForm, { type ProfileDraft } from "../components/ProfileForm";
 import {
+  clearAllLocalStorage,
   clearAllResults,
   clearAllRevisions,
   clearDraft,
@@ -18,37 +19,56 @@ import {
   saveProfile,
   type Profile,
 } from "../lib/storage";
+import { clearConsent } from "../lib/consent-store";
+import { useAuth } from "../lib/use-auth";
 
 type LoadState = "loading" | "missing" | "loaded";
 
 export default function MePage() {
   const router = useRouter();
+  const { status } = useAuth();
   const [state, setState] = useState<LoadState>("loading");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const handleDelete = () => {
-    // Codex PR #25/#29: 삭제 범위가 profile만이라 "프로필·이력 삭제" 카피와 실제 동작 불일치였음.
-    // 5개 LS 키 모두 clear — 학생/공용 기기에서 "모두 지웠다"는 약속을 실제 보장.
-    // Codex PR #56: missing 분기에서도 호출 — MetaUsageCard로 노출되는 학습 이력 삭제 동선 제공.
-    clearProfile();
-    clearDraft();
-    clearAllRevisions();
-    clearAllResults();
-    clearMetaUsage();
+  // 데이터 전량 삭제 — account/guest 분기(중복·idempotency·consent 일괄 해소, Task 6).
+  const handleDelete = async () => {
+    if (status === "authed") {
+      // ── account mode ──
+      // 서버 계정 데이터(동의 포함 6키)는 전체 1회 DELETE로 삭제(개별 /api/data/[key] PUT(null) 금지 —
+      //   전체 DELETE 후 null row를 재생성해 idempotency를 깬다).
+      await fetch("/api/data", { method: "DELETE", credentials: "include" }).catch(() => {});
+      // 같은 기기에 남은 게스트-시절 로컬 흔적 정리(서버 PUT(null) 미발생 — 순수 localStorage).
+      clearAllLocalStorage();
+    } else {
+      // ── guest/local ── clear*는 이 모드에서 localStorage로 라우팅.
+      await clearProfile();
+      await clearDraft();
+      await clearAllRevisions();
+      await clearAllResults();
+      await clearMetaUsage();
+      await clearConsent(); // 동의 기록도 삭제(카피 "프로필·동의 기록" 약속 충족)
+    }
     router.push("/");
   };
 
   useEffect(() => {
-    const p = loadProfile();
-    if (p) {
-      setProfile(p);
-      setState("loaded");
-    } else {
-      setState("missing");
-    }
+    let alive = true;
+    void (async () => {
+      const p = await loadProfile();
+      if (!alive) return;
+      if (p) {
+        setProfile(p);
+        setState("loaded");
+      } else {
+        setState("missing");
+      }
+    })();
+    return () => {
+      alive = false;
+    };
   }, []);
 
   // 저장 토스트 — 4초 후 자동 해제
@@ -93,7 +113,7 @@ export default function MePage() {
   }
 
   // state === "loaded"
-  const handleSubmit = (draft: ProfileDraft, _consent: boolean) => {
+  const handleSubmit = async (draft: ProfileDraft, _consent: boolean) => {
     if (!draft.school_level || !draft.primary_subject || !draft.nickname?.trim()) return;
     if (draft.primary_subject === "기타" && !draft.primary_subject_other?.trim()) return;
     setSaveError(null);
@@ -108,7 +128,7 @@ export default function MePage() {
       frequent_genre: draft.frequent_genre || undefined,
       consent_at: profile?.consent_at ?? new Date().toISOString(),
     };
-    const result = saveProfile(next);
+    const result = await saveProfile(next);
     if (result.ok) {
       setProfile(next);
       setSavedAt(Date.now());
@@ -184,7 +204,7 @@ function DataDeleteSection({
 }: {
   confirmDelete: boolean;
   setConfirmDelete: (v: boolean) => void;
-  onDelete: () => void;
+  onDelete: () => void | Promise<void>;
 }) {
   return (
     <section className="border-band-warn-surface bg-band-warn-surface/30 mt-10 rounded-xl border p-5">
@@ -211,7 +231,7 @@ function DataDeleteSection({
           <div className="mt-3 flex gap-2">
             <button
               type="button"
-              onClick={onDelete}
+              onClick={() => void onDelete()}
               className="bg-band-warn hover:bg-band-warn/90 inline-flex h-9 items-center rounded-lg px-4 text-xs font-semibold text-white"
             >
               네, 삭제할게요
