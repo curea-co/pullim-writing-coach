@@ -1,13 +1,15 @@
 "use client";
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { setAccountMode } from "./storage";
 
 type User = { email?: string; displayName?: string; name?: string };
 // 중앙 SSO 세션의 소비자 — 로그인/로그아웃/refresh는 중앙(web/api)이 담당.
 //   로컬 SSO 런북: 모든 표면이 api 호스트를 브라우저에서 직접 호출(credentials include) + host-only same-site 쿠키.
 //   여기서는 GET ${API}/me 를 직접 호출해 현재 사용자만 읽는다(BFF 아님 — host-only 쿠키는 api 호스트로만 전송됨).
 //   error = /me가 5xx/네트워크 실패 — 게스트로 단정하지 않음(인증서버 장애를 미로그인으로 은폐 안 함).
-type Status = "loading" | "authed" | "guest" | "error";
-type AuthCtx = { user: User | null; status: Status; refresh: () => Promise<void> };
+export type Status = "loading" | "authed" | "guest" | "error";
+// refresh는 최종 Status를 반환한다 — storage.onAuthExpired가 refresh 결과로 재요청 여부를 판단(Constraint 10).
+type AuthCtx = { user: User | null; status: Status; refresh: () => Promise<Status> };
 
 const Ctx = createContext<AuthCtx | null>(null);
 
@@ -18,7 +20,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [status, setStatus] = useState<Status>("loading");
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<Status> => {
     const isUser = (j: { email?: string; displayName?: string; name?: string } | null) =>
       !!j && !!(j.email || j.displayName || j.name);
     // /me 응답을 상태로 매핑. authed 시 setUser. 401/403은 호출부가 회전 여부를 결정하므로 null 반환.
@@ -45,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           // csrf 발급 네트워크 실패 — 회전 불가. 아래 csrf falsy 분기로 게스트.
         }
-        if (!csrf) { setUser(null); setStatus("guest"); return; }
+        if (!csrf) { setUser(null); setStatus("guest"); return "guest"; }
 
         // (b) refresh — 성공(200)이면 /me 재시도, 401/403이면 게스트, 5xx면 error(장애 은폐 안 함).
         const rr = await fetch(`${API_BASE}/auth/refresh`, {
@@ -56,29 +58,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         if (rr.status === 200) {
           const r2 = await fetch(`${API_BASE}/me`, { credentials: "include", cache: "no-store" });
-          if (r2.status === 401 || r2.status === 403) { setUser(null); setStatus("guest"); return; }
-          if (!r2.ok) { setUser(null); setStatus("error"); return; }
+          if (r2.status === 401 || r2.status === 403) { setUser(null); setStatus("guest"); return "guest"; }
+          if (!r2.ok) { setUser(null); setStatus("error"); return "error"; }
           const s = await applyMe(r2);
-          if (s === "authed") { setStatus("authed"); return; }
-          setUser(null); setStatus("guest"); return;
+          if (s === "authed") { setStatus("authed"); return "authed"; }
+          setUser(null); setStatus("guest"); return "guest";
         }
-        if (rr.status === 401 || rr.status === 403) { setUser(null); setStatus("guest"); return; }
+        if (rr.status === 401 || rr.status === 403) { setUser(null); setStatus("guest"); return "guest"; }
         // refresh 5xx — 인증서버 장애. 게스트로 단정하지 않는다(미로그인 은폐 방지).
-        setUser(null); setStatus("error"); return;
+        setUser(null); setStatus("error"); return "error";
       }
 
-      if (!r.ok) { setUser(null); setStatus("error"); return; } // 5xx — 장애(게스트 단정 안 함)
+      if (!r.ok) { setUser(null); setStatus("error"); return "error"; } // 5xx — 장애(게스트 단정 안 함)
       const s = await applyMe(r);
-      if (s === "authed") { setStatus("authed"); return; }
-      setUser(null); setStatus("guest");
+      if (s === "authed") { setStatus("authed"); return "authed"; }
+      setUser(null); setStatus("guest"); return "guest";
     } catch {
       // 응답 자체를 못 받음(네트워크/CORS/미도달) — 가장 흔한 원인은 미구성이라 게스트(→로그인)로 둔다.
       // (서버가 응답한 5xx는 위 !r.ok 분기에서 error로 구분 — 진짜 장애 은폐 방지)
-      setUser(null); setStatus("guest");
+      setUser(null); setStatus("guest"); return "guest";
     }
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
+
+  // 계정 store 어댑터에 모드 주입 — authed && !local이면 /api/data path. local(host-only 쿠키)은 localStorage 폴백.
+  //   onAuthExpired는 refresh 결과를 그대로 반환 — authed면 true(재요청), guest/error면 false(재시도 없이 auth 실패 낙하).
+  const isLocal = API_BASE.includes("pullim.local");
+  useEffect(() => {
+    setAccountMode({
+      authed: status === "authed",
+      local: isLocal,
+      onAuthExpired: async () => (await refresh()) === "authed",
+    });
+  }, [status, isLocal, refresh]);
 
   return <Ctx.Provider value={{ user, status, refresh }}>{children}</Ctx.Provider>;
 }

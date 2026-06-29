@@ -1,6 +1,7 @@
 import { it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { AuthProvider, useAuth } from "@/app/lib/use-auth";
+import * as storageMod from "@/app/lib/storage";
 
 function Probe() { const { status, user } = useAuth(); return <div>{status}:{user?.displayName ?? "-"}</div>; }
 beforeEach(() => { globalThis.fetch = vi.fn(); });
@@ -103,4 +104,31 @@ it("me401 → csrf !ok → 회전 안 함 → guest", async () => {
   });
   render(<AuthProvider><Probe /></AuthProvider>);
   await waitFor(() => expect(screen.getByText(/guest:-/)).toBeInTheDocument());
+});
+
+// ── accountMode 주입 (계정 store 라우팅) ──────────────────────────────
+it("authed 전환 시 setAccountMode({authed:true, local:false}) 주입", async () => {
+  const spy = vi.spyOn(storageMod, "setAccountMode");
+  (globalThis.fetch as any).mockResolvedValue({ ok: true, status: 200, json: async () => ({ displayName: "민수" }) });
+  render(<AuthProvider><Probe /></AuthProvider>);
+  await waitFor(() => expect(screen.getByText(/authed:민수/)).toBeInTheDocument());
+  const lastCall = spy.mock.calls.at(-1)?.[0];
+  expect(lastCall?.authed).toBe(true);
+  expect(lastCall?.local).toBe(false); // 기본 API_BASE는 dev — pullim.local 아님
+});
+
+it("onAuthExpired — refresh가 guest로 끝나면 false 반환(재시도 없이 auth 실패 낙하)", async () => {
+  const spy = vi.spyOn(storageMod, "setAccountMode");
+  // me 401 → csrf 토큰 없음 → 회전 안 함 → guest 로 refresh가 끝난다.
+  globalThis.fetch = routedFetch({
+    meSeq: [{ ok: false, status: 401, json: async () => ({}) }],
+    csrf: { ok: true, status: 200, json: async () => ({}) },
+    refresh: { ok: true, status: 200, json: async () => ({}) },
+  });
+  render(<AuthProvider><Probe /></AuthProvider>);
+  await waitFor(() => expect(screen.getByText(/guest:-/)).toBeInTheDocument());
+  // 주입된 onAuthExpired 직접 호출 → refresh가 다시 guest로 끝나므로 false.
+  const onAuthExpired = spy.mock.calls.at(-1)?.[0]?.onAuthExpired;
+  expect(onAuthExpired).toBeTypeOf("function");
+  expect(await onAuthExpired!()).toBe(false);
 });
