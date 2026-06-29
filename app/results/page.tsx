@@ -25,9 +25,16 @@ export default function ResultsListPage() {
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
   useEffect(() => {
-    const list = loadResults();
-    setItems(list);
-    setState(list.length === 0 ? "empty" : "loaded");
+    let alive = true;
+    void (async () => {
+      const list = await loadResults();
+      if (!alive) return;
+      setItems(list);
+      setState(list.length === 0 ? "empty" : "loaded");
+    })();
+    return () => {
+      alive = false;
+    };
   }, []);
 
   // 유니크 과목 — 필터 옵션 만들기 (현 데이터 기반 동적 옵션).
@@ -73,8 +80,8 @@ export default function ResultsListPage() {
     return arr;
   }, [items, subjectFilter, query, sortKey]);
 
-  function handleDelete(id: string) {
-    const result = removeResult(id);
+  async function handleDelete(id: string) {
+    const result = await removeResult(id);
     if (result.ok && result.removed) {
       const next = items.filter((r) => r.id !== id);
       setItems(next);
@@ -244,7 +251,7 @@ export default function ResultsListPage() {
                           </span>
                           <button
                             type="button"
-                            onClick={() => handleDelete(r.id)}
+                            onClick={() => void handleDelete(r.id)}
                             className="bg-band-warn text-white hover:opacity-90 rounded-md px-2 py-0.5 text-xs font-semibold"
                           >
                             삭제

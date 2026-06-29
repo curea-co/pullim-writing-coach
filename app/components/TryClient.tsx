@@ -20,16 +20,23 @@ export default function TryClient() {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    const p = loadProfile();
-    if (p) {
-      setProfile(p);
-      setState("with-profile");
-    } else {
-      setState("no-profile");
-    }
+    let alive = true;
+    void (async () => {
+      const p = await loadProfile();
+      if (!alive) return;
+      if (p) {
+        setProfile(p);
+        setState("with-profile");
+      } else {
+        setState("no-profile");
+      }
+    })();
+    return () => {
+      alive = false;
+    };
   }, []);
 
-  const handleInlineSubmit = (draft: ProfileDraft, _consent: boolean) => {
+  const handleInlineSubmit = async (draft: ProfileDraft, _consent: boolean) => {
     if (!draft.school_level || !draft.primary_subject || !draft.nickname?.trim()) return;
     if (draft.primary_subject === "기타" && !draft.primary_subject_other?.trim()) return;
     setSaveError(null);
@@ -43,7 +50,7 @@ export default function TryClient() {
       frequent_genre: draft.frequent_genre || undefined,
       consent_at: consentNow(),
     };
-    const result = saveProfile(next);
+    const result = await saveProfile(next);
     if (result.ok) {
       setProfile(next);
       setState("with-profile");

@@ -15,8 +15,9 @@ import {
   emptyConsent,
   type ConsentState,
 } from "./consent";
-
-const CONSENT_KEY = "pwc-consent-v1";
+// consent도 계정 귀속(스펙 PII (1)) — storage 어댑터가 account/local 라우팅 담당.
+//   storage는 raw payload만 read/write/clear 하고, 검증·폴백·토글은 여기서 적용(관심사 분리).
+import { loadConsentData, saveConsentData, clearConsentData } from "./storage";
 
 // 런타임 type guard — 다른 탭 손상·schema 변경에도 안전(storage.ts isProfile 패턴).
 //   각 필드는 string|null만 허용. 누락/타입 불일치 시 false → load가 emptyConsent로 폴백.
@@ -30,40 +31,22 @@ export function isConsentState(v: unknown): v is ConsentState {
   return true;
 }
 
-// LS에서 로드. 미존재·손상·SSR → emptyConsent()(기본 OFF 상태).
-export function loadConsent(): ConsentState {
-  if (typeof window === "undefined") return emptyConsent();
-  try {
-    const raw = window.localStorage.getItem(CONSENT_KEY);
-    if (!raw) return emptyConsent();
-    const parsed = JSON.parse(raw);
-    return isConsentState(parsed) ? parsed : emptyConsent();
-  } catch {
-    return emptyConsent();
-  }
+// 로드. account면 GET /api/data/consent, 아니면 LS. 미존재·손상·SSR → emptyConsent()(기본 OFF).
+export async function loadConsent(): Promise<ConsentState> {
+  const parsed = await loadConsentData();
+  return isConsentState(parsed) ? parsed : emptyConsent();
 }
 
-export function saveConsent(
+export async function saveConsent(
   state: ConsentState,
-): { ok: true } | { ok: false; reason: "quota" | "denied" | "invalid" } {
-  if (typeof window === "undefined") return { ok: false, reason: "denied" };
+): Promise<{ ok: true } | { ok: false; reason: "quota" | "denied" | "invalid" | "auth" }> {
   if (!isConsentState(state)) return { ok: false, reason: "invalid" };
-  try {
-    window.localStorage.setItem(CONSENT_KEY, JSON.stringify(state));
-    return { ok: true };
-  } catch (e) {
-    const reason = e instanceof DOMException && e.name === "QuotaExceededError" ? "quota" : "denied";
-    return { ok: false, reason };
-  }
+  const r = await saveConsentData(state);
+  return r.ok ? { ok: true } : { ok: false, reason: r.reason ?? "denied" };
 }
 
-export function clearConsent(): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.removeItem(CONSENT_KEY);
-  } catch {
-    /* swallow — clear 실패는 사용자에게 의미 없음 */
-  }
+export async function clearConsent(): Promise<void> {
+  await clearConsentData();
 }
 
 // ── 필드 단위 토글 헬퍼 — 타임스탬프는 반드시 호출부가 주입(now 인자) ──────────
