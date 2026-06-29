@@ -14,8 +14,12 @@ export async function DELETE(req: Request): Promise<Response> {
   try {
     await deleteAllUserData(sub);
     return Response.json({ ok: true }, { status: 200 });
-  } catch (e) {
-    Sentry.captureException(e, { tags: { route: "/api/data", errorCode: "E8" } });
+  } catch {
+    // Constraint 7: 예외 객체(message·stack)를 Sentry로 보내지 않는다 — 사실(route·errorCode)만 tags로.
+    Sentry.captureMessage("[/api/data] DB 작업 실패", {
+      level: "error",
+      tags: { route: "/api/data", errorCode: "E8" },
+    });
     return jsonError("E8");
   }
 }
