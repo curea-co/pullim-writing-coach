@@ -30,9 +30,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (isUser(j)) { setUser(j); setStatus("authed"); return; }
       setUser(null); setStatus("guest");
     } catch {
-      // 응답 자체를 못 받음(네트워크/CORS/미도달) — 가장 흔한 원인은 미구성이라 게스트(→로그인)로 둔다.
-      // (서버가 응답한 5xx는 위 !r.ok 분기에서 error로 구분 — 진짜 장애 은폐 방지)
-      setUser(null); setStatus("guest");
+      // 응답 자체를 못 받음(네트워크/CORS/미도달) — error로 둔다(미로그인 위장 안 함, "장애를 로그아웃으로 은폐하지 않음" 계약).
+      //   헤더는 error를 중립 "연결 오류"로 표시(로그인 버튼 X). 올바른 로컬 env(writing.pullim.local+로컬 api)면 이 catch는 안 탄다.
+      setUser(null); setStatus("error");
     }
   }, []);
 

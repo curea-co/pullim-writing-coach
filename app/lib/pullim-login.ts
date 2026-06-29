@@ -3,10 +3,22 @@
 //   WEB base: local = http://pullim.local:3001 · prod = https://pullim.ai (env로 주입, 미설정 시 prod).
 const WEB_BASE = (process.env.NEXT_PUBLIC_WEB_URL ?? "https://pullim.ai").replace(/\/$/, "");
 
+// next 값을 same-origin으로 제한 — open redirect 방지(util이 export라 외부 입력이 흘러들 수 있음).
+//   same-origin 절대 URL 또는 상대경로(/…, // 제외)만 허용, 그 외(외부)는 현재 origin 루트로.
+function safeNext(returnTo: string | undefined, fallback: () => string): string {
+  const raw = returnTo ?? fallback();
+  const origin = typeof window !== "undefined" ? window.location.origin : (process.env.NEXT_PUBLIC_WEB_URL ?? "");
+  if (raw.startsWith("/") && !raw.startsWith("//") && !raw.startsWith("/\\")) return raw; // 상대 경로
+  try {
+    const u = new URL(raw);
+    if (origin && u.origin === origin) return u.href; // same-origin 절대 URL만
+  } catch { /* 파싱 불가 → 폴백 */ }
+  return origin || "/";
+}
+
 // 복귀 경로는 `next` 쿼리로 전달 — pullim 지침·api.md SoT·pullim-web /login(LoginClient: get('next')) 정합.
 function withNext(path: string, returnTo: string | undefined, fallback: () => string): string {
-  const next = returnTo ?? fallback();
-  return `${WEB_BASE}${path}?next=${encodeURIComponent(next)}`;
+  return `${WEB_BASE}${path}?next=${encodeURIComponent(safeNext(returnTo, fallback))}`;
 }
 
 // 로그인 페이지 URL. returnTo 미지정 시 현재 전체 URL(로그인 후 복귀).
