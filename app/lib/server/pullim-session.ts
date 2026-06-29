@@ -18,9 +18,12 @@ import { createHash, timingSafeEqual } from "node:crypto";
 // access 쿠키 이름 — dev/prod는 Domain=.pullim.ai 로 writing-coach 서버에 도달.
 const ACCESS_COOKIE = "dev-pullim-at";
 
-// 인증 API 호스트 — local·dev·prod 환경변수로 주입(미설정 시 dev).
+// 인증 API 호스트 — env로 주입. prod에서 미설정 시 dev로 fallback하면 서버 인증 검증이 dev-api로
+//   새므로 빈 값(=상대요청 → 서버 fetch 실패 → verify catch에서 fail-closed). dev/local만 기본값.
 function apiBase(): string {
-  return (process.env.NEXT_PUBLIC_API_URL ?? "https://dev-api.pullim.ai").replace(/\/$/, "");
+  const v = process.env.NEXT_PUBLIC_API_URL;
+  if (v) return v.replace(/\/$/, "");
+  return process.env.NODE_ENV === "production" ? "" : "https://dev-api.pullim.ai";
 }
 
 // 길이 누설 방지: 양쪽을 고정 길이 해시로 비교(timingSafeEqual은 길이 다르면 throw).

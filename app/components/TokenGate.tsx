@@ -13,7 +13,7 @@
 //   x-demo-token 헤더로 보내고(useScoreForm·CoachClient·extract-client), 서버 verifyWritingAccess가
 //   비prod 한정 데모 fallback으로 통과시킨다. DEMO_TOKEN_KEY export는 그 송신부가 import한다.
 
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useAuth } from "@/app/lib/use-auth";
 import { loginUrl } from "@/app/lib/pullim-login";
 import ScoreWizard from "./ScoreWizard";
@@ -69,9 +69,32 @@ export default function TokenGate({
   // 인가 판정: 중앙 SSO authed 이거나, 로컬 데모 토큰 보유(로컬 한정 폼 진입).
   const allowed = status === "authed" || demoToken !== null;
 
-  if (allowed) {
+  // 한 번 진입(allowed)했으면 기억한다 — 이후 401로 토큰이 폐기돼도 위저드를 언마운트하지 않아
+  //   작성 중인 글을 보존하기 위함(아래 needsReauth 배너만 올린다).
+  const [entered, setEntered] = useState(false);
+  useEffect(() => {
+    if (allowed) setEntered(true);
+  }, [allowed]);
+
+  // 진입한 적 있으면 위저드를 계속 렌더(상태=작성 글 보존). allowed가 풀렸으면(401 등) 재인증 배너만 올린다.
+  if (allowed || entered) {
+    const needsReauth = !allowed; // 진입 후 토큰 폐기(서버 401) — 폼은 유지, 재로그인 유도.
     return (
       <div className="space-y-4">
+        {needsReauth && (
+          <div className="border-border bg-surface flex flex-wrap items-center justify-between gap-2 rounded-xl border px-4 py-3">
+            <p className="text-foreground text-sm">
+              세션이 만료됐어요. <span className="text-muted-foreground">작성 중인 글은 그대로 유지됩니다.</span>
+            </p>
+            <button
+              type="button"
+              onClick={() => window.location.assign(loginUrl())}
+              className="bg-primary text-primary-foreground rounded-lg px-4 py-2 text-sm font-semibold transition hover:opacity-90"
+            >
+              다시 로그인
+            </button>
+          </div>
+        )}
         {children ? (
           children(handleAuthExpired)
         ) : (
