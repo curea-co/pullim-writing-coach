@@ -92,14 +92,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // 계정 store 어댑터에 모드 주입 — authed && !local이면 /api/data path. local(host-only 쿠키)은 localStorage 폴백.
   //   onAuthExpired는 refresh 결과를 그대로 반환 — authed면 true(재요청), guest/error면 false(재시도 없이 auth 실패 낙하).
+  //
+  // ★ PR #115 결함 1: 렌더 중 동기 주입(useEffect 금지).
+  //   React effect 실행 순서는 자식 → 부모다. 주입을 useEffect로 두면 소비자(자식)의
+  //   load effect가 부모의 setAccountMode effect보다 먼저 돌아, 첫 load가 stale accountMode
+  //   (기본 guest=localStorage)로 서버 데이터를 못 읽는다(로그인 유저 데이터 누락).
+  //   부모 렌더는 자식 effect보다 항상 먼저 실행되므로, 렌더 중 호출하면 첫 load 시점에
+  //   accountMode가 최신이다. setAccountMode는 모듈 전역 변수 대입이라 idempotent — 매 렌더
+  //   호출해도 부수효과·렌더 트리거 없음(React state 아님).
   const isLocal = API_BASE.includes("pullim.local");
-  useEffect(() => {
-    setAccountMode({
-      authed: status === "authed",
-      local: isLocal,
-      onAuthExpired: async () => (await refresh()) === "authed",
-    });
-  }, [status, isLocal, refresh]);
+  setAccountMode({
+    authed: status === "authed",
+    local: isLocal,
+    onAuthExpired: async () => (await refresh()) === "authed",
+  });
 
   return <Ctx.Provider value={{ user, status, refresh }}>{children}</Ctx.Provider>;
 }
