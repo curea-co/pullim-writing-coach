@@ -36,14 +36,26 @@ function useApi(): boolean {
   return accountMode.authed && !accountMode.local;
 }
 
-// 계정 store 읽기 — 401이면 refresh 1회 후 재시도. 실패 시 null(로컬 폴백 금지).
+// 계정 store 읽기 — 401이면 refresh 1회 후 재시도.
+// ★ PR #115 결함 2: "데이터 없음"(200 + payload null)과 "읽기 실패"(401/403/5xx/네트워크)를 구분한다.
+//   기존 구현은 둘 다 null로 뭉개 빈 결과로 둔갑시켰다(로그인 유저의 실제 데이터를 "없음"으로 오인).
+//   → 200이면 payload 반환, 그 외(401 재시도 후도)·네트워크 throw는 Error를 던진다.
+//   호출부(readKey 경유): 중요 데이터(loadResults·loadProfile)는 throw를 전파해 에러 UI를,
+//   비중요 데이터(loadDraft·loadMetaUsage·loadRevisions·loadConsentData)는 자체 try/catch로 안전 기본값.
+//   로컬(비 useApi) 경로는 기존대로 throw 없음.
 async function apiGet(key: DataKey): Promise<unknown> {
-  let res = await fetch(`/api/data/${key}`, { method: "GET", credentials: "include", cache: "no-store" });
-  if (res.status === 401 && accountMode.onAuthExpired) {
-    const ok = await accountMode.onAuthExpired();
-    if (ok) res = await fetch(`/api/data/${key}`, { method: "GET", credentials: "include", cache: "no-store" });
+  let res: Response;
+  try {
+    res = await fetch(`/api/data/${key}`, { method: "GET", credentials: "include", cache: "no-store" });
+    if (res.status === 401 && accountMode.onAuthExpired) {
+      const ok = await accountMode.onAuthExpired();
+      if (ok) res = await fetch(`/api/data/${key}`, { method: "GET", credentials: "include", cache: "no-store" });
+    }
+  } catch {
+    // 네트워크/CORS/미도달 — 빈 데이터와 구분해 읽기 실패로 던진다.
+    throw new Error(`apiGet(${key}): network error`);
   }
-  if (res.status !== 200) return null;
+  if (res.status !== 200) throw new Error(`apiGet(${key}): HTTP ${res.status}`);
   const body = (await res.json().catch(() => null)) as { payload?: unknown } | null;
   return body?.payload ?? null;
 }
@@ -209,7 +221,13 @@ function isRevisionThread(v: unknown): v is RevisionThread {
 }
 
 export async function loadRevisions(): Promise<RevisionThread[]> {
-  const parsed = await readKey("revisions");
+  // PR #115 결함 2: 비중요 데이터 — 읽기 실패(apiGet throw)는 일시 장애로 보고 빈 배열로 관대 처리.
+  let parsed: unknown;
+  try {
+    parsed = await readKey("revisions");
+  } catch {
+    return [];
+  }
   if (!Array.isArray(parsed)) return [];
   return parsed.filter(isRevisionThread);
 }
@@ -342,7 +360,13 @@ export function isDraftSnapshot(v: unknown): v is DraftSnapshot {
 }
 
 export async function loadDraft(): Promise<DraftSnapshot | null> {
-  const parsed = await readKey("drafts");
+  // PR #115 결함 2: 비중요 데이터 — 읽기 실패는 null(복원 배너 미노출). 입력 흐름은 막지 않는다.
+  let parsed: unknown;
+  try {
+    parsed = await readKey("drafts");
+  } catch {
+    return null;
+  }
   return isDraftSnapshot(parsed) ? parsed : null;
 }
 
@@ -526,7 +550,13 @@ function dedupAndCapLRU(entries: MetaUsageEntry[]): MetaUsageEntry[] {
 }
 
 export async function loadMetaUsage(): Promise<MetaUsage> {
-  const parsed = await readKey("meta_usage");
+  // PR #115 결함 2: 비중요 데이터 — 읽기 실패는 빈 LRU(학습 이력 일시 미반영). 채점 흐름은 막지 않는다.
+  let parsed: unknown;
+  try {
+    parsed = await readKey("meta_usage");
+  } catch {
+    return emptyMetaUsage();
+  }
   if (typeof parsed !== "object" || parsed === null) return emptyMetaUsage();
   const o = parsed as Record<string, unknown>;
   const result = emptyMetaUsage();
@@ -619,7 +649,13 @@ export async function getMostUsedMeta(field: MetaField): Promise<string | null> 
 //   6번째가 정상이면, cap이 enum 필터보다 먼저 일어나면 정상 이력이 영원히 잘림.
 //   raw에서 다시 읽어 enum 필터 → dedup → cap 순서 보장.
 export async function loadValidatedMetaUsage(): Promise<MetaUsage> {
-  const parsed = await readKey("meta_usage");
+  // PR #115 결함 2: 비중요 데이터 — 읽기 실패는 빈 LRU(prefill 미반영, ScoreForm 수동 입력 폴백).
+  let parsed: unknown;
+  try {
+    parsed = await readKey("meta_usage");
+  } catch {
+    return emptyMetaUsage();
+  }
   if (typeof parsed !== "object" || parsed === null) return emptyMetaUsage();
   const o = parsed as Record<string, unknown>;
   const result = emptyMetaUsage();
@@ -643,7 +679,12 @@ export async function clearMetaUsage(): Promise<void> {
 //   consent 상태도 계정 귀속(스펙 PII (1)). storage는 raw payload만 read/write/clear 하고,
 //   검증(isConsentState)·emptyConsent 폴백·필드 토글은 consent-store.ts가 적용.
 export async function loadConsentData(): Promise<unknown | null> {
-  return readKey("consent");
+  // PR #115 결함 2: 비중요 데이터 통로 — 읽기 실패는 null(consent-store가 emptyConsent 폴백).
+  try {
+    return await readKey("consent");
+  } catch {
+    return null;
+  }
 }
 
 export async function saveConsentData(

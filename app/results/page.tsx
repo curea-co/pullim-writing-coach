@@ -8,15 +8,18 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { loadResults, removeResult, type ResultEntry } from "../lib/storage";
+import { useAuth } from "../lib/use-auth";
 import { getTotalScoreBand } from "../data/scoring";
 import { cn } from "../lib/utils";
 import Breadcrumb from "../components/Breadcrumb";
 import CtaBand from "../components/CtaBand";
 
-type LoadState = "loading" | "empty" | "loaded";
+// PR #115 결함 2: "결과 없음"(empty)과 "읽기 실패"(error)를 분리 — 빈 상태 카피가 장애를 은폐하지 않게.
+type LoadState = "loading" | "empty" | "loaded" | "error";
 type SortKey = "date_desc" | "date_asc" | "score_desc" | "score_asc";
 
 export default function ResultsListPage() {
+  const { status } = useAuth();
   const [state, setState] = useState<LoadState>("loading");
   const [items, setItems] = useState<ResultEntry[]>([]);
   const [subjectFilter, setSubjectFilter] = useState<string>("");
@@ -24,18 +27,26 @@ export default function ResultsListPage() {
   const [sortKey, setSortKey] = useState<SortKey>("date_desc");
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
+  // PR #115 결함 1: status가 resolved될 때까지 보류 + guest→authed 전환 시 재로드(서버 데이터 누락 차단).
   useEffect(() => {
+    if (status === "loading") return;
     let alive = true;
     void (async () => {
-      const list = await loadResults();
-      if (!alive) return;
-      setItems(list);
-      setState(list.length === 0 ? "empty" : "loaded");
+      try {
+        const list = await loadResults();
+        if (!alive) return;
+        setItems(list);
+        setState(list.length === 0 ? "empty" : "loaded");
+      } catch {
+        // PR #115 결함 2: 읽기 실패(401/403/5xx/네트워크) — 빈 상태가 아니라 에러 상태로.
+        if (!alive) return;
+        setState("error");
+      }
     })();
     return () => {
       alive = false;
     };
-  }, []);
+  }, [status]);
 
   // 유니크 과목 — 필터 옵션 만들기 (현 데이터 기반 동적 옵션).
   const subjects = useMemo(() => {
@@ -103,6 +114,36 @@ export default function ResultsListPage() {
 
       {state === "loading" && (
         <p className="text-muted-foreground text-sm">불러오는 중…</p>
+      )}
+
+      {state === "error" && (
+        <section
+          role="alert"
+          className="border-band-warn-surface bg-band-warn-surface/30 rounded-xl border p-8 text-left"
+        >
+          <p className="text-foreground text-base font-semibold">결과를 불러오지 못했어요</p>
+          <p className="text-muted-foreground break-keep mt-2 text-sm">
+            일시적인 연결 문제일 수 있어요. 잠시 후 다시 시도해 주세요.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setState("loading");
+              void (async () => {
+                try {
+                  const list = await loadResults();
+                  setItems(list);
+                  setState(list.length === 0 ? "empty" : "loaded");
+                } catch {
+                  setState("error");
+                }
+              })();
+            }}
+            className="bg-primary text-primary-foreground mt-5 inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold transition hover:opacity-90"
+          >
+            다시 시도
+          </button>
+        </section>
       )}
 
       {state === "empty" && (

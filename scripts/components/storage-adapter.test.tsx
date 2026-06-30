@@ -70,12 +70,22 @@ it("accountMode — GET 401 → refresh 콜백 1회 → 재시도", async () => 
   expect((globalThis.fetch as any).mock.calls.length).toBe(2);
 });
 
-it("accountMode — GET 401 → refresh가 false면 재시도 없이 빈 상태", async () => {
+it("accountMode — GET 401 → refresh가 false면 재시도 없이 읽기 실패(throw)", async () => {
+  // PR #115 결함 2: 중요 데이터(loadResults)는 401(읽기 실패)을 빈 상태로 뭉개지 않고 throw한다.
+  //   ("데이터 없음"=200+payload null과 구분 — 소비자가 에러 UI를 띄울 수 있게.)
   const refresh = vi.fn().mockResolvedValue(false);
   storage.setAccountMode({ authed: true, local: false, onAuthExpired: refresh });
   (globalThis.fetch as any).mockResolvedValueOnce({ status: 401, json: async () => ({}) });
-  const list = await storage.loadResults();
+  await expect(storage.loadResults()).rejects.toThrow();
   expect(refresh).toHaveBeenCalledTimes(1);
   expect((globalThis.fetch as any).mock.calls.length).toBe(1);
-  expect(list).toEqual([]);
+});
+
+it("accountMode — 비중요 데이터(loadDraft/loadRevisions)는 GET 401 읽기 실패를 안전 기본값으로", async () => {
+  // PR #115 결함 2: loadDraft/loadMetaUsage/loadRevisions/loadConsentData는 일시 장애에 관대 — throw 흡수.
+  const refresh = vi.fn().mockResolvedValue(false);
+  storage.setAccountMode({ authed: true, local: false, onAuthExpired: refresh });
+  (globalThis.fetch as any).mockResolvedValue({ status: 401, json: async () => ({}) });
+  expect(await storage.loadDraft()).toBeNull();
+  expect(await storage.loadRevisions()).toEqual([]);
 });

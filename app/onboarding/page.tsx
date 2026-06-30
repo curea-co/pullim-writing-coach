@@ -29,6 +29,7 @@ import {
   setServiceConsent,
 } from "../lib/consent-store";
 import { consentNow, loadProfile, saveProfile, type Profile } from "../lib/storage";
+import { useAuth } from "../lib/use-auth";
 
 type Step = 1 | 2 | 3;
 const TOTAL_STEPS = 3;
@@ -36,6 +37,7 @@ const TOTAL_STEPS = 3;
 function OnboardingInner() {
   const router = useRouter();
   const params = useSearchParams();
+  const { status } = useAuth();
   const force = params.get("force") === "1";
 
   // 초기 step 결정 + 이미 프로필 있으면 redirect (force=1 이면 무시).
@@ -45,14 +47,23 @@ function OnboardingInner() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedProfile, setSavedProfile] = useState<Profile | null>(null);
 
+  // PR #115 결함 1: status resolved 전 보류 + 전환 시 재확인(authed인데 guest로 읽어 redirect를
+  //   놓치는 회귀 차단). 결함 2: loadProfile throw(읽기 실패) — redirect 게이트는 보수적으로
+  //   "프로필 없음"으로 보고 온보딩을 노출(에러 UI 불필요, 사용자가 다시 진행 가능).
   useEffect(() => {
     if (force) {
       setCheckedProfile(true);
       return;
     }
+    if (status === "loading") return;
     let alive = true;
     void (async () => {
-      const profile = await loadProfile();
+      let profile: Profile | null = null;
+      try {
+        profile = await loadProfile();
+      } catch {
+        profile = null;
+      }
       if (!alive) return;
       if (profile) {
         router.replace("/");
@@ -63,7 +74,7 @@ function OnboardingInner() {
     return () => {
       alive = false;
     };
-  }, [force, router]);
+  }, [force, router, status]);
 
   // 프로필 체크 전엔 빈 화면(깜박임 방지) — 짧은 시간이라 스피너 생략.
   if (!checkedProfile) return null;
@@ -311,7 +322,14 @@ function Step3({ profile }: { profile: Profile | null }) {
   useEffect(() => {
     let alive = true;
     void (async () => {
-      const has = !!(await loadProfile());
+      // PR #115 결함 2: 읽기 실패 시 step1 강제 복귀(redirect) 회귀를 피하려 안전하게 "있음"으로 가정.
+      //   직전 Step2에서 막 저장한 흐름이라 보수적으로 hasProfile=true(불필요한 step1 복귀 방지).
+      let has = true;
+      try {
+        has = !!(await loadProfile());
+      } catch {
+        has = true;
+      }
       if (alive) setHasProfile(has);
     })();
     return () => {

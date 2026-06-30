@@ -7,11 +7,13 @@
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import { getResult, type ResultEntry } from "../../lib/storage";
+import { useAuth } from "../../lib/use-auth";
 import Breadcrumb from "../../components/Breadcrumb";
 import ResultView from "../../components/ResultView";
 import CtaBand from "../../components/CtaBand";
 
-type LoadState = "loading" | "missing" | "loaded";
+// PR #115 결함 2: "id 미발견"(missing)과 "읽기 실패"(error)를 분리.
+type LoadState = "loading" | "missing" | "loaded" | "error";
 
 export default function ResultDetailPage({
   params,
@@ -20,30 +22,83 @@ export default function ResultDetailPage({
 }) {
   // Next.js 16 — params는 Promise. use()로 client 컴포넌트에서 unwrap.
   const { id } = use(params);
+  const { status } = useAuth();
   const [state, setState] = useState<LoadState>("loading");
   const [entry, setEntry] = useState<ResultEntry | null>(null);
 
+  // PR #115 결함 1: status resolved 전 보류 + 전환 시 재로드. 결함 2: getResult throw → 에러 상태.
   useEffect(() => {
+    if (status === "loading") return;
     let alive = true;
     void (async () => {
-      const r = await getResult(id);
-      if (!alive) return;
-      if (r) {
-        setEntry(r);
-        setState("loaded");
-      } else {
-        setState("missing");
+      try {
+        const r = await getResult(id);
+        if (!alive) return;
+        if (r) {
+          setEntry(r);
+          setState("loaded");
+        } else {
+          setState("missing");
+        }
+      } catch {
+        if (!alive) return;
+        setState("error");
       }
     })();
     return () => {
       alive = false;
     };
-  }, [id]);
+  }, [id, status]);
 
   if (state === "loading") {
     return (
       <main className="w-full max-w-4xl px-5 py-8 md:py-12">
         <p className="text-muted-foreground text-sm">불러오는 중…</p>
+      </main>
+    );
+  }
+
+  if (state === "error") {
+    return (
+      <main className="w-full max-w-4xl px-5 py-8 md:py-12">
+        <Breadcrumb
+          items={[
+            { label: "홈", href: "/" },
+            { label: "채점 결과 조회", href: "/results" },
+            { label: "불러오기 실패" },
+          ]}
+        />
+        <section
+          role="alert"
+          className="border-band-warn-surface bg-band-warn-surface/30 rounded-xl border p-6 text-left"
+        >
+          <p className="text-foreground text-base font-semibold">결과를 불러오지 못했어요</p>
+          <p className="text-muted-foreground mt-2 text-sm">
+            일시적인 연결 문제일 수 있어요. 잠시 후 다시 시도해 주세요.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setState("loading");
+              void (async () => {
+                try {
+                  const r = await getResult(id);
+                  if (r) {
+                    setEntry(r);
+                    setState("loaded");
+                  } else {
+                    setState("missing");
+                  }
+                } catch {
+                  setState("error");
+                }
+              })();
+            }}
+            className="bg-primary text-primary-foreground mt-4 inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold transition hover:opacity-90"
+          >
+            다시 시도
+          </button>
+        </section>
       </main>
     );
   }
