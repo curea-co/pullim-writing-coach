@@ -178,7 +178,8 @@ describe("ScoreWizard", () => {
     }));
     const user = userEvent.setup();
     render(<ScoreWizard />);
-    expect(screen.getByText("📝 이전에 쓰던 작업이 있어요")).toBeInTheDocument();
+    // loadDraft가 async — 복원 배너는 마운트 effect 완료 후 노출.
+    expect(await screen.findByText("📝 이전에 쓰던 작업이 있어요")).toBeInTheDocument();
     expectBodyEmpty();
     await user.click(screen.getByRole("button", { name: "이어 쓰기" }));
     expectBodyContent(MOCK_BODY);
@@ -242,7 +243,7 @@ describe("ScoreWizard", () => {
     );
     const user = userEvent.setup();
     render(<ScoreWizard />);
-    await user.click(screen.getByRole("button", { name: "이어 쓰기" }));
+    await user.click(await screen.findByRole("button", { name: "이어 쓰기" }));
     expectBodyContent(MOCK_BODY);
     // Step 2 진입해 meta 검증
     await waitFor(() => expect(screen.getByRole("button", { name: /다음 단계/ })).toBeEnabled());

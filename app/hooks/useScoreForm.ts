@@ -27,7 +27,7 @@ import {
   getMostUsedMeta,
   getThread,
   loadDraft,
-  recordMetaUsage,
+  recordMetaUsageBatch,
   type RevisionEntry,
   saveDraft,
 } from "@/app/lib/storage";
@@ -137,16 +137,11 @@ export function useScoreForm(opts: {
   const { onAuthExpired, defaults, onResubmit } = opts;
 
   // 초기값 우선순위: profile defaults > LRU 최빈값 > 빈 문자열.
-  const [schoolLevel, setSchoolLevel] = useState(
-    () => defaults?.school_level ?? getMostUsedMeta("school_level") ?? "",
-  );
-  const [subject, setSubject] = useState(
-    () => defaults?.subject ?? getMostUsedMeta("subject") ?? "",
-  );
-  const [genre, setGenre] = useState(
-    () => defaults?.genre ?? getMostUsedMeta("genre") ?? "",
-  );
-  const [targetRaw, setTargetRaw] = useState(() => getMostUsedMeta("target_raw") ?? "");
+  //   getMostUsedMeta가 async가 되어 lazy initializer 불가 → defaults로 초기화 후 effect로 LRU 채움.
+  const [schoolLevel, setSchoolLevel] = useState(defaults?.school_level ?? "");
+  const [subject, setSubject] = useState(defaults?.subject ?? "");
+  const [genre, setGenre] = useState(defaults?.genre ?? "");
+  const [targetRaw, setTargetRaw] = useState("");
   const [promptText, setPromptText] = useState("");
   const [body, setBody] = useState("");
   const [bodyHtml, setBodyHtml] = useState("");
@@ -173,32 +168,54 @@ export function useScoreForm(opts: {
   // Refs for scroll
   const outcomeRef = useRef<HTMLDivElement>(null);
 
-  // #9 마운트 시 1회 — 저장된 draft가 있으면 배너로 사용자에게 선택권 부여.
+  // LRU 최빈값 prefill — async라 마운트 effect로. defaults(profile)·복원·사용자 입력이 우선이므로
+  //   함수형 갱신으로 "아직 빈 값일 때만" 채운다(늦게 도착한 LRU가 복원값을 덮어쓰는 회귀 방지).
   useEffect(() => {
-    const draft = loadDraft();
-    if (
-      draft &&
-      (draft.body.trim().length > 0 || (draft.prompt_text ?? "").trim().length > 0)
-    ) {
-      setRestoredDraft(draft);
-    }
+    let alive = true;
+    void (async () => {
+      if (!defaults?.school_level) {
+        const v = await getMostUsedMeta("school_level");
+        if (alive && v) setSchoolLevel((prev) => prev || v);
+      }
+      if (!defaults?.subject) {
+        const v = await getMostUsedMeta("subject");
+        if (alive && v) setSubject((prev) => prev || v);
+      }
+      if (!defaults?.genre) {
+        const v = await getMostUsedMeta("genre");
+        if (alive && v) setGenre((prev) => prev || v);
+      }
+      const t = await getMostUsedMeta("target_raw");
+      if (alive && t) setTargetRaw((prev) => prev || t);
+    })();
+    return () => {
+      alive = false;
+    };
+    // defaults는 prefill 우선순위 — 마운트 1회. 복원/입력값은 함수형 갱신으로 보존.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // #B 마운트 시 1회 — 클립보드에 의미 있는 텍스트가 있으면 배너로 1클릭 붙여넣기 제공.
+  // #9·#B 마운트 시 1회 — draft·클립보드 로직을 단일 async effect로 병합(loadDraft 1회만 호출).
+  //   account mode에서 loadDraft가 /api/data 왕복이라 중복 fetch·완료순서 레이스를 막으려 단일 결과를 공유.
   useEffect(() => {
-    if (typeof navigator === "undefined" || !navigator.clipboard?.readText) return;
-    if (loadDraft() !== null) return;
     let cancelled = false;
-    navigator.clipboard
-      .readText()
-      .then((text) => {
+    void (async () => {
+      const draft = await loadDraft(); // ★ 1회만 — 두 로직이 같은 결과를 공유(중복 fetch·레이스 제거)
+      if (cancelled) return;
+      if (draft && (draft.body.trim().length > 0 || (draft.prompt_text ?? "").trim().length > 0)) {
+        setRestoredDraft(draft);
+        return; // draft가 있으면 클립보드 배너 억제(기존 동기 가드와 동일 의미)
+      }
+      if (typeof navigator === "undefined" || !navigator.clipboard?.readText) return;
+      try {
+        const text = await navigator.clipboard.readText();
         if (cancelled) return;
         const trimmed = text?.trim() ?? "";
         if (trimmed.length >= 30) setClipboardPreview(text);
-      })
-      .catch(() => {
+      } catch {
         // 권한 거절 / 미지원 — 조용히 폴백
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -218,16 +235,18 @@ export function useScoreForm(opts: {
     const meaningful = body.trim().length > 0 || promptText.trim().length > 0;
     if (!meaningful) return;
     const t = setTimeout(() => {
-      const res = saveDraft({
-        body,
-        body_html: bodyHtml,
-        school_level: schoolLevel || undefined,
-        subject: subject || undefined,
-        genre: genre || undefined,
-        target_raw: targetRaw || undefined,
-        prompt_text: promptText || undefined,
-      });
-      if (res.ok) setLastSavedAt(res.saved_at);
+      void (async () => {
+        const res = await saveDraft({
+          body,
+          body_html: bodyHtml,
+          school_level: schoolLevel || undefined,
+          subject: subject || undefined,
+          genre: genre || undefined,
+          target_raw: targetRaw || undefined,
+          prompt_text: promptText || undefined,
+        });
+        if (res.ok) setLastSavedAt(res.saved_at);
+      })();
     }, 800);
     return () => clearTimeout(t);
   }, [body, bodyHtml, schoolLevel, subject, genre, targetRaw, promptText, submitState.phase, restoredDraft]);
@@ -235,7 +254,7 @@ export function useScoreForm(opts: {
   // #9 제출 성공 시 draft 폐기.
   useEffect(() => {
     if (submitState.phase === "result") {
-      clearDraft();
+      void clearDraft();
       setLastSavedAt(null);
     }
   }, [submitState.phase]);
@@ -255,7 +274,7 @@ export function useScoreForm(opts: {
 
   function dismissRestore() {
     setRestoredDraft(null);
-    clearDraft();
+    void clearDraft();
     setLastSavedAt(null);
   }
 
@@ -474,7 +493,7 @@ export function useScoreForm(opts: {
     if (res.ok) {
       try {
         const output = (await res.json()) as F3Output;
-        addResult({
+        await addResult({
           assignment: payload.assignment,
           submission: {
             body: payload.submission.body,
@@ -483,14 +502,17 @@ export function useScoreForm(opts: {
           output,
         });
 
-        recordMetaUsage("school_level", payload.assignment.school_level);
-        recordMetaUsage("subject", payload.assignment.subject);
-        recordMetaUsage("genre", payload.assignment.genre);
-        if (payload.assignment.target_char_count !== null) {
-          recordMetaUsage("target_raw", String(payload.assignment.target_char_count));
-        }
+        // 단일 RMW로 4필드 일괄 기록(Promise.all 금지 — 같은 meta_usage 키 lost update 방지).
+        await recordMetaUsageBatch([
+          ["school_level", payload.assignment.school_level],
+          ["subject", payload.assignment.subject],
+          ["genre", payload.assignment.genre],
+          ...(payload.assignment.target_char_count !== null
+            ? [["target_raw", String(payload.assignment.target_char_count)] as const]
+            : []),
+        ]);
 
-        const revRes = addRevision(revisionThreadId, {
+        const revRes = await addRevision(revisionThreadId, {
           assignment: payload.assignment,
           submission: {
             body: payload.submission.body,
@@ -500,7 +522,7 @@ export function useScoreForm(opts: {
         });
         if (revRes.ok) {
           setRevisionThreadId(revRes.thread_id);
-          const thread = getThread(revRes.thread_id);
+          const thread = await getThread(revRes.thread_id);
           if (thread && thread.revisions.length >= 2) {
             const rs = thread.revisions;
             setRevisionPair({ v1: rs[rs.length - 2], v2: rs[rs.length - 1] });

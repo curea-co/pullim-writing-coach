@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useImperativeHandle } from "react";
+import { useEffect, useImperativeHandle, useRef } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import TextStyle from "@tiptap/extension-text-style";
@@ -27,6 +27,16 @@ export interface RichEditorProps {
 export default function RichEditor({
   valueHtml, onChange, spellcheck = false, disabled = false, placeholder, editorRef, ariaLabel, ariaDescribedby, onToggleSpellcheck, dataTestid, editableClassName, editableId,
 }: RichEditorProps) {
+  // ★ PR #115 결함 4: 에디터 ↔ 호스트 desync 방지.
+  //   immediatelyRender:false로 에디터가 비동기 마운트되며 webkit에서 "빈 초기 onUpdate"를 늦게
+  //   발사하는데, 그 echo가 파일 업로드·복원·클립보드로 막 채운 호스트 body를 ""로 되돌려 desync
+  //   시켰다(E2E flaky: 에디터엔 본문 보이는데 '다음 단계' 비활성).
+  //   가드: 사용자 입력이 한 번이라도 들어오기 전(userTyped=false)에 발사되는 "빈 내용" onUpdate는
+  //   사용자 편집이 아니라 마운트/프로그램적 echo다 → host onChange를 발사하지 않는다. 사용자가
+  //   실제로 입력하기 시작하면(비어있지 않은 onUpdate 1회) 이후 전체 삭제(빈 onUpdate)는 정상 전파.
+  const userTyped = useRef<boolean>(false);
+  const isEmptyText = (t: string) => t.trim().length === 0;
+
   const editor = useEditor({
     immediatelyRender: false, // SSR 안전
     editable: !disabled,
@@ -63,7 +73,12 @@ export default function RichEditor({
     },
     onUpdate: ({ editor }) => {
       const html = editor.getHTML();
-      onChange({ html, text: htmlToPlain(html) });
+      const text = htmlToPlain(html);
+      // 비어있지 않은 onUpdate면 사용자 입력이 시작된 것으로 표시(이후 빈 onUpdate는 정상 전파).
+      if (!isEmptyText(text)) userTyped.current = true;
+      // 사용자 입력 전의 빈 echo(마운트/프로그램적)는 호스트를 ""로 덮지 않게 차단.
+      else if (!userTyped.current) return;
+      onChange({ html, text });
     },
   });
 
@@ -83,9 +98,9 @@ export default function RichEditor({
     },
   }), [editor, editorRef]);
 
-  // valueHtml prop 변화를 에디터에 동기화 (복원/리셋 시 반영).
+  // valueHtml prop 변화를 에디터에 동기화 (복원/리셋·파일 업로드·클립보드 시 반영).
   // 타이핑 중엔 호스트가 getHTML()을 valueHtml에 저장하므로 값이 같아 setContent 스킵 → 커서 유지.
-  // emitUpdate=false로 onChange를 재발사하지 않음.
+  // emitUpdate=false로 onChange를 재발사하지 않음(호스트가 이미 body/bodyHtml을 함께 세팅).
   useEffect(() => {
     if (!editor) return;
     const current = editor.getHTML();

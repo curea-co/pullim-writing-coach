@@ -4,11 +4,11 @@
 //   initial이 있으면(모드 선택에서 '과제 다시 입력'으로 복귀) 그 값을 복원 — 입력 유실 방지(curea-review-ai 지적).
 //   없으면 프로필 기반 prefill, 과제 내용은 빈 상태로 시작.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import MetaForm from "@/app/components/MetaForm";
 import { type CoachAssignment, validateAssignment } from "@/app/lib/coach-setup";
 import { TARGET_MIN, TARGET_MAX } from "@/app/lib/grading";
-import { loadProfile } from "@/app/lib/storage";
+import { loadProfile, type Profile } from "@/app/lib/storage";
 
 export default function AssignmentStep({
   initial,
@@ -19,19 +19,36 @@ export default function AssignmentStep({
   onSubmit: (a: CoachAssignment) => void;
   onDraftChange?: (a: CoachAssignment) => void; // 입력 중 draft 영속(디바운스) — 새로고침 보호
 }) {
-  const profile = useMemo(() => loadProfile(), []);
-  const [schoolLevel, setSchoolLevel] = useState<string>(
-    initial?.school_level ?? profile?.school_level ?? "중2",
-  );
-  const [subject, setSubject] = useState<string>(
-    initial?.subject ??
-      (profile?.primary_subject && profile.primary_subject !== "기타" ? profile.primary_subject : "과학"),
-  );
-  const [genre, setGenre] = useState<string>(initial?.genre ?? profile?.frequent_genre ?? "설명문");
+  // 프로필 기반 prefill — 비동기 로드(account mode면 /api/data 왕복). initial(과제 복원)·사용자 입력이
+  //   우선이므로, 프로필 prefill은 "사용자가 아직 안 건드린 필드"에만 함수형 갱신으로 적용한다.
+  const hasInitial = initial != null;
+  const [schoolLevel, setSchoolLevel] = useState<string>(initial?.school_level ?? "중2");
+  const [subject, setSubject] = useState<string>(initial?.subject ?? "과학");
+  const [genre, setGenre] = useState<string>(initial?.genre ?? "설명문");
   const [targetRaw, setTargetRaw] = useState(
     initial?.target_char_count != null ? String(initial.target_char_count) : "",
   );
   const [promptText, setPromptText] = useState(initial?.prompt_text ?? "");
+
+  useEffect(() => {
+    if (hasInitial) return; // 과제 복원값이 있으면 프로필 prefill 안 함(유실 방지)
+    let alive = true;
+    void (async () => {
+      const profile: Profile | null = await loadProfile();
+      if (!alive || !profile) return;
+      // 기본 fallback("중2"·"과학"·"설명문") 상태일 때만 프로필 값으로 덮어쓴다.
+      setSchoolLevel((prev) => (prev === "중2" && profile.school_level ? profile.school_level : prev));
+      setSubject((prev) =>
+        prev === "과학" && profile.primary_subject && profile.primary_subject !== "기타"
+          ? profile.primary_subject
+          : prev,
+      );
+      setGenre((prev) => (prev === "설명문" && profile.frequent_genre ? profile.frequent_genre : prev));
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [hasInitial]);
 
   const targetTrimmed = targetRaw.trim();
   const targetNum = targetTrimmed === "" ? null : Number(targetTrimmed);

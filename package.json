@@ -11,9 +11,11 @@
     "test:components": "vitest run --config vitest.config.ts",
     "test:e2e": "playwright test",
     "test:all": "npm run test:unit && npm run test:components",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "node scripts/db-migrate.mjs"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
     "@sentry/nextjs": "^10.56.0",
     "@tiptap/extension-text-style": "^2.27.2",
     "@tiptap/react": "^2.27.2",
