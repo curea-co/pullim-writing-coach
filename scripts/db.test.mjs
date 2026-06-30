@@ -1,4 +1,4 @@
-// db.ts 단위 테스트 — Neon sql 태그드 템플릿을 모킹(__setSqlForTest)해 쿼리 형태·스코프 검증.
+// db.ts 단위 테스트 — sql 태그드 템플릿을 모킹(__setSqlForTest)해 쿼리 형태·스코프 검증.
 //   실행: node --import ./scripts/register-ts.mjs --test scripts/db.test.mjs
 import assert from "node:assert/strict";
 import { test, beforeEach, afterEach } from "node:test";
@@ -35,11 +35,13 @@ test("getUserData — row 없으면 null", async () => {
   assert.equal(await db.getUserData("u", "results"), null);
 });
 
-test("setUserData — upsert에 sub·key·payload 바인딩", async () => {
+test("setUserData — upsert에 sub·key·payload(jsonb 직렬화) 바인딩", async () => {
   await db.setUserData("user-abc", "profile", { nickname: "민수" });
   assert.match(calls[0].text, /insert into writing_user_data/i);
   assert.match(calls[0].text, /on conflict/i);
-  assert.deepEqual(calls[0].values, ["user-abc", "profile", { nickname: "민수" }]);
+  assert.match(calls[0].text, /::jsonb/i); // payload는 ::jsonb 캐스트로 바인딩
+  // payload는 JSON 문자열로 직렬화돼 바인딩(postgres 드라이버는 객체 자동 직렬화 안 함).
+  assert.deepEqual(calls[0].values, ["user-abc", "profile", JSON.stringify({ nickname: "민수" })]);
 });
 
 test("deleteAllUserData — sub만 바인딩", async () => {
