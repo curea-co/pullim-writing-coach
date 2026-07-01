@@ -41,13 +41,31 @@ aws ec2 authorize-security-group-ingress --region $REGION \
 > 보안 완화: 마이그레이션·psql 접속은 **본인 IP만** 임시 허용하고, 앱 접속용으로만 최소 대역을 열어두는
 > 방식을 권장(운영 중 0.0.0.0/0은 강한 비번+TLS 전제).
 
+### DB 서브넷 그룹 (퍼블릭 서브넷 ≥2 AZ) — 필수
+
+`create-db-instance`는 DB 서브넷 그룹이 필요하다(기본 그룹이 없거나 커스텀 VPC면 반드시 생성·지정).
+```bash
+# VPC의 서브넷 확인 — 퍼블릭(MapPublicIpOnLaunch=true)인 것 2개 이상을 서로 다른 AZ로 고른다.
+aws ec2 describe-subnets --region $REGION --filters "Name=vpc-id,Values=$VPC_ID" \
+  --query 'Subnets[].{id:SubnetId,az:AvailabilityZone,public:MapPublicIpOnLaunch}' --output table
+
+aws rds create-db-subnet-group --region $REGION \
+  --db-subnet-group-name pwc-db-subnets \
+  --db-subnet-group-description "writing-coach db subnets" \
+  --subnet-ids subnet-aaaa subnet-bbbb   # 위에서 고른 퍼블릭 서브넷 ID들
+```
+> `--publicly-accessible`가 실제로 인터넷에서 도달하려면 이 서브넷들이 **퍼블릭 서브넷**(라우트 테이블이
+> Internet Gateway로 향함)이어야 한다. 프라이빗 서브넷만 있으면 도달 불가.
+
 ## 3. RDS Postgres 인스턴스 (퍼블릭)
 
 ```bash
 DB_ID=pwc-db
 DB_NAME=writing
 MASTER_USER=pwc_admin
-MASTER_PW='<강한-랜덤-비번>'   # openssl rand -base64 24
+# ★ URL-safe 비번을 쓸 것. base64(openssl rand -base64)는 @ / + = 를 만들어 접속문자열(URI)을 깨뜨린다.
+#   hex는 0-9a-f만이라 안전:
+MASTER_PW="$(openssl rand -hex 24)"
 
 aws rds create-db-instance --region $REGION \
   --db-instance-identifier $DB_ID \
@@ -56,6 +74,7 @@ aws rds create-db-instance --region $REGION \
   --master-username $MASTER_USER --master-user-password "$MASTER_PW" \
   --allocated-storage 20 --max-allocated-storage 100 \
   --db-name $DB_NAME \
+  --db-subnet-group-name pwc-db-subnets \
   --vpc-security-group-ids $SG_ID \
   --publicly-accessible \
   --storage-encrypted \
@@ -103,6 +122,8 @@ Vercel → pullim-writing-coach → Settings → Environment Variables:
 ```
 DATABASE_URL = postgres://pwc_app:<앱-비번>@<HOST>:5432/writing?sslmode=require
 ```
+- ⚠️ **비번의 특수문자는 URI를 깨뜨린다.** `pwc_app` 비번도 URL-safe(예: `openssl rand -hex 24`) 권장.
+  base64/특수문자를 썼다면 URI에 넣을 때 **percent-encoding** 필수(`@`→`%40`, `/`→`%2F`, `+`→`%2B`, `=`→`%3D`, `:`→`%3A`).
 - **Production + Preview** 둘 다 설정(서버 전용 — NEXT_PUBLIC_ 접두 금지).
 - 저장 후 재배포(또는 다음 main push 자동 배포).
 
