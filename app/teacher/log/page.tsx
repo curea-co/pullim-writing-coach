@@ -143,7 +143,7 @@ export default function TeacherLogPage() {
             className="mt-5 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--pb-1)] px-4 py-3 text-[13px] leading-[1.6] text-[var(--ink-3)]"
           >
             아직 연결된 학생 세션이 없어요. 아래는 형식을 보여드리는{" "}
-            <b className="text-[var(--pullim-ink)]">데모 샘플</b>입니다 (중2 과학 설명문).
+            <b className="text-[var(--pullim-ink)]">예시 샘플</b>입니다 (중2 과학 설명문).
           </div>
         )}
 
