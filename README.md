@@ -80,25 +80,25 @@
 | `DEMO_ACCESS_TOKEN` | 데모 접근 비밀번호(서버 검증). 비어 있으면 API가 401 fail-closed → 사실상 필수 |
 | `NEXT_PUBLIC_DEMO_TOKEN` | 설정 시 TokenGate 자동 입력(비번 0회 입장). ⚠ 번들 노출 → rate limit·예산 알람 필수 |
 | `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | 에러 모니터링 (미설정 시 no-op) |
-| `DATABASE_URL` | per-user 계정 데이터 store(AWS RDS/Aurora Postgres) 연결 문자열. **서버 전용 — `NEXT_PUBLIC_` 금지**. 미설정 시 계정 store fail-closed. local은 미설정(localStorage 폴백). 프로비저닝: `docs/ops-aws-db-provisioning.md` |
+| `DATABASE_URL` | per-user 계정 데이터 store(Supabase Postgres, Transaction pooler) 연결 문자열. **서버 전용 — `NEXT_PUBLIC_` 금지**. 미설정 시 계정 store fail-closed. local은 미설정(localStorage 폴백). 프로비저닝: `docs/ops-db-provisioning.md` |
 | `DEMO_SESSION_SUB` | (선택) 비prod 로컬 e2e용 데모 세션 sub. prod 무시. 미설정 시 `"demo-sub"` |
 
 ---
 
 ## 계정 데이터 store (per-user)
 
-로그인 회원의 6종 데이터(프로필·결과·수정이력·임시저장·메타·동의)는 localStorage가 아니라 **계정 귀속 서버 저장**(writing-coach 자체 Next API `/api/data/*` + AWS RDS/Aurora Postgres, `postgres` 드라이버)으로 전환됩니다. 로그인하면 다른 기기/브라우저에서도 같은 데이터가 보입니다. 게스트·로컬은 기존 localStorage 동작을 그대로 유지합니다.
+로그인 회원의 6종 데이터(프로필·결과·수정이력·임시저장·메타·동의)는 localStorage가 아니라 **계정 귀속 서버 저장**(writing-coach 자체 Next API `/api/data/*` + Supabase Postgres, `postgres` 드라이버)으로 전환됩니다. 로그인하면 다른 기기/브라우저에서도 같은 데이터가 보입니다. 게스트·로컬은 기존 localStorage 동작을 그대로 유지합니다.
 
 ### 마이그레이션
 
 ```bash
-# 접속문자열을 argv/history에 남기지 않도록 read -s로 주입(자세한 프로비저닝: docs/ops-aws-db-provisioning.md)
+# 접속문자열을 argv/history에 남기지 않도록 read -s로 주입(Session pooler 5432 사용. 자세한 절차: docs/ops-db-provisioning.md)
 read -rs -p "DATABASE_URL: " DATABASE_URL; echo; export DATABASE_URL
 npm run db:migrate   # db/migrations/0001_init.sql 적용
 ```
 
 - ⚠️ 러너(`scripts/db-migrate.mjs`)는 `;` 단순 분할이라 **단순 DDL 전용** — 문자열 리터럴·함수 본문·달러쿼팅(`$$`) 안의 세미콜론은 미지원. 그런 마이그레이션은 러너 보강이 필요합니다. 예상 출력: `applying 0001_init.sql (2 statement(s))` → `done (1 file(s))`.
-- AWS RDS/Aurora 프로비저닝(SG·서브넷·유저·Vercel env)은 `docs/ops-aws-db-provisioning.md` 참조.
+- Supabase 프로비저닝(프로젝트·풀러 접속문자열·Vercel env·검증)은 `docs/ops-db-provisioning.md` 참조. 앱 런타임은 Transaction pooler(6543), 마이그레이션은 Session pooler(5432).
 
 ### 로컬 검증 한계 (host-only)
 
