@@ -12,7 +12,7 @@ export interface RailItem {
   active?: boolean;
 }
 
-export const NAV: NavLink[] = [
+export const NAV = [
   { label: "홈", href: "/" },
   { label: "직접 채점받기", href: "/try" },
   { label: "과정 코치", href: "/coach" },
@@ -20,7 +20,10 @@ export const NAV: NavLink[] = [
   { label: "샘플 채점 결과", href: "/samples" },
   { label: "내 정보", href: "/me" },
   { label: "서비스 소개", href: "/about" },
-];
+] as const satisfies readonly NavLink[];
+
+// NAV href 유니온 — NAV_ICONS가 이 유니온으로 exhaustive해야 하므로(아이콘 누락 시 빌드 깨짐).
+export type NavHref = (typeof NAV)[number]["href"];
 
 const PREFIX_MATCH = new Set(["/results", "/samples"]);
 

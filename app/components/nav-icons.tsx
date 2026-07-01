@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { NavHref } from "./nav-adapter";
 
 // 사이드바(OsRail)·탭바 아이콘 — 라우트 href → 라인 아이콘(currentColor, 24 viewBox).
 //   OsRail이 [&_svg]로 19px 크기를 강제하므로 여기선 viewBox·stroke만 지정한다.
@@ -13,7 +14,8 @@ const svgProps = {
   "aria-hidden": true,
 };
 
-export const NAV_ICONS: Record<string, ReactNode> = {
+// Record<NavHref> — NAV의 모든 href를 빠짐없이 매핑해야 타입 통과(누락 시 빌드 실패 → collapsed 빈 칸 방지).
+export const NAV_ICONS: Record<NavHref, ReactNode> = {
   // 홈
   "/": (
     <svg {...svgProps}>
