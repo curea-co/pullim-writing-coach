@@ -1,7 +1,8 @@
 // Pullim Writing Coach — AWS Postgres 접속 + per-user 데이터 CRUD (server 전용).
 //   모듈 경계: 부수효과(env·DB 커넥션). app/lib/server/* 만 server 전용 부수효과 가능.
 //   자격증명·payload 본문 로깅 금지. DATABASE_URL 미설정 시 fail-closed throw.
-//   드라이버 = postgres(porsager). RDS Proxy 뒤 AWS RDS/Aurora 전제(서버리스 풀링은 프록시가 담당).
+//   드라이버 = postgres(porsager). 퍼블릭 AWS RDS/Aurora 직접 연결 전제(RDS Proxy는 VPC 내부 전용이라
+//   Vercel 서버리스에서 미도달 — PrivateLink 필요). 프로비저닝: docs/ops-aws-db-provisioning.md.
 import "server-only";
 import postgres from "postgres";
 
@@ -22,10 +23,10 @@ function sql(): Sql {
   if (cached) return cached;
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("[db] DATABASE_URL 미설정 — 계정 데이터 store 비활성(fail-closed)");
-  // 서버리스(Vercel) + RDS Proxy 전제:
-  //   max:1        — 함수 인스턴스당 커넥션 1개(실풀링은 RDS Proxy가 다중화).
+  // 서버리스(Vercel) + 퍼블릭 RDS 직접 연결:
+  //   max:1        — 함수 인스턴스당 커넥션 1개(저트래픽 전제; 대규모면 PrivateLink+RDS Proxy 재검토).
   //   idle_timeout — 유휴 커넥션 정리(인스턴스 단명).
-  //   prepare:false — RDS Proxy/pooler에서 prepared statement는 커넥션 pinning을 유발 → 비활성.
+  //   prepare:false — pooler/프록시 도입 시 prepared statement pinning 방지(직접 연결에도 무해).
   //   ssl:'require' — RDS는 TLS 필수(암호화). prod에서 CA 고정이 필요하면 ssl 객체로 교체.
   cached = postgres(url, { max: 1, idle_timeout: 20, prepare: false, ssl: "require" }) as unknown as Sql;
   return cached;
