@@ -23,23 +23,35 @@ writing-coach의 `/api/data/*`(per-user 데이터)가 쓰는 AWS Postgres를 만
 - [ ] **리전**: pullim-api와 동일하게(추정 `ap-northeast-2` 서울). 아래 명령의 `--region` 교체.
 - [ ] **VPC/서브넷**: 기존 VPC 재사용 or 신규. 퍼블릭 접근이면 퍼블릭 서브넷 + IGW 필요.
 - [ ] **엔진 크기**: `db.t4g.micro`(최저비용, 단일 소형 테이블에 충분) 권장. 스파이크 예상 시 Aurora Serverless v2.
+- [ ] 🔴 **Vercel↔DB 안전 연결(필수 전제)**: Vercel 서버리스는 egress IP가 유동이라, 안전 연결은
+  **Vercel Static IP(Enterprise 애드온)** 또는 **Secure Compute(PrivateLink)** 로 고정 IP를 확보해야 한다.
+  둘 다 안 되는 플랜이면 이 경로를 **운영에 적용하지 말고** 서버리스 PG(Neon/Supabase)를 재검토.
+  `0.0.0.0/0` 개방은 미성년 에세이 저장 서비스에 부적절 — **금지**.
 
-## 2. 보안 그룹 (인바운드 5432)
+## 2. 보안 그룹 (인바운드 5432 — 고정 IP만)
 
 ```bash
 REGION=ap-northeast-2
 VPC_ID=vpc-xxxxxxxx   # 사용할 VPC
 
 SG_ID=$(aws ec2 create-security-group --region $REGION \
-  --group-name pwc-db-sg --description "writing-coach RDS public access" \
+  --group-name pwc-db-sg --description "writing-coach RDS" \
   --vpc-id $VPC_ID --query GroupId --output text)
 
-# Vercel egress IP가 유동이라 5432를 넓게 허용(비번+TLS로 보호). 가능하면 Vercel 공표 IP 대역으로 좁힐 것.
+# (a) 마이그레이션/psql용 — 본인 공인 IP만 임시 허용(작업 후 제거 권장)
+MYIP=$(curl -s https://checkip.amazonaws.com)
 aws ec2 authorize-security-group-ingress --region $REGION \
-  --group-id $SG_ID --protocol tcp --port 5432 --cidr 0.0.0.0/0
+  --group-id $SG_ID --protocol tcp --port 5432 --cidr ${MYIP}/32
+
+# (b) 앱 접속용 — Vercel Static IP 대역만 허용(0.0.0.0/0 금지).
+#     Vercel → Team/Project Settings → Secure Compute / Static IPs 에서 egress IP를 확인 후 각각 추가:
+aws ec2 authorize-security-group-ingress --region $REGION \
+  --group-id $SG_ID --protocol tcp --port 5432 --cidr <VERCEL_STATIC_IP>/32
 ```
-> 보안 완화: 마이그레이션·psql 접속은 **본인 IP만** 임시 허용하고, 앱 접속용으로만 최소 대역을 열어두는
-> 방식을 권장(운영 중 0.0.0.0/0은 강한 비번+TLS 전제).
+> 🔴 **`0.0.0.0/0` 개방 금지** — 미성년 에세이 저장 서비스라 전세계 스캔/브루트포스 노출은 부적절.
+> 고정 IP(Vercel Static IP)를 확보 못 하면 이 경로를 운영에 쓰지 말 것(§1 전제).
+> **PrivateLink(Secure Compute)** 를 쓰면 RDS를 프라이빗 서브넷에 두고(§3 `--no-publicly-accessible`),
+> SG는 Vercel PrivateLink ENI만 허용 — 퍼블릭 미개방이 가장 안전.
 
 ### DB 서브넷 그룹 (퍼블릭 서브넷 ≥2 AZ) — 필수
 

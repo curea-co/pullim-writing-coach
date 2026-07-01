@@ -97,7 +97,7 @@ read -rs -p "DATABASE_URL: " DATABASE_URL; echo; export DATABASE_URL
 npm run db:migrate   # db/migrations/0001_init.sql 적용
 ```
 
-- 러너는 SQL을 `;`로 분할해 순차 실행합니다(`CREATE TABLE`·`CREATE INDEX`). 예상 출력: `applying 0001_init.sql (2 statement(s))` → `done (1 file(s))`.
+- ⚠️ 러너(`scripts/db-migrate.mjs`)는 `;` 단순 분할이라 **단순 DDL 전용** — 문자열 리터럴·함수 본문·달러쿼팅(`$$`) 안의 세미콜론은 미지원. 그런 마이그레이션은 러너 보강이 필요합니다. 예상 출력: `applying 0001_init.sql (2 statement(s))` → `done (1 file(s))`.
 - AWS RDS/Aurora 프로비저닝(SG·서브넷·유저·Vercel env)은 `docs/ops-aws-db-provisioning.md` 참조.
 
 ### 로컬 검증 한계 (host-only)
