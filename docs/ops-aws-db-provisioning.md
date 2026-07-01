@@ -23,23 +23,37 @@ writing-coach의 `/api/data/*`(per-user 데이터)가 쓰는 AWS Postgres를 만
 - [ ] **리전**: pullim-api와 동일하게(추정 `ap-northeast-2` 서울). 아래 명령의 `--region` 교체.
 - [ ] **VPC/서브넷**: 기존 VPC 재사용 or 신규. 퍼블릭 접근이면 퍼블릭 서브넷 + IGW 필요.
 - [ ] **엔진 크기**: `db.t4g.micro`(최저비용, 단일 소형 테이블에 충분) 권장. 스파이크 예상 시 Aurora Serverless v2.
+- [ ] 🔴 **Vercel↔DB 안전 연결(필수 전제)**: Vercel 서버리스는 egress IP가 유동이라, 안전 연결은
+  **Vercel Static IP(Enterprise 애드온)** 또는 **Secure Compute(PrivateLink)** 로 고정 IP를 확보해야 한다.
+  둘 다 안 되는 플랜이면 이 경로를 **운영에 적용하지 말고** 서버리스 PG(Neon/Supabase)를 재검토.
+  `0.0.0.0/0` 개방은 미성년 에세이 저장 서비스에 부적절 — **금지**.
+  - **본문 §2~§9 = "퍼블릭 RDS + Vercel Static IP 허용" 경로.** 완전 비공개(프라이빗 RDS + PrivateLink)는
+    §10에서 분리해 다룬다(§3의 `--publicly-accessible`을 뒤집는 변경이라 본문과 섞지 않음).
 
-## 2. 보안 그룹 (인바운드 5432)
+## 2. 보안 그룹 (인바운드 5432 — 고정 IP만)
 
 ```bash
 REGION=ap-northeast-2
 VPC_ID=vpc-xxxxxxxx   # 사용할 VPC
 
 SG_ID=$(aws ec2 create-security-group --region $REGION \
-  --group-name pwc-db-sg --description "writing-coach RDS public access" \
+  --group-name pwc-db-sg --description "writing-coach RDS" \
   --vpc-id $VPC_ID --query GroupId --output text)
 
-# Vercel egress IP가 유동이라 5432를 넓게 허용(비번+TLS로 보호). 가능하면 Vercel 공표 IP 대역으로 좁힐 것.
+# (a) 마이그레이션/psql용 — 본인 공인 IP만 임시 허용(작업 후 제거 권장)
+MYIP=$(curl -s https://checkip.amazonaws.com)
 aws ec2 authorize-security-group-ingress --region $REGION \
-  --group-id $SG_ID --protocol tcp --port 5432 --cidr 0.0.0.0/0
+  --group-id $SG_ID --protocol tcp --port 5432 --cidr ${MYIP}/32
+
+# (b) 앱 접속용 — Vercel Static IP 대역만 허용(0.0.0.0/0 금지).
+#     Vercel → Team/Project Settings → Secure Compute / Static IPs 에서 egress IP를 확인 후 각각 추가:
+aws ec2 authorize-security-group-ingress --region $REGION \
+  --group-id $SG_ID --protocol tcp --port 5432 --cidr <VERCEL_STATIC_IP>/32
 ```
-> 보안 완화: 마이그레이션·psql 접속은 **본인 IP만** 임시 허용하고, 앱 접속용으로만 최소 대역을 열어두는
-> 방식을 권장(운영 중 0.0.0.0/0은 강한 비번+TLS 전제).
+> 🔴 **`0.0.0.0/0` 개방 금지** — 미성년 에세이 저장 서비스라 전세계 스캔/브루트포스 노출은 부적절.
+> 고정 IP(Vercel Static IP)를 확보 못 하면 이 경로를 운영에 쓰지 말 것(§1 전제).
+> **이 아래 §3~§9는 "퍼블릭 RDS + Static IP 허용" 기준.** 완전 비공개(프라이빗 RDS + PrivateLink)를 원하면
+> §3 대신 §10을 따르라(퍼블릭 서브넷·`--publicly-accessible`을 프라이빗으로 뒤집는다).
 
 ### DB 서브넷 그룹 (퍼블릭 서브넷 ≥2 AZ) — 필수
 
@@ -157,10 +171,16 @@ DATABASE_URL = postgres://pwc_app:<앱-비번>@<HOST>:5432/writing?sslmode=requi
 - [ ] 운영 중 SG 인바운드를 가능한 좁게(Vercel 대역/본인 IP). `deletion-protection` 활성.
 - [ ] 미성년 에세이 저장 → 개인정보/보존정책 확정 후 실사용(별도 트랙).
 
-## 10. (확장) RDS Proxy + PrivateLink — 나중에 필요 시
+## 10. (대안) 완전 비공개 — PrivateLink(Secure Compute) [+ RDS Proxy]
 
-트래픽이 커져 서버리스 커넥션 풀링이 필요하면: Vercel **Secure Compute**(PrivateLink)로 VPC 연결 후
-RDS Proxy(내부 엔드포인트) 사용. 엔터프라이즈 기능·셋업 복잡 → 초기엔 4~6절의 퍼블릭 직접 연결로 시작.
+퍼블릭 RDS를 아예 열지 않는 가장 안전한 구성. 본문 §2~§9 대신 이 경로를 쓴다:
+- **RDS를 프라이빗 서브넷 + `--no-publicly-accessible`** 로 생성(§3의 `--publicly-accessible`·퍼블릭 서브넷을 대체).
+- **SG 인바운드는 Vercel PrivateLink ENI(또는 VPC 내부)만** 허용 — 퍼블릭 5432 미개방(§2의 Static IP 허용 불필요).
+- Vercel **Secure Compute**(Enterprise·PrivateLink)로 VPC 연결. 트래픽이 커지면 그 뒤에 **RDS Proxy**(내부
+  엔드포인트)로 커넥션 풀링 추가 가능(퍼블릭 경로에선 RDS Proxy가 Vercel에서 미도달이라 불가).
+- 마이그레이션(§5)·env(§6)·검증(§7)은 엔드포인트만 프라이빗/프록시 주소로 바뀔 뿐 동일.
+
+엔터프라이즈 기능·셋업 복잡. 플랜이 안 되면 서버리스 PG(Neon/Supabase) 재검토가 현실적.
 
 ---
 
