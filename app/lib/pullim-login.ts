@@ -36,7 +36,16 @@ export function logoutUrl(returnTo?: string): string {
   return withNext("/logout", returnTo, () => (typeof window !== "undefined" ? window.location.origin : "/"));
 }
 
-// 풀림 OS 허브 — 앱런처 목적지. local = http://os.pullim.local:3001 · prod = https://os.pullim.ai.
+// 풀림 OS 허브 — 앱런처 목적지. OS 진입은 `/os` 경로(통합로그인 배포 문서 정본).
+//   local = http://os.pullim.local:3001/os · dev = https://dev-os.pullim.ai/os · prod = https://os.pullim.ai/os.
+//   기존 배포 env가 경로 없는 값(https://os.pullim.ai)이어도 /os를 보강한다(env 동시 갱신 미보장 대비).
 export function osHubUrl(): string {
-  return (process.env.NEXT_PUBLIC_OS_URL ?? "https://os.pullim.ai").replace(/\/$/, "") + "/";
+  const raw = (process.env.NEXT_PUBLIC_OS_URL ?? "https://os.pullim.ai/os").replace(/\/$/, "");
+  try {
+    const u = new URL(raw);
+    if (u.pathname === "" || u.pathname === "/") u.pathname = "/os"; // 호스트만 있는 값 → /os 보강
+    return u.toString().replace(/\/$/, "");
+  } catch {
+    return raw; // URL 파싱 불가 시 원값(정상적으로는 도달 안 함)
+  }
 }
