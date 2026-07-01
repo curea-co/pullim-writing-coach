@@ -1,3 +1,6 @@
+import type { ReactNode } from "react";
+import { NAV_ICONS } from "./nav-icons";
+
 export interface NavLink {
   label: string;
   href: string;
@@ -5,6 +8,7 @@ export interface NavLink {
 export interface RailItem {
   label: string;
   href: string;
+  icon?: ReactNode;
   active?: boolean;
 }
 
@@ -27,11 +31,12 @@ function isActive(href: string, pathname: string): boolean {
 }
 
 export function railItems(pathname: string): RailItem[] {
-  return NAV.map((n) => ({ label: n.label, href: n.href, active: isActive(n.href, pathname) }));
+  // icon 필수 — 사이드바 collapsed 시 라벨이 숨고 아이콘만 남는다(아이콘 없으면 빈 칸).
+  return NAV.map((n) => ({ label: n.label, href: n.href, icon: NAV_ICONS[n.href], active: isActive(n.href, pathname) }));
 }
 
 export function tabItems(pathname: string): RailItem[] {
   // Mobile bottom bar: the 5 primary content routes (홈/직접 채점/과정 코치/채점 결과/샘플).
   // 내 정보·서비스 소개 stay rail-only (reachable on mobile via the home banner/closing CTA).
-  return NAV.slice(0, 5).map((n) => ({ label: n.label, href: n.href, active: isActive(n.href, pathname) }));
+  return NAV.slice(0, 5).map((n) => ({ label: n.label, href: n.href, icon: NAV_ICONS[n.href], active: isActive(n.href, pathname) }));
 }
