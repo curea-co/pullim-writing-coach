@@ -8,7 +8,6 @@ import { ServiceIcon } from "@/components/ui/service-icon";
 import { SectionHead } from "@/components/ui/section-head";
 import { ServiceTile } from "@/components/ui/service-tile";
 import { StatCard, Card, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 
 // 대시보드 홈(2026-06-24) — OS/classbot 스타일 재편.
 //   ServiceHero → HomeWelcomeBanner → 바로 시작(ServiceTile 4-up)
@@ -85,7 +84,6 @@ export default function Home() {
         icon={<ServiceIcon name="writing" size={56} />}
         title="라이팅 코치"
         tagline="학생이 쓴 글을 1분 안에 5영역으로 채점하고, 잘한 점·고칠 점·수정 가이드를 코칭 말투로 보여줘요."
-        badges={<Badge intent="primary">데모 · Week 1</Badge>}
         decoration={<HeroMotion3D />}
         cta={
           <Link

@@ -34,7 +34,7 @@ export function isAuthorized(req: Request): boolean {
 //   - E-CAP: docs/27 정책상 /api/score와 동일 envelope 통일 → 본 맵 제외 (grading.ts 기본 사용)
 export const EXTRACT_MESSAGE: Partial<Record<ErrorCode, string>> = {
   "E-PARSE": "추출 결과 형식이 올바르지 않아요. 다시 시도해 주세요.",
-  "E-AUTH": "데모 비밀번호를 다시 확인해 주세요.",
+  "E-AUTH": "로그인이 필요해요. 다시 로그인해 주세요.",
   E1: "안내서 정보가 올바르지 않아요. 다시 입력해 주세요.",
   E2: "안내서 내용이 너무 짧아요. 좀 더 입력해 주세요.",
   E3: "안내서가 너무 길어요. 8,000자 이내로 줄여 주세요.",

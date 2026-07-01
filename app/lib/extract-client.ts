@@ -13,7 +13,7 @@ export type ExtractErrorCode = ErrorCode | "E-NETWORK" | "E-PARSE";
 //   server가 message 없이 code만 보내거나 errorEnvelope 기본값 사용 시 추출 컨텍스트 카피 노출.
 const EXTRACT_MESSAGE: Record<ExtractErrorCode, string> = {
   "E-PARSE": "추출 결과 형식이 올바르지 않아요. 다시 시도해 주세요.",
-  "E-AUTH": "데모 비밀번호를 다시 확인해 주세요.",
+  "E-AUTH": "로그인이 필요해요. 다시 로그인해 주세요.",
   "E-CAP": "요청이 너무 많아요. 잠시 후 다시 시도해 주세요.",
   "E-NETWORK": "인터넷 연결을 확인하고 다시 시도해 주세요.",
   E1: "안내서 정보가 올바르지 않아요. 다시 입력해 주세요.",

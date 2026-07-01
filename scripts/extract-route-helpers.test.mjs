@@ -92,7 +92,7 @@ test("jsonError — E-AUTH 401 + 추출 envelope", async () => {
   assert.equal(res.status, 401);
   const body = await res.json();
   assert.equal(body.error.code, "E-AUTH");
-  assert.match(body.error.message, /데모 비밀번호/);
+  assert.match(body.error.message, /로그인이 필요/);
 });
 
 test("jsonError — E-PARSE 400 + 추출 envelope", async () => {

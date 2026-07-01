@@ -3,9 +3,9 @@ import "./globals.css";
 import { AppShell } from "./components/app-shell";
 
 export const metadata: Metadata = {
-  title: "Pullim Writing Coach — 데모",
+  title: "Pullim Writing Coach",
   description:
-    "수행평가 글, AI가 5가지 기준으로 첨삭해 드려요. Week 1 산출물 — 5개 학생 글 샘플의 채점 결과 미리보기.",
+    "수행평가 글, AI가 5가지 기준으로 채점하고 잘한 점·고칠 점·수정 가이드를 코칭 말투로 보여드려요.",
 };
 
 export default function RootLayout({
