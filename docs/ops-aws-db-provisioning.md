@@ -129,9 +129,13 @@ DATABASE_URL = postgres://pwc_app:<앱-비번>@<HOST>:5432/writing?sslmode=requi
 ```
 - ⚠️ **비번의 특수문자는 URI를 깨뜨린다.** `pwc_app` 비번도 URL-safe(예: `openssl rand -hex 24`) 권장.
   base64/특수문자를 썼다면 URI에 넣을 때 **percent-encoding** 필수(`@`→`%40`, `/`→`%2F`, `+`→`%2B`, `=`→`%3D`, `:`→`%3A`).
-- 🔴 **Production 에만 설정.** Preview에 같은 DATABASE_URL을 넣으면 **모든 프리뷰 배포가 운영 per-user
-  데이터(미성년 에세이 포함)를 읽고/쓴다** — 금지. Preview는 (a) 미설정(store fail-closed → localStorage
-  폴백이라 안전) 또는 (b) **별도 Preview 전용 DB** 로 둘 것.
+- 🔴 **Production 에만 설정.** Preview에 같은 DATABASE_URL을 넣으면 프리뷰 배포가 운영 per-user
+  데이터(미성년 에세이 포함)를 읽고/쓴다 — 금지.
+  - 표준 프리뷰(`*.vercel.app`)는 SSO 쿠키(`Domain=.pullim.ai`)가 도달하지 않아 사용자가 **항상 게스트**
+    → localStorage 경로라 `DATABASE_URL`이 쓰이지 않음(계정 store 비활성). 즉 미설정으로 둬도 됨.
+  - ⚠️ 단 이는 "authed 자동 localStorage 폴백"이 **아니다**. authed 요청은 `storage.ts`가 항상
+    `/api/data/*`를 호출하므로, `DATABASE_URL`이 없으면 서버가 에러를 반환(폴백 안 함). authed 계정
+    기능을 프리뷰에서 테스트하려면 `.pullim.ai` 하위로 alias된 프리뷰 + **별도 Preview 전용 DB**가 필요.
 - 서버 전용 — NEXT_PUBLIC_ 접두 금지. 저장 후 재배포(또는 다음 main push 자동 배포).
 
 ## 7. 종단 검증 (배포 후)
