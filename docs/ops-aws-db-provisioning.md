@@ -92,7 +92,9 @@ aws rds describe-db-instances --region $REGION --db-instance-identifier $DB_ID \
 
 ```bash
 HOST=<위 엔드포인트>
-psql "postgres://$MASTER_USER:$MASTER_PW@$HOST:5432/$DB_NAME?sslmode=require"
+# ★ 비번을 URI/커맨드라인 인자로 넣지 말 것(셸 history·ps·/proc/PID/cmdline 노출). PGPASSWORD 환경변수 사용.
+read -rs -p "master 비밀번호: " PGPASSWORD; echo; export PGPASSWORD
+psql "host=$HOST port=5432 dbname=$DB_NAME user=$MASTER_USER sslmode=require"   # 비번은 argv에 없음
 ```
 ```sql
 CREATE ROLE pwc_app LOGIN PASSWORD '<앱-전용-강한-비번>';
@@ -108,12 +110,15 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 
 리포 루트에서, 프록시 아닌 **DB 엔드포인트**에 도달 가능한 곳(본인 PC 등, SG에 본인 IP 허용):
 ```bash
-DATABASE_URL="postgres://pwc_admin:$MASTER_PW@$HOST:5432/writing?sslmode=require" npm run db:migrate
+# 접속문자열(비번 포함)을 argv/history에 남기지 않도록 read -s로 env에 주입.
+read -rs -p "DATABASE_URL (postgres://pwc_admin:비번@HOST:5432/writing?sslmode=require) 붙여넣기: " DATABASE_URL
+echo; export DATABASE_URL
+npm run db:migrate
 # → [db:migrate] applying 0001_init.sql (2 statement(s)) / done
 ```
-검증:
+검증(PGPASSWORD는 4절에서 export됨):
 ```bash
-psql "postgres://pwc_admin:$MASTER_PW@$HOST:5432/writing?sslmode=require" -c "\d writing_user_data"
+psql "host=$HOST port=5432 dbname=writing user=pwc_admin sslmode=require" -c "\d writing_user_data"
 ```
 
 ## 6. Vercel 환경변수 (앱은 pwc_app 자격)
@@ -124,8 +129,10 @@ DATABASE_URL = postgres://pwc_app:<앱-비번>@<HOST>:5432/writing?sslmode=requi
 ```
 - ⚠️ **비번의 특수문자는 URI를 깨뜨린다.** `pwc_app` 비번도 URL-safe(예: `openssl rand -hex 24`) 권장.
   base64/특수문자를 썼다면 URI에 넣을 때 **percent-encoding** 필수(`@`→`%40`, `/`→`%2F`, `+`→`%2B`, `=`→`%3D`, `:`→`%3A`).
-- **Production + Preview** 둘 다 설정(서버 전용 — NEXT_PUBLIC_ 접두 금지).
-- 저장 후 재배포(또는 다음 main push 자동 배포).
+- 🔴 **Production 에만 설정.** Preview에 같은 DATABASE_URL을 넣으면 **모든 프리뷰 배포가 운영 per-user
+  데이터(미성년 에세이 포함)를 읽고/쓴다** — 금지. Preview는 (a) 미설정(store fail-closed → localStorage
+  폴백이라 안전) 또는 (b) **별도 Preview 전용 DB** 로 둘 것.
+- 서버 전용 — NEXT_PUBLIC_ 접두 금지. 저장 후 재배포(또는 다음 main push 자동 배포).
 
 ## 7. 종단 검증 (배포 후)
 
