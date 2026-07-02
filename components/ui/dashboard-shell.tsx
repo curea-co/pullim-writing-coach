@@ -39,8 +39,8 @@ function Brand({ brand, linkComponent }: { brand: BrandProp; linkComponent: Reac
       {logo}
       {/* os.pullim.ai 정합: 풀림 17px extrabold + 서비스명을 중립 pill 배지로 */}
       <span className="text-[17px] font-extrabold tracking-[-.02em]">{title}</span>
+      {/* whitespace-nowrap — 모바일에서 "라이팅 코치"가 2줄로 꺾이던 것 방지(UX 점검 ⑨). */}
       {sub && (
-        // whitespace-nowrap — 모바일에서 "라이팅 코치"가 2줄로 꺾이던 것 방지(UX 점검 ⑨).
         <span className="whitespace-nowrap rounded-md bg-[var(--surface-sunken,#eef1f6)] px-2 py-0.5 text-[12px] font-semibold text-[var(--text-secondary)]">
           {sub}
         </span>
