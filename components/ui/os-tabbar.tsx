@@ -21,7 +21,9 @@ export function OsTabbar({ items, linkComponent = "a", className }: OsTabbarProp
     <nav
       aria-label="모바일 탭 메뉴"
       className={cn(
-        "fixed inset-x-0 bottom-0 z-50 flex justify-start gap-1 overflow-x-auto border-t border-[var(--border-default)] bg-[var(--surface-raised)] px-2 pb-[env(safe-area-inset-bottom)] md:hidden",
+        // 탭을 고정폭(w-[68px]) 대신 flex-1 균등분배 — 5탭 총폭이 화면폭을 넘던 구조 자체를 제거
+        //   (360px 등 좁은 기기 오버플로 해소, Codex 리뷰 #125). 축약 라벨이라 균등분배로 충분.
+        "fixed inset-x-0 bottom-0 z-50 flex gap-1 border-t border-[var(--border-default)] bg-[var(--surface-raised)] px-2 pb-[env(safe-area-inset-bottom)] md:hidden",
         className,
       )}
     >
@@ -31,7 +33,7 @@ export function OsTabbar({ items, linkComponent = "a", className }: OsTabbarProp
           href={item.href}
           aria-current={item.active ? "page" : undefined}
           className={cn(
-            "flex w-[68px] shrink-0 flex-col items-center gap-1 py-2 text-[11px] font-medium text-[var(--text-tertiary)] transition-colors [&_svg]:h-[22px] [&_svg]:w-[22px]",
+            "flex min-w-0 flex-1 flex-col items-center gap-1 py-2 text-[11px] font-medium text-[var(--text-tertiary)] transition-colors [&_svg]:h-[22px] [&_svg]:w-[22px]",
             item.active && "text-[var(--color-action-primary)]",
           )}
         >
