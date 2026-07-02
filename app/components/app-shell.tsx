@@ -15,8 +15,9 @@ import { loginUrl, logoutUrl, signupUrl, osHubUrl } from "@/app/lib/pullim-login
 const ICON_BTN =
   "flex h-[38px] w-[38px] items-center justify-center rounded-[11px] text-[#45555c] transition-colors hover:bg-[var(--surface-sunken,#eef1f6)]";
 // 미연결(준비 중) 아이콘 버튼 — 시각적으로 비활성 명시(클릭 가능한 컨트롤로 오인 방지).
+//   모바일에선 숨김(hidden md:flex) — 기능 없는 컨트롤로 좁은 헤더를 차지하지 않게(UX 점검 ⑪).
 const DISABLED_ICON_BTN =
-  "flex h-[38px] w-[38px] items-center justify-center rounded-[11px] text-[#45555c] opacity-40 cursor-not-allowed";
+  "hidden h-[38px] w-[38px] items-center justify-center rounded-[11px] text-[#45555c] opacity-40 cursor-not-allowed md:flex";
 const PILL =
   "flex h-[42px] items-center rounded-[12px] bg-[#f4faff] px-3.5 text-[13px] font-semibold text-[#0362da] transition-colors hover:bg-[#e6f1ff]";
 

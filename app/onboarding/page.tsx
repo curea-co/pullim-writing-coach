@@ -223,8 +223,9 @@ function DemoPreview() {
       <div className="flex items-baseline gap-2">
         <span className="text-foreground text-3xl font-bold tracking-tight">67</span>
         <span className="text-subtle-foreground text-xs">/ 100</span>
-        <span className="bg-band-good-surface text-band-good-foreground ml-1 rounded px-2 py-0.5 text-[10px] font-semibold">
-          상위 구간
+        {/* 67점의 실제 밴드(getTotalScoreBand 55~74) 라벨과 정합 — "상위 구간"은 과장 카피였음(UX 점검 ⑩). */}
+        <span className="bg-band-normal-surface text-band-normal-foreground ml-1 rounded px-2 py-0.5 text-[10px] font-semibold">
+          기본 토대는 있음
         </span>
       </div>
       {/* 5영역 미니 바 */}
