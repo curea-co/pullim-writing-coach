@@ -108,7 +108,11 @@ export default function ResultsListPage() {
       <header className="mb-6">
         <h1 className="text-foreground text-2xl font-bold md:text-3xl">채점 결과 조회</h1>
         <p className="text-muted-foreground mt-2 text-sm">
-          내가 받은 채점 결과를 모아 봐요. 최대 20건까지 자동 저장돼요. 데이터는 이 브라우저에만 있어요(서버 X).
+          내가 받은 채점 결과를 모아 봐요. 최대 20건까지 자동 저장돼요.{" "}
+          {/* 저장 위치 안내 — 실제 동작과 일치(authed=계정 서버 저장·다기기, guest=이 브라우저만). */}
+          {status === "authed"
+            ? "내 계정에 저장돼 다른 기기에서도 볼 수 있어요."
+            : "로그인하지 않으면 이 브라우저에만 저장돼요."}
         </p>
       </header>
 

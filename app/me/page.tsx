@@ -171,6 +171,7 @@ export default function MePage() {
           setConfirmDelete={setConfirmDelete}
           onDelete={handleDelete}
           deleteError={deleteError}
+          authed={status === "authed"}
         />
       </main>
     );
@@ -210,7 +211,10 @@ export default function MePage() {
       <header className="mb-6">
         <h1 className="text-foreground text-2xl font-bold">내 정보</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          프로필은 이 브라우저에만 저장돼요.
+          {/* 저장 위치 안내 — 실제 동작과 일치(authed=계정 서버 저장, guest=이 브라우저만). */}
+          {status === "authed"
+            ? "프로필은 내 계정에 저장돼 다른 기기에서도 유지돼요."
+            : "프로필은 이 브라우저에만 저장돼요. 로그인하면 계정에 저장돼요."}
         </p>
       </header>
 
@@ -253,6 +257,8 @@ export default function MePage() {
         confirmDelete={confirmDelete}
         setConfirmDelete={setConfirmDelete}
         onDelete={handleDelete}
+        deleteError={deleteError}
+        authed={status === "authed"}
       />
     </main>
   );
@@ -264,6 +270,7 @@ export default function MePage() {
 function DataDeleteSection({
   confirmDelete,
   setConfirmDelete,
+  authed,
   onDelete,
   deleteError,
 }: {
@@ -272,12 +279,15 @@ function DataDeleteSection({
   onDelete: () => void | Promise<void>;
   // PR #115 결함 3: DELETE 실패 안내(있으면 표시, 이동 안 함).
   deleteError?: string | null;
+  // 저장 위치 안내 분기 — authed는 계정(서버) 데이터까지 삭제됨을 정확히 고지.
+  authed?: boolean;
 }) {
   return (
     <section className="border-band-warn-surface bg-band-warn-surface/30 mt-10 rounded-xl border p-5">
       <h2 className="text-band-warn-foreground text-sm font-semibold">데이터 삭제</h2>
       <p className="text-muted-foreground break-keep mt-2 text-justify text-xs leading-relaxed">
-        이 브라우저에 저장된 <strong className="text-foreground">모든 데이터</strong>를 지웁니다:
+        {authed ? "내 계정과 이 브라우저에 저장된 " : "이 브라우저에 저장된 "}
+        <strong className="text-foreground">모든 데이터</strong>를 지웁니다:
         프로필·동의 기록, 본문 임시 저장본, 수정 이력, 채점 결과(최대 20건), 자주 쓰는 메타.
         이 작업은 되돌릴 수 없습니다.
       </p>
