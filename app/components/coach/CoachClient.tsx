@@ -55,7 +55,7 @@ import NudgeCard from "./NudgeCard";
 import GrowthBars, { GrowthRow } from "./GrowthBars";
 import BreakthroughBadge from "./BreakthroughBadge";
 import ProcessTimeline from "./ProcessTimeline";
-import { BlockIcon, MastGlyph } from "./icons";
+import { BlockIcon } from "./icons";
 import ShareStory from "./ShareStory";
 import { formatStoryText } from "@/app/lib/story";
 
@@ -532,7 +532,12 @@ export default function CoachClient({
   const rubricRef = useRef<string | undefined>(undefined);
 
   const assignment = assignmentProp ?? DEMO_ASSIGNMENT;
-  const assignmentTitle = assignment.title ?? assignment.prompt_text.slice(0, 24);
+  // 과제명 폴백 — 잘릴 때 말줄임표(…)로 잘림을 드러낸다(UX 점검 ⑤: "…글을 50"처럼 뚝 끊기지 않게).
+  const assignmentTitle =
+    assignment.title ??
+    (Array.from(assignment.prompt_text).length > 24
+      ? `${Array.from(assignment.prompt_text).slice(0, 24).join("")}…`
+      : assignment.prompt_text);
 
   const busy = state.phase === "checking" || state.phase === "rechecking";
 
@@ -747,27 +752,7 @@ export default function CoachClient({
 
   return (
     <div className={`${styles.root} ${styles.stageBg} flex w-full flex-col items-center`}>
-      {/* OS 토픽바 */}
-      <header className="sticky top-0 z-[60] w-full border-b border-[var(--line)] bg-white/[0.82] backdrop-blur-md backdrop-saturate-150">
-        <div className="mx-auto flex h-[60px] max-w-[1280px] items-center gap-3.5 px-[22px]">
-          <span className="flex items-center gap-[9px]">
-            <span className="grid h-[30px] w-[30px] place-items-center rounded-[9px] bg-[var(--pullim-blue)] shadow-[inset_0_0_0_2px_rgba(255,255,255,0.2)]">
-              <MastGlyph size={20} />
-            </span>
-            <span className={`${styles.brandFont} text-[18px] font-bold tracking-[-0.02em]`}>풀림</span>
-            <span className={`${styles.monoFont} -ml-[3px] text-[11px] text-[var(--ink-4)]`}>OS</span>
-          </span>
-          <span className="flex items-center gap-2 rounded-[var(--r-pill)] bg-[var(--pb-1)] px-3 py-1.5 text-[13px] font-semibold text-[var(--pullim-blue)]">
-            <BlockIcon name="pen" size={18} /> 라이팅 코치
-          </span>
-          <span className="flex-1" />
-          <span
-            className={`${styles.monoFont} inline-block rounded bg-[var(--pullim-lemon)] px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-[var(--pullim-ink)]`}
-          >
-            체험
-          </span>
-        </div>
-      </header>
+      {/* (OS 토픽바 제거 — 앱셸 헤더(풀림·라이팅 코치)와 중복 + "체험" 데모 배지 잔재였음. UX 점검 ④) */}
 
       {/* 무대 리드 카피 */}
       <div className="flex w-full max-w-[1280px] items-center justify-between gap-4 px-[22px] pt-[18px]">

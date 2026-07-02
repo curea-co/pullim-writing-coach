@@ -21,34 +21,37 @@ export default function AssignmentStep({
 }) {
   // 프로필 기반 prefill — 비동기 로드(account mode면 /api/data 왕복). initial(과제 복원)·사용자 입력이
   //   우선이므로, 프로필 prefill은 "사용자가 아직 안 건드린 필드"에만 함수형 갱신으로 적용한다.
-  const hasInitial = initial != null;
-  const [schoolLevel, setSchoolLevel] = useState<string>(initial?.school_level ?? "중2");
-  const [subject, setSubject] = useState<string>(initial?.subject ?? "과학");
-  const [genre, setGenre] = useState<string>(initial?.genre ?? "설명문");
+  // 기본값 = 미선택("") — 데모 하드코딩(중2·과학·설명문) 프리필은 사용자를 오인시킴(UX 점검 ⑥).
+  //   프로필이 있으면 아래 effect가 프로필 값으로 prefill, 없으면 "선택해 주세요"에서 시작.
+  const [schoolLevel, setSchoolLevel] = useState<string>(initial?.school_level ?? "");
+  const [subject, setSubject] = useState<string>(initial?.subject ?? "");
+  const [genre, setGenre] = useState<string>(initial?.genre ?? "");
   const [targetRaw, setTargetRaw] = useState(
     initial?.target_char_count != null ? String(initial.target_char_count) : "",
   );
   const [promptText, setPromptText] = useState(initial?.prompt_text ?? "");
 
   useEffect(() => {
-    if (hasInitial) return; // 과제 복원값이 있으면 프로필 prefill 안 함(유실 방지)
+    // initial(부분 draft 복원)이 있어도 skip하지 않는다 — 복원된 draft가 학년·과목·장르를 아직 안
+    //   채웠으면 그 빈 필드만 프로필로 prefill(아래 prev==="" 가드가 복원값·사용자 입력을 보호).
+    //   (기본값이 하드코딩이던 시절엔 hasInitial skip이 무해했지만, ""-기본값에선 UX 퇴행 — Codex 리뷰 #124.)
     let alive = true;
     void (async () => {
       const profile: Profile | null = await loadProfile();
       if (!alive || !profile) return;
-      // 기본 fallback("중2"·"과학"·"설명문") 상태일 때만 프로필 값으로 덮어쓴다.
-      setSchoolLevel((prev) => (prev === "중2" && profile.school_level ? profile.school_level : prev));
+      // 미선택("") 상태일 때만 프로필 값으로 prefill(사용자가 고른 값은 덮어쓰지 않음).
+      setSchoolLevel((prev) => (prev === "" && profile.school_level ? profile.school_level : prev));
       setSubject((prev) =>
-        prev === "과학" && profile.primary_subject && profile.primary_subject !== "기타"
+        prev === "" && profile.primary_subject && profile.primary_subject !== "기타"
           ? profile.primary_subject
           : prev,
       );
-      setGenre((prev) => (prev === "설명문" && profile.frequent_genre ? profile.frequent_genre : prev));
+      setGenre((prev) => (prev === "" && profile.frequent_genre ? profile.frequent_genre : prev));
     })();
     return () => {
       alive = false;
     };
-  }, [hasInitial]);
+  }, []);
 
   const targetTrimmed = targetRaw.trim();
   const targetNum = targetTrimmed === "" ? null : Number(targetTrimmed);
