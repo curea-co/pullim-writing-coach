@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import TryClient from "../components/TryClient";
 
 export const metadata: Metadata = {
-  title: "글 입력 — Pullim Writing Coach",
+  title: "직접 채점받기 — Pullim Writing Coach",
   description:
     "학생 글을 입력하면 AI가 5가지 기준으로 첨삭해 드려요 (WBS P3.1·P3.2).",
 };
