@@ -80,7 +80,10 @@
 ### 3-1. 팀 공통 (성호님 지침 — 항상 우선)
 - **브랜치/PR**: main 직push 금지. 기능별 브랜치 → PR → CI green + 리뷰 해소 → squash 머지. (pullim-api에 PR 낼 땐 **base=dev**.)
 - **로컬 포트**: 라이팅코치 = **3008**, 접속은 `http://writing.pullim.local:3008`(hosts 등록, 쿠키 SSO). 포트 SoT = pullim-api `.claude/rules/local-ports.md`.
-- **로그인/SSO**: 자체 로그인 만들지 않음 — 중앙 위임(`?next=` 쿼리). 쿠키는 api가 굽고(`Domain=.pullim.ai`) 우리는 소비만.
+- **로그인/SSO**: 자체 로그인 만들지 않음 — 중앙 위임(`?next=` 쿼리). 쿠키는 api가 굽고 우리는 소비만.
+  ⚠️ 쿠키 도달 범위는 환경별로 다름: **dev/prod는 `Domain=.pullim.ai` 공유**(writing 서버에도 도달), **로컬은
+  api 호스트 전용(host-only)이라 writing-coach 서버에 도달하지 않음** → 로컬 서버 인가는 데모토큰 fallback에
+  의존(브라우저→api 직접 호출인 `/me` 읽기는 로컬도 동작). 상세: `app/lib/server/pullim-session.ts` 주석.
 - **DB/마이그레이션**: 임의 생성·배포 금지, 엔티티/스키마 먼저 검증. 이 레포 DB는 자체 Supabase(pullim-api RDS 아님 — writing은 schema-less 소비자, q/ADR-031 선례).
 - **완료 기준**: "코드 머지"가 아니라 **배포 환경에서 동작 확인**. 0%면 0%로 보고.
 - **보고 형식**: ① 한 것(실행 결과 근거) ② **남은 것/막힌 것(가장 중요)** ③ 다음 계획. 추측 금지 — 실측만.
@@ -94,7 +97,8 @@ npm run build            # next build
 npm run test:e2e         # playwright 3브라우저 (~36) — 시간 걸림, UI 변경 시 필수
 ```
 - dev 서버: `npm run dev` (3008). E2E도 3008 전제(`playwright.config.ts`).
-- `.env`(로컬, gitignored)에 `ANTHROPIC_API_KEY`·데모토큰 있음 — 로컬 실채점 가능.
+- 로컬 실채점 셋업: `.env`는 gitignored(새 환경엔 없음) — `.env.example`을 복사해 `ANTHROPIC_API_KEY`와
+  `DEMO_ACCESS_TOKEN`/`NEXT_PUBLIC_DEMO_TOKEN`(로컬 게이트 자동입장)을 채우면 로컬에서 실채점 가능.
 
 ### 3-3. Codex 자동리뷰 대응 (경험으로 굳은 규칙)
 - PR을 올리면 Codex가 리뷰 스레드를 단다. **모든 스레드를 반드시 읽고 평가한 뒤** 처리:
