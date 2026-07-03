@@ -3,7 +3,7 @@
 이 문서 하나로 현재 상태·남은 작업·작업 지침을 파악할 수 있게 정리했다.
 **모든 "완료" 표기는 실측(실행 결과·스크린샷·curl) 기반**이며, 미확인 항목은 미확인이라고 적었다.
 
-- 레포: https://github.com/curea-co/pullim-writing-coach (main 기준 `197e7b2`)
+- 레포: https://github.com/curea-co/pullim-writing-coach (**작성 시점(2026-07-03) HEAD** `197e7b2` — 이후 main은 계속 전진하니 현재 상태는 `git log`가 기준)
 - 서비스: **https://writing.pullim.ai** (Vercel 프로젝트 `pullim-writing-coach`, team curea — main push 시 자동 prod 배포)
 - 관련 레포: pullim-api(백엔드·인증) · pullim-web(중앙 로그인 UI)
 
@@ -14,7 +14,7 @@
 ### 1-1. 아키텍처 한 장 요약
 - **인증**: 자체 인증 없음. 중앙 SSO **소비자** — 헤더 로그인 버튼 → `pullim.ai/login?next=<복귀URL>` → 로그인 후 복귀 → 브라우저가 `api.pullim.ai/me`를 직접 호출(credentials 포함, `.pullim.ai` 공유 쿠키)해 세션을 읽는다. `/me` 401 시 csrf→refresh→재시도(15분 만료 대응). 코드: `app/lib/use-auth.tsx`(클라) · `app/lib/server/pullim-session.ts`(서버 검증, prod fail-closed).
 - **인가**: `/api/score·coach·extract`는 `verifyWritingAccess`(서버에서 `/me` 쿠키 릴레이) — 회원이면 통과. 비prod 한정 데모토큰 fallback 잔존(로컬 개발용).
-- **per-user 데이터**: 6종(프로필·결과·수정이력·임시저장·메타·동의)을 `app/lib/storage.ts` 어댑터가 라우팅 — **로그인=자체 `/api/data/*` → Supabase Postgres** / **게스트·로컬=localStorage**. DB는 단일 KV 테이블 `writing_user_data(user_id=sub, data_key, payload jsonb)`. 코드: `app/lib/server/db.ts`(postgres 드라이버) · `app/api/data/`.
+- **per-user 데이터**: 6종(프로필·결과·수정이력·임시저장·메타·동의)을 `app/lib/storage.ts` 어댑터가 라우팅 — **authed=자체 `/api/data/*` → Supabase Postgres** / **게스트·로컬·그리고 인증상태 `error`=localStorage 폴백**(⚠️ 인증서버 장애 시 저장/조회가 브라우저 로컬로 떨어짐 — 운영 디버깅 포인트). DB는 단일 KV 테이블 `writing_user_data(user_id=sub, data_key, payload jsonb)`. 코드: `app/lib/server/db.ts`(postgres 드라이버) · `app/api/data/`.
 - **AI**: 채점 `/api/score`·코치 `/api/coach`·추출 `/api/extract` — Anthropic API(`ANTHROPIC_API_KEY`).
 
 ### 1-2. 완료 (실측 확인)
@@ -79,7 +79,9 @@
 
 ### 3-1. 팀 공통 (성호님 지침 — 항상 우선)
 - **브랜치/PR**: main 직push 금지. 기능별 브랜치 → PR → CI green + 리뷰 해소 → squash 머지. (pullim-api에 PR 낼 땐 **base=dev**.)
-- **로컬 포트**: 라이팅코치 = **3008**, 접속은 `http://writing.pullim.local:3008`(hosts 등록, 쿠키 SSO). 포트 SoT = pullim-api `.claude/rules/local-ports.md`.
+- **로컬 포트**: 라이팅코치 = **3008**, 접속은 `http://writing.pullim.local:3008`(hosts 등록). 로컬 SSO는
+  **클라이언트 `/me` 읽기까지만**(브라우저가 api 호스트 쿠키를 직접 전송) — 서버 인가는 데모토큰 fallback(아래
+  SSO 항목 참조). 포트 SoT = pullim-api `.claude/rules/local-ports.md`.
 - **로그인/SSO**: 자체 로그인 만들지 않음 — 중앙 위임(`?next=` 쿼리). 쿠키는 api가 굽고 우리는 소비만.
   ⚠️ 쿠키 도달 범위는 환경별로 다름: **dev/prod는 `Domain=.pullim.ai` 공유**(writing 서버에도 도달), **로컬은
   api 호스트 전용(host-only)이라 writing-coach 서버에 도달하지 않음** → 로컬 서버 인가는 데모토큰 fallback에
