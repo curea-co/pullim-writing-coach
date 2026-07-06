@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AppShell } from "./components/app-shell";
+import { AuthProvider } from "./lib/auth/auth-context";
 
 export const metadata: Metadata = {
   title: "Pullim Writing Coach — 데모",
@@ -35,7 +36,9 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-background text-foreground min-h-full">
-        <AppShell>{children}</AppShell>
+        <AuthProvider>
+          <AppShell>{children}</AppShell>
+        </AuthProvider>
       </body>
     </html>
   );
