@@ -8,15 +8,18 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { loadResults, removeResult, type ResultEntry } from "../lib/storage";
+import { useAuth } from "../lib/use-auth";
 import { getTotalScoreBand } from "../data/scoring";
 import { cn } from "../lib/utils";
 import Breadcrumb from "../components/Breadcrumb";
 import CtaBand from "../components/CtaBand";
 
-type LoadState = "loading" | "empty" | "loaded";
+// PR #115 결함 2: "결과 없음"(empty)과 "읽기 실패"(error)를 분리 — 빈 상태 카피가 장애를 은폐하지 않게.
+type LoadState = "loading" | "empty" | "loaded" | "error";
 type SortKey = "date_desc" | "date_asc" | "score_desc" | "score_asc";
 
 export default function ResultsListPage() {
+  const { status } = useAuth();
   const [state, setState] = useState<LoadState>("loading");
   const [items, setItems] = useState<ResultEntry[]>([]);
   const [subjectFilter, setSubjectFilter] = useState<string>("");
@@ -24,11 +27,26 @@ export default function ResultsListPage() {
   const [sortKey, setSortKey] = useState<SortKey>("date_desc");
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
+  // PR #115 결함 1: status가 resolved될 때까지 보류 + guest→authed 전환 시 재로드(서버 데이터 누락 차단).
   useEffect(() => {
-    const list = loadResults();
-    setItems(list);
-    setState(list.length === 0 ? "empty" : "loaded");
-  }, []);
+    if (status === "loading") return;
+    let alive = true;
+    void (async () => {
+      try {
+        const list = await loadResults();
+        if (!alive) return;
+        setItems(list);
+        setState(list.length === 0 ? "empty" : "loaded");
+      } catch {
+        // PR #115 결함 2: 읽기 실패(401/403/5xx/네트워크) — 빈 상태가 아니라 에러 상태로.
+        if (!alive) return;
+        setState("error");
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [status]);
 
   // 유니크 과목 — 필터 옵션 만들기 (현 데이터 기반 동적 옵션).
   const subjects = useMemo(() => {
@@ -73,8 +91,8 @@ export default function ResultsListPage() {
     return arr;
   }, [items, subjectFilter, query, sortKey]);
 
-  function handleDelete(id: string) {
-    const result = removeResult(id);
+  async function handleDelete(id: string) {
+    const result = await removeResult(id);
     if (result.ok && result.removed) {
       const next = items.filter((r) => r.id !== id);
       setItems(next);
@@ -90,12 +108,49 @@ export default function ResultsListPage() {
       <header className="mb-6">
         <h1 className="text-foreground text-2xl font-bold md:text-3xl">채점 결과 조회</h1>
         <p className="text-muted-foreground mt-2 text-sm">
-          내가 받은 채점 결과를 모아 봐요. 최대 20건까지 자동 저장돼요. 데이터는 이 브라우저에만 있어요(서버 X).
+          내가 받은 채점 결과를 모아 봐요. 최대 20건까지 자동 저장돼요.{" "}
+          {/* 저장 위치 안내 — 실제 동작과 일치. error(인증서버 미확인)는 게스트로 단정하지 않는다(use-auth 계약). */}
+          {status === "authed"
+            ? "내 계정에 저장돼 다른 기기에서도 볼 수 있어요."
+            : status === "guest"
+              ? "로그인하지 않으면 이 브라우저에만 저장돼요."
+              : // error: 이 상태의 읽기는 storage가 localStorage로 폴백 — 화면의 결과가 계정 데이터라고 보장 못 함.
+                "지금은 로그인 상태를 확인할 수 없어요 — 아래 결과는 이 브라우저에 저장된 데이터일 수 있어요."}
         </p>
       </header>
 
       {state === "loading" && (
         <p className="text-muted-foreground text-sm">불러오는 중…</p>
+      )}
+
+      {state === "error" && (
+        <section
+          role="alert"
+          className="border-band-warn-surface bg-band-warn-surface/30 rounded-xl border p-8 text-left"
+        >
+          <p className="text-foreground text-base font-semibold">결과를 불러오지 못했어요</p>
+          <p className="text-muted-foreground break-keep mt-2 text-sm">
+            일시적인 연결 문제일 수 있어요. 잠시 후 다시 시도해 주세요.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setState("loading");
+              void (async () => {
+                try {
+                  const list = await loadResults();
+                  setItems(list);
+                  setState(list.length === 0 ? "empty" : "loaded");
+                } catch {
+                  setState("error");
+                }
+              })();
+            }}
+            className="bg-primary text-primary-foreground mt-5 inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold transition hover:opacity-90"
+          >
+            다시 시도
+          </button>
+        </section>
       )}
 
       {state === "empty" && (
@@ -244,7 +299,7 @@ export default function ResultsListPage() {
                           </span>
                           <button
                             type="button"
-                            onClick={() => handleDelete(r.id)}
+                            onClick={() => void handleDelete(r.id)}
                             className="bg-band-warn text-white hover:opacity-90 rounded-md px-2 py-0.5 text-xs font-semibold"
                           >
                             삭제

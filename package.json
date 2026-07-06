@@ -3,15 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --port 3008",
     "build": "next build",
-    "start": "next start",
+    "start": "next start --port 3008",
     "lint": "eslint",
     "test:unit": "node --import ./scripts/register-ts.mjs --test scripts/*.test.mjs",
     "test:components": "vitest run --config vitest.config.ts",
     "test:e2e": "playwright test",
     "test:all": "npm run test:unit && npm run test:components",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "node scripts/db-migrate.mjs"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.56.0",
@@ -24,6 +25,7 @@
     "jspdf": "^4.2.1",
     "mammoth": "^1.12.0",
     "next": "16.2.6",
+    "postgres": "^3.4.9",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "server-only": "^0.0.1",

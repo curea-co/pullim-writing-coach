@@ -1,0 +1,66 @@
+/* 순수 CSS 3D 히어로 모션 — 의존성 0. GPU transform(translate/rotate/opacity)만 사용.
+   글쓰기 테마: 떠다니는 '글 시트' 레이어가 원근(perspective) 안에서 살짝 기울며 회전하고 부유한다.
+   접근성: prefers-reduced-motion 시 애니메이션 정지(정적 배치 유지). 데코레이션이라 pointer-events: none. */
+
+.scene {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: clamp(8px, 3vw, 48px);
+  perspective: 1000px;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* 시트 묶음 — 전체가 천천히 좌우로 기울며(rotateY) 살짝 끄덕(rotateX). */
+.stack {
+  position: relative;
+  width: clamp(82px, 19vw, 156px);
+  height: clamp(104px, 22vw, 190px);
+  transform-style: preserve-3d;
+  animation: heroTilt 9s ease-in-out infinite;
+  will-change: transform;
+}
+
+.sheet {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  padding: 18px 16px;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+/* 3겹 깊이 — translateZ로 앞뒤 배치 + 개별 부유(서로 다른 지연으로 시차감). */
+.s1 { transform: translateZ(-60px) translateY(6px) scale(0.9); opacity: 0.5; animation: heroFloat 7s ease-in-out infinite; }
+.s2 { transform: translateZ(0) scale(0.96); opacity: 0.8; animation: heroFloat 7s ease-in-out infinite; animation-delay: -2.3s; }
+.s3 { transform: translateZ(56px); opacity: 1; animation: heroFloat 7s ease-in-out infinite; animation-delay: -4.6s; }
+
+/* 시트 안의 '글줄' 막대 — 맨 앞 시트에만 또렷하게. 레몬 한 줄로 성취 액센트. */
+.line { height: 7px; border-radius: 4px; background: rgba(255, 255, 255, 0.55); margin-bottom: 11px; }
+.line:nth-child(1) { width: 62%; }
+.line:nth-child(2) { width: 90%; }
+.line:nth-child(3) { width: 78%; }
+.line:nth-child(4) { width: 84%; }
+.lemon { background: var(--pullim-lemon, #e6ff4c); width: 46% !important; box-shadow: 0 0 12px rgba(230, 255, 76, 0.5); }
+
+@keyframes heroTilt {
+  0%, 100% { transform: rotateY(-22deg) rotateX(8deg); }
+  50% { transform: rotateY(18deg) rotateX(2deg); }
+}
+@keyframes heroFloat {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -10px; }
+}
+
+/* 접근성: 모션 최소화 선호 시 정지(기울어진 정적 구도는 유지). */
+@media (prefers-reduced-motion: reduce) {
+  .stack { animation: none; transform: rotateY(-14deg) rotateX(6deg); }
+  .s1, .s2, .s3 { animation: none; }
+}

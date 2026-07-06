@@ -13,7 +13,7 @@ export type ExtractErrorCode = ErrorCode | "E-NETWORK" | "E-PARSE";
 //   server가 message 없이 code만 보내거나 errorEnvelope 기본값 사용 시 추출 컨텍스트 카피 노출.
 const EXTRACT_MESSAGE: Record<ExtractErrorCode, string> = {
   "E-PARSE": "추출 결과 형식이 올바르지 않아요. 다시 시도해 주세요.",
-  "E-AUTH": "데모 비밀번호를 다시 확인해 주세요.",
+  "E-AUTH": "로그인이 필요해요. 다시 로그인해 주세요.",
   "E-CAP": "요청이 너무 많아요. 잠시 후 다시 시도해 주세요.",
   "E-NETWORK": "인터넷 연결을 확인하고 다시 시도해 주세요.",
   E1: "안내서 정보가 올바르지 않아요. 다시 입력해 주세요.",
@@ -75,16 +75,23 @@ function looksLikeExtractedAssignment(v: unknown): v is ExtractedAssignment {
 }
 
 // 안내서 원문 → /api/extract 호출 → 검증된 ExtractedAssignment. 실패는 ExtractError로 throw.
+//   SSO 정합: 인가는 서버 verifyWritingAccess(쿠키/me)가 권위. token은 로컬 데모 fallback 전용이라
+//   선택값이며, 있을 때만 x-demo-token을 부착한다(부재가 곧 차단이 되지 않게 — prod authed 사용자는
+//   데모토큰이 없다). 동일 출처 요청이라 access 쿠키(Domain=.pullim.ai)는 자동 전송된다.
 export async function extractAssignment(
   rawText: string,
   channel: ExtractChannel,
-  token: string,
+  token?: string,
 ): Promise<ExtractedAssignment> {
   let res: Response;
   try {
     res = await fetch("/api/extract", {
       method: "POST",
-      headers: { "content-type": "application/json", "x-demo-token": token },
+      headers: {
+        "content-type": "application/json",
+        ...(token ? { "x-demo-token": token } : {}),
+      },
+      credentials: "include",
       body: JSON.stringify({ raw_text: rawText, channel }),
     });
   } catch {

@@ -80,6 +80,38 @@ AI는 글을 대신 써주지 않고, 학생이 직접 쓰도록 안내합니다
 | `DEMO_ACCESS_TOKEN` | 데모 접근 비밀번호(서버 검증). 비어 있으면 API가 401 fail-closed → 사실상 필수 |
 | `NEXT_PUBLIC_DEMO_TOKEN` | 설정 시 TokenGate 자동 입력(비번 0회 입장). ⚠ 번들 노출 → rate limit·예산 알람 필수 |
 | `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | 에러 모니터링 (미설정 시 no-op) |
+| `DATABASE_URL` | per-user 계정 데이터 store(Supabase Postgres, Transaction pooler) 연결 문자열. **서버 전용 — `NEXT_PUBLIC_` 금지**. 미설정 시 계정 store fail-closed. local은 미설정(localStorage 폴백). 프로비저닝: `docs/ops-db-provisioning.md` |
+| `DEMO_SESSION_SUB` | (선택) 비prod 로컬 e2e용 데모 세션 sub. prod 무시. 미설정 시 `"demo-sub"` |
+
+---
+
+## 계정 데이터 store (per-user)
+
+로그인 회원의 6종 데이터(프로필·결과·수정이력·임시저장·메타·동의)는 localStorage가 아니라 **계정 귀속 서버 저장**(writing-coach 자체 Next API `/api/data/*` + Supabase Postgres, `postgres` 드라이버)으로 전환됩니다. 로그인하면 다른 기기/브라우저에서도 같은 데이터가 보입니다. 게스트·로컬은 기존 localStorage 동작을 그대로 유지합니다.
+
+### 마이그레이션
+
+```bash
+# 접속문자열을 argv/history에 남기지 않도록 read -s로 주입(Session pooler 5432 사용. 자세한 절차: docs/ops-db-provisioning.md)
+read -rs -p "DATABASE_URL: " DATABASE_URL; echo; export DATABASE_URL
+npm run db:migrate   # db/migrations/0001_init.sql 적용
+```
+
+- ⚠️ 러너(`scripts/db-migrate.mjs`)는 `;` 단순 분할이라 **단순 DDL 전용** — 문자열 리터럴·함수 본문·달러쿼팅(`$$`) 안의 세미콜론은 미지원. 그런 마이그레이션은 러너 보강이 필요합니다. 예상 출력: `applying 0001_init.sql (2 statement(s))` → `done (1 file(s))`.
+- Supabase 프로비저닝(프로젝트·풀러 접속문자열·Vercel env·검증)은 `docs/ops-db-provisioning.md` 참조. 앱 런타임은 Transaction pooler(6543), 마이그레이션은 Session pooler(5432).
+
+### 로컬 검증 한계 (host-only)
+
+로컬에서는 access 쿠키가 api 호스트 전용(host-only)이라 writing-coach 서버에 도달하지 않습니다 → 계정 store path가 동작하지 않고 **localStorage 폴백**으로 떨어집니다. 따라서 로컬에서는 단위/컴포넌트 테스트(fetch·db·localStorage mock)로만 검증하며, 계정 store end-to-end는 **`dev-writing.pullim.ai`(+ `.pullim.ai` 쿠키)에서만 실증**합니다.
+
+### Dev e2e 수용 절차
+
+1. `dev-writing.pullim.ai` 로그인 → 채점.
+2. **다른 브라우저/기기**로 로그인 시 동일 결과가 조회됨.
+3. 게스트(미로그인)는 로컬(localStorage)만 사용.
+4. `/me` "데이터 삭제"가 서버 계정 데이터(동의 포함 6종)까지 삭제됨.
+
+> **선행**: 로그인 `#111` · Phase3 게이팅/refresh `#112` 머지 필요. `/me`가 안정 키 `sub`를 반환해야 합니다.
 
 ---
 

@@ -55,7 +55,7 @@ import NudgeCard from "./NudgeCard";
 import GrowthBars, { GrowthRow } from "./GrowthBars";
 import BreakthroughBadge from "./BreakthroughBadge";
 import ProcessTimeline from "./ProcessTimeline";
-import { BlockIcon, MastGlyph } from "./icons";
+import { BlockIcon } from "./icons";
 import ShareStory from "./ShareStory";
 import { formatStoryText } from "@/app/lib/story";
 
@@ -418,8 +418,11 @@ async function callCoach(
   | { ok: false; auth: true }
   | { ok: false; auth: false; message: string; retryable: boolean }
 > {
+  // SSO 정합: 인가는 서버 verifyWritingAccess(쿠키/me)가 권위. 데모토큰은 로컬 fallback 전용이므로
+  //   토큰 부재가 곧 차단이 되어선 안 된다(prod authed 사용자는 데모토큰이 없다). 토큰이 있을 때만
+  //   x-demo-token을 부착하고, 동일 출처 요청이라 access 쿠키(Domain=.pullim.ai)는 자동 전송된다.
+  //   실제 인가 실패는 서버 401 → 아래 res.status===401 분기에서 { auth: true }로 처리.
   const token = sessionStorage.getItem(DEMO_TOKEN_KEY) ?? "";
-  if (!token) return { ok: false, auth: true };
 
   const payload: CoachRequest = {
     assignment: {
@@ -440,7 +443,11 @@ async function callCoach(
   try {
     res = await fetch("/api/coach", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-demo-token": token },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { "x-demo-token": token } : {}),
+      },
+      credentials: "include",
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(65_000),
     });
@@ -525,7 +532,12 @@ export default function CoachClient({
   const rubricRef = useRef<string | undefined>(undefined);
 
   const assignment = assignmentProp ?? DEMO_ASSIGNMENT;
-  const assignmentTitle = assignment.title ?? assignment.prompt_text.slice(0, 24);
+  // 과제명 폴백 — 잘릴 때 말줄임표(…)로 잘림을 드러낸다(UX 점검 ⑤: "…글을 50"처럼 뚝 끊기지 않게).
+  const assignmentTitle =
+    assignment.title ??
+    (Array.from(assignment.prompt_text).length > 24
+      ? `${Array.from(assignment.prompt_text).slice(0, 24).join("")}…`
+      : assignment.prompt_text);
 
   const busy = state.phase === "checking" || state.phase === "rechecking";
 
@@ -740,27 +752,7 @@ export default function CoachClient({
 
   return (
     <div className={`${styles.root} ${styles.stageBg} flex w-full flex-col items-center`}>
-      {/* OS 토픽바 */}
-      <header className="sticky top-0 z-[60] w-full border-b border-[var(--line)] bg-white/[0.82] backdrop-blur-md backdrop-saturate-150">
-        <div className="mx-auto flex h-[60px] max-w-[1280px] items-center gap-3.5 px-[22px]">
-          <span className="flex items-center gap-[9px]">
-            <span className="grid h-[30px] w-[30px] place-items-center rounded-[9px] bg-[var(--pullim-blue)] shadow-[inset_0_0_0_2px_rgba(255,255,255,0.2)]">
-              <MastGlyph size={20} />
-            </span>
-            <span className={`${styles.brandFont} text-[18px] font-bold tracking-[-0.02em]`}>풀림</span>
-            <span className={`${styles.monoFont} -ml-[3px] text-[11px] text-[var(--ink-4)]`}>OS</span>
-          </span>
-          <span className="flex items-center gap-2 rounded-[var(--r-pill)] bg-[var(--pb-1)] px-3 py-1.5 text-[13px] font-semibold text-[var(--pullim-blue)]">
-            <BlockIcon name="pen" size={18} /> 라이팅 코치
-          </span>
-          <span className="flex-1" />
-          <span
-            className={`${styles.monoFont} inline-block rounded bg-[var(--pullim-lemon)] px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-[var(--pullim-ink)]`}
-          >
-            체험
-          </span>
-        </div>
-      </header>
+      {/* (OS 토픽바 제거 — 앱셸 헤더(풀림·라이팅 코치)와 중복 + "체험" 데모 배지 잔재였음. UX 점검 ④) */}
 
       {/* 무대 리드 카피 */}
       <div className="flex w-full max-w-[1280px] items-center justify-between gap-4 px-[22px] pt-[18px]">
@@ -773,7 +765,9 @@ export default function CoachClient({
 
       {/* 디바이스 */}
       <div className="relative mx-auto mb-[26px] mt-[18px] w-full max-w-[432px] overflow-hidden rounded-[var(--r-xl)] border border-[var(--line)] bg-white shadow-[var(--sh-3)]">
-        <div className="relative flex h-[min(76vh,690px)] min-h-[560px] flex-col overflow-hidden bg-white">
+        {/* 모바일은 76vh가 헤더+고정 탭바 공간을 비례 확보하도록 min-h 바닥을 낮춤(440). min-h-560을 강제하면
+            짧은 폰에서 프레임이 고정 OsTabbar 영역까지 내려가 BottomSheet '봐줘' CTA가 가려짐 → 데스크톱만 560. */}
+        <div className="relative flex h-[min(76dvh,690px)] min-h-[400px] flex-col overflow-hidden bg-white md:min-h-[560px]">
           {/* 과제 헤더 */}
           <div className="border-b border-[var(--line-2)] bg-gradient-to-b from-[var(--pb-1)] to-white px-[18px] pb-[13px] pt-4">
             <div className="flex items-center gap-[11px]">

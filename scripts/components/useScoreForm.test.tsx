@@ -92,6 +92,33 @@ describe("useScoreForm", () => {
     );
   });
 
+  it("SSO authed + 데모토큰 없음 → 단락 없이 fetch 발생 (x-demo-token 미부착)", async () => {
+    // prod authed 사용자는 데모토큰이 없다(데모토큰은 로컬 전용). 토큰 부재가 곧 차단이 되어선 안 됨.
+    sessionStorage.removeItem(DEMO_TOKEN_KEY);
+    const onAuthExpired = vi.fn();
+    const { result } = renderHook(() => useScoreForm({ onAuthExpired }));
+    act(() => {
+      result.current.onEditorChange({ html: "<p>오늘 학교에서 친구들과 점심을 먹으며 교복 자율화에 대해 토론했다. 나는 교복이 학생의 개성을 제한한다고 생각한다.</p>", text: "오늘 학교에서 친구들과 점심을 먹으며 교복 자율화에 대해 토론했다. 나는 교복이 학생의 개성을 제한한다고 생각한다." });
+      result.current.setSchoolLevel("중2");
+      result.current.setSubject("국어");
+      result.current.setGenre("논설문·주장하는 글");
+      result.current.setPromptText("교복 자율화에 대한 자신의 주장을 근거 2개 이상으로 쓰시오.");
+    });
+    act(() => { result.current.handleSubmit({ preventDefault: () => {} } as React.FormEvent); });
+    await waitFor(() => expect(result.current.submitState.phase).toBe("result"));
+    // 토큰 부재로 단락되지 않고 fetch가 발생해야 한다(인가는 서버 쿠키/me가 권위).
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/score",
+      expect.objectContaining({ method: "POST", credentials: "include" }),
+    );
+    // 데모토큰이 없으므로 x-demo-token 헤더는 부착되지 않아야 한다.
+    const callArgs = (globalThis.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls[0];
+    const headers = (callArgs[1] as { headers: Record<string, string> }).headers;
+    expect(headers["x-demo-token"]).toBeUndefined();
+    // 토큰 부재만으로 onAuthExpired가 호출돼선 안 된다(서버 401일 때만).
+    expect(onAuthExpired).not.toHaveBeenCalled();
+  });
+
   it("401 response → onAuthExpired called, phase back to idle", async () => {
     vi.stubGlobal("fetch", vi.fn(() =>
       Promise.resolve({ ok: false, status: 401, json: () => Promise.reject() } as unknown as Response)
@@ -110,35 +137,38 @@ describe("useScoreForm", () => {
     expect(result.current.submitState.phase).toBe("idle");
   });
 
-  it("draft in LS → restoredDraft set on mount, body stays empty", () => {
+  it("draft in LS → restoredDraft set on mount, body stays empty", async () => {
     localStorage.setItem("pwc_draft_v1", JSON.stringify({
       body: "이전에 작성한 글입니다. 충분히 길어요.", school_level: "중2",
       subject: "국어", genre: "논설문·주장하는 글", saved_at: "2026-06-02T10:00:00+09:00"
     }));
     const { result } = renderHook(() => useScoreForm({}));
-    expect(result.current.restoredDraft).not.toBeNull();
+    // loadDraft가 async — 복원은 마운트 effect 완료 후.
+    await waitFor(() => expect(result.current.restoredDraft).not.toBeNull());
     expect(result.current.body).toBe("");
   });
 
-  it("applyRestore → body filled, restoredDraft null", () => {
+  it("applyRestore → body filled, restoredDraft null", async () => {
     const draftBody = "이전에 작성한 글입니다. 충분히 길어요.";
     localStorage.setItem("pwc_draft_v1", JSON.stringify({
       body: draftBody, saved_at: "2026-06-02T10:00:00+09:00"
     }));
     const { result } = renderHook(() => useScoreForm({}));
+    await waitFor(() => expect(result.current.restoredDraft).not.toBeNull());
     act(() => { result.current.applyRestore(); });
     expect(result.current.body).toBe(draftBody);
     expect(result.current.restoredDraft).toBeNull();
   });
 
-  it("dismissRestore → restoredDraft null, LS cleared", () => {
+  it("dismissRestore → restoredDraft null, LS cleared", async () => {
     localStorage.setItem("pwc_draft_v1", JSON.stringify({
       body: "이전 글.", saved_at: "2026-06-02T10:00:00+09:00"
     }));
     const { result } = renderHook(() => useScoreForm({}));
+    await waitFor(() => expect(result.current.restoredDraft).not.toBeNull());
     act(() => { result.current.dismissRestore(); });
     expect(result.current.restoredDraft).toBeNull();
-    expect(localStorage.getItem("pwc_draft_v1")).toBeNull();
+    await waitFor(() => expect(localStorage.getItem("pwc_draft_v1")).toBeNull());
   });
 
   it("retryable error → retry() re-calls fetch with same payload", async () => {

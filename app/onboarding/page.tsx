@@ -29,6 +29,7 @@ import {
   setServiceConsent,
 } from "../lib/consent-store";
 import { consentNow, loadProfile, saveProfile, type Profile } from "../lib/storage";
+import { useAuth } from "../lib/use-auth";
 
 type Step = 1 | 2 | 3;
 const TOTAL_STEPS = 3;
@@ -36,6 +37,7 @@ const TOTAL_STEPS = 3;
 function OnboardingInner() {
   const router = useRouter();
   const params = useSearchParams();
+  const { status } = useAuth();
   const force = params.get("force") === "1";
 
   // 초기 step 결정 + 이미 프로필 있으면 redirect (force=1 이면 무시).
@@ -45,18 +47,34 @@ function OnboardingInner() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedProfile, setSavedProfile] = useState<Profile | null>(null);
 
+  // PR #115 결함 1: status resolved 전 보류 + 전환 시 재확인(authed인데 guest로 읽어 redirect를
+  //   놓치는 회귀 차단). 결함 2: loadProfile throw(읽기 실패) — redirect 게이트는 보수적으로
+  //   "프로필 없음"으로 보고 온보딩을 노출(에러 UI 불필요, 사용자가 다시 진행 가능).
   useEffect(() => {
     if (force) {
       setCheckedProfile(true);
       return;
     }
-    const profile = loadProfile();
-    if (profile) {
-      router.replace("/");
-      return;
-    }
-    setCheckedProfile(true);
-  }, [force, router]);
+    if (status === "loading") return;
+    let alive = true;
+    void (async () => {
+      let profile: Profile | null = null;
+      try {
+        profile = await loadProfile();
+      } catch {
+        profile = null;
+      }
+      if (!alive) return;
+      if (profile) {
+        router.replace("/");
+        return;
+      }
+      setCheckedProfile(true);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [force, router, status]);
 
   // 프로필 체크 전엔 빈 화면(깜박임 방지) — 짧은 시간이라 스피너 생략.
   if (!checkedProfile) return null;
@@ -66,7 +84,7 @@ function OnboardingInner() {
 
   // Step2 onSubmit — 검증은 ProfileForm 안에서, 여기는 저장+다음 단계 진행.
   //   consentAccepted=true(ProfileForm이 서비스 동의 체크 강제) → 서비스 동의 타임스탬프 기록.
-  const handleProfileSubmit = (draft: ProfileDraft, consentAccepted: boolean) => {
+  const handleProfileSubmit = async (draft: ProfileDraft, consentAccepted: boolean) => {
     // ProfileForm 검증 통과 = 필수 필드 있음. 그래도 type narrowing 위해 가드.
     if (!draft.school_level || !draft.primary_subject || !draft.nickname?.trim()) return;
     if (draft.primary_subject === "기타" && !draft.primary_subject_other?.trim()) return;
@@ -82,12 +100,12 @@ function OnboardingInner() {
       frequent_genre: draft.frequent_genre || undefined,
       consent_at: now,
     };
-    const result = saveProfile(profile);
+    const result = await saveProfile(profile);
     if (result.ok) {
       // 서비스 동의 영속(타임스탬프 주입). 보호자 동의·AI 학습 옵트인은 Step3에서 분기 처리.
       //   기존 consent 로드 후 서비스 동의만 갱신(가산적) — AI 옵트인 등 다른 필드 보존.
-      const base = loadConsent();
-      saveConsent(setServiceConsent(base, consentAccepted, now));
+      const base = await loadConsent();
+      await saveConsent(setServiceConsent(base, consentAccepted, now));
       setSavedProfile(profile);
       next();
     } else {
@@ -205,8 +223,9 @@ function DemoPreview() {
       <div className="flex items-baseline gap-2">
         <span className="text-foreground text-3xl font-bold tracking-tight">67</span>
         <span className="text-subtle-foreground text-xs">/ 100</span>
-        <span className="bg-band-good-surface text-band-good-foreground ml-1 rounded px-2 py-0.5 text-[10px] font-semibold">
-          상위 구간
+        {/* 67점의 실제 밴드(getTotalScoreBand 55~74) 라벨과 정합 — "상위 구간"은 과장 카피였음(UX 점검 ⑩). */}
+        <span className="bg-band-normal-surface text-band-normal-foreground ml-1 rounded px-2 py-0.5 text-[10px] font-semibold">
+          기본 토대는 있음
         </span>
       </div>
       {/* 5영역 미니 바 */}
@@ -289,15 +308,40 @@ function Step3({ profile }: { profile: Profile | null }) {
   const [consent, setConsent] = useState<ConsentState>(emptyConsent());
 
   useEffect(() => {
-    setConsent(loadConsent());
+    let alive = true;
+    void (async () => {
+      const c = await loadConsent();
+      if (alive) setConsent(c);
+    })();
+    return () => {
+      alive = false;
+    };
   }, []);
 
   // 만약 어떤 이유로 step3에 왔는데 profile이 없으면 안전상 step1로 돌아감.
+  const [hasProfile, setHasProfile] = useState<boolean | null>(null);
   useEffect(() => {
-    if (!profile && !loadProfile()) {
+    let alive = true;
+    void (async () => {
+      // PR #115 결함 2: 읽기 실패 시 step1 강제 복귀(redirect) 회귀를 피하려 안전하게 "있음"으로 가정.
+      //   직전 Step2에서 막 저장한 흐름이라 보수적으로 hasProfile=true(불필요한 step1 복귀 방지).
+      let has = true;
+      try {
+        has = !!(await loadProfile());
+      } catch {
+        has = true;
+      }
+      if (alive) setHasProfile(has);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (!profile && hasProfile === false) {
       router.replace("/onboarding");
     }
-  }, [profile, router]);
+  }, [profile, hasProfile, router]);
 
   const guardianTrack = needsGuardianConsent(schoolLevel);
   const stillRequired = useMemo(
@@ -306,18 +350,18 @@ function Step3({ profile }: { profile: Profile | null }) {
   );
   const ready = canUseService(consent, schoolLevel);
 
-  // 보호자 동의 토글 — 타임스탬프 주입 + LS 영속(가산적).
+  // 보호자 동의 토글 — 타임스탬프 주입 + 영속(가산적). 낙관적 set 후 저장.
   const handleGuardianChange = (accepted: boolean) => {
     const nextState = setGuardianConsent(consent, accepted, consentNow());
     setConsent(nextState);
-    saveConsent(nextState);
+    void saveConsent(nextState);
   };
 
   // AI 학습 별도 옵트인 토글 — 기본 OFF, 철회 시 null로 되돌림(불변식).
   const handleAiTrainingChange = (accepted: boolean) => {
     const nextState = setAiTrainingOptIn(consent, accepted, consentNow());
     setConsent(nextState);
-    saveConsent(nextState);
+    void saveConsent(nextState);
   };
 
   const go = (path: string) => {

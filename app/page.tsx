@@ -1,11 +1,13 @@
 import Link from "next/link";
 import HomeWelcomeBanner from "./components/HomeWelcomeBanner";
+import HeroMotion3D from "./components/HeroMotion3D";
+import TileGlyph3D from "./components/TileGlyph3D";
+import { IconPen, IconRoute, IconChart, IconArchive } from "./components/tile-icons";
 import { ServiceHero } from "@/components/ui/service-hero";
 import { ServiceIcon } from "@/components/ui/service-icon";
 import { SectionHead } from "@/components/ui/section-head";
 import { ServiceTile } from "@/components/ui/service-tile";
 import { StatCard, Card, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 
 // 대시보드 홈(2026-06-24) — OS/classbot 스타일 재편.
 //   ServiceHero → HomeWelcomeBanner → 바로 시작(ServiceTile 4-up)
@@ -51,34 +53,38 @@ const TILES = [
     description: "글 붙여넣고 1분 안에 5영역 채점·첨삭",
     href: "/try",
     cta: "실시간",
+    icon: <IconPen />,
   },
   {
     title: "과정 코치",
     description: "개요→본문 단계별 코칭",
     href: "/coach",
     cta: "베타",
+    icon: <IconRoute />,
   },
   {
     title: "샘플 채점 결과",
     description: "점수대 5케이스 미리보기",
     href: "/samples",
+    icon: <IconChart />,
   },
   {
     title: "채점 결과 조회",
     description: "저장된 채점 결과 다시 보기",
     href: "/results",
+    icon: <IconArchive />,
   },
 ];
 
 export default function Home() {
   return (
-    <main className="w-full max-w-5xl px-5 py-10 md:py-12">
-      {/* 1. ServiceHero */}
+    <main className="w-full max-w-5xl px-4 py-6 md:px-5 md:py-12">
+      {/* 1. ServiceHero — 우측에 순수 CSS 3D 모션(글 시트) 데코 */}
       <ServiceHero
         icon={<ServiceIcon name="writing" size={56} />}
         title="라이팅 코치"
         tagline="학생이 쓴 글을 1분 안에 5영역으로 채점하고, 잘한 점·고칠 점·수정 가이드를 코칭 말투로 보여줘요."
-        badges={<Badge intent="primary">데모 · Week 1</Badge>}
+        decoration={<HeroMotion3D />}
         cta={
           <Link
             href="/try"
@@ -102,6 +108,7 @@ export default function Home() {
             description={tile.description}
             href={tile.href}
             cta={tile.cta}
+            glyph={<TileGlyph3D icon={tile.icon} />}
           />
         ))}
       </div>

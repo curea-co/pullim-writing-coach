@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import MetaUsageCard from "../components/MetaUsageCard";
 import ProfileForm, { type ProfileDraft } from "../components/ProfileForm";
 import {
+  clearAllLocalStorage,
   clearAllResults,
   clearAllRevisions,
   clearDraft,
@@ -18,38 +19,81 @@ import {
   saveProfile,
   type Profile,
 } from "../lib/storage";
+import { clearConsent } from "../lib/consent-store";
+import { useAuth } from "../lib/use-auth";
 
-type LoadState = "loading" | "missing" | "loaded";
+// PR #115 결함 2: "프로필 없음"(missing)과 "읽기 실패"(error)를 분리.
+type LoadState = "loading" | "missing" | "loaded" | "error";
 
 export default function MePage() {
   const router = useRouter();
+  const { status } = useAuth();
   const [state, setState] = useState<LoadState>("loading");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // PR #115 결함 3: DELETE 실패 시 이동하지 않고 에러 안내(삭제 오인 방지).
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const handleDelete = () => {
-    // Codex PR #25/#29: 삭제 범위가 profile만이라 "프로필·이력 삭제" 카피와 실제 동작 불일치였음.
-    // 5개 LS 키 모두 clear — 학생/공용 기기에서 "모두 지웠다"는 약속을 실제 보장.
-    // Codex PR #56: missing 분기에서도 호출 — MetaUsageCard로 노출되는 학습 이력 삭제 동선 제공.
-    clearProfile();
-    clearDraft();
-    clearAllRevisions();
-    clearAllResults();
-    clearMetaUsage();
+  // 데이터 전량 삭제 — account/guest 분기(중복·idempotency·consent 일괄 해소, Task 6).
+  const handleDelete = async () => {
+    setDeleteError(null);
+    if (status === "authed") {
+      // ── account mode ──
+      // 서버 계정 데이터(동의 포함 6키)는 전체 1회 DELETE로 삭제(개별 /api/data/[key] PUT(null) 금지 —
+      //   전체 DELETE 후 null row를 재생성해 idempotency를 깬다).
+      // ★ PR #115 결함 3: DELETE 응답을 확인한다. 성공(200/204)일 때만 로컬 정리 + 이동.
+      //   실패(네트워크/401/5xx)면 이동하지 말고 에러 안내 — 안 지워졌는데 "지웠다"고 오인시키지 않는다.
+      let res: Response;
+      try {
+        res = await fetch("/api/data", { method: "DELETE", credentials: "include" });
+      } catch {
+        setDeleteError("삭제에 실패했어요. 다시 시도해 주세요.");
+        return;
+      }
+      if (res.status !== 200 && res.status !== 204) {
+        setDeleteError("삭제에 실패했어요. 다시 시도해 주세요.");
+        return;
+      }
+      // 같은 기기에 남은 게스트-시절 로컬 흔적 정리(서버 PUT(null) 미발생 — 순수 localStorage).
+      clearAllLocalStorage();
+    } else {
+      // ── guest/local ── clear*는 이 모드에서 localStorage로 라우팅.
+      await clearProfile();
+      await clearDraft();
+      await clearAllRevisions();
+      await clearAllResults();
+      await clearMetaUsage();
+      await clearConsent(); // 동의 기록도 삭제(카피 "프로필·동의 기록" 약속 충족)
+    }
     router.push("/");
   };
 
+  // PR #115 결함 1: status resolved 전 보류 + guest→authed 전환 시 재로드.
+  //   결함 2: loadProfile throw(읽기 실패) → 에러 상태(빈 "프로필 없음"과 구분).
   useEffect(() => {
-    const p = loadProfile();
-    if (p) {
-      setProfile(p);
-      setState("loaded");
-    } else {
-      setState("missing");
-    }
-  }, []);
+    if (status === "loading") return;
+    let alive = true;
+    void (async () => {
+      try {
+        const p = await loadProfile();
+        if (!alive) return;
+        if (p) {
+          setProfile(p);
+          setState("loaded");
+        } else {
+          setState("missing");
+        }
+      } catch {
+        if (!alive) return;
+        setState("error");
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [status]);
 
   // 저장 토스트 — 4초 후 자동 해제
   useEffect(() => {
@@ -59,6 +103,45 @@ export default function MePage() {
   }, [savedAt]);
 
   if (state === "loading") return null;
+
+  if (state === "error") {
+    return (
+      <main className="w-full max-w-md px-5 py-8">
+        <h1 className="text-foreground text-2xl font-bold">내 정보</h1>
+        <section
+          role="alert"
+          className="border-band-warn-surface bg-band-warn-surface/30 mt-6 rounded-xl border p-5 text-left"
+        >
+          <p className="text-foreground text-base font-semibold">정보를 불러오지 못했어요</p>
+          <p className="text-muted-foreground break-keep mt-2 text-sm leading-relaxed">
+            일시적인 연결 문제일 수 있어요. 잠시 후 다시 시도해 주세요.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setState("loading");
+              void (async () => {
+                try {
+                  const p = await loadProfile();
+                  if (p) {
+                    setProfile(p);
+                    setState("loaded");
+                  } else {
+                    setState("missing");
+                  }
+                } catch {
+                  setState("error");
+                }
+              })();
+            }}
+            className="mt-4 inline-flex h-10 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90"
+          >
+            다시 시도
+          </button>
+        </section>
+      </main>
+    );
+  }
 
   if (state === "missing") {
     // Codex PR #56: 공용 기기 보호 — missing 분기는 "내 프로필 없음" = 새 사용자 또는 공용 기기.
@@ -87,13 +170,15 @@ export default function MePage() {
           confirmDelete={confirmDelete}
           setConfirmDelete={setConfirmDelete}
           onDelete={handleDelete}
+          deleteError={deleteError}
+          session={status === "authed" ? "authed" : status === "error" ? "error" : "guest"}
         />
       </main>
     );
   }
 
   // state === "loaded"
-  const handleSubmit = (draft: ProfileDraft, _consent: boolean) => {
+  const handleSubmit = async (draft: ProfileDraft, _consent: boolean) => {
     if (!draft.school_level || !draft.primary_subject || !draft.nickname?.trim()) return;
     if (draft.primary_subject === "기타" && !draft.primary_subject_other?.trim()) return;
     setSaveError(null);
@@ -108,7 +193,7 @@ export default function MePage() {
       frequent_genre: draft.frequent_genre || undefined,
       consent_at: profile?.consent_at ?? new Date().toISOString(),
     };
-    const result = saveProfile(next);
+    const result = await saveProfile(next);
     if (result.ok) {
       setProfile(next);
       setSavedAt(Date.now());
@@ -126,7 +211,13 @@ export default function MePage() {
       <header className="mb-6">
         <h1 className="text-foreground text-2xl font-bold">내 정보</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          프로필은 이 브라우저에만 저장돼요.
+          {/* 저장 위치 안내 — 실제 동작과 일치. error(인증서버 미확인)는 게스트로 단정하지 않는다(use-auth 계약). */}
+          {status === "authed"
+            ? "프로필은 내 계정에 저장돼 다른 기기에서도 유지돼요."
+            : status === "guest"
+              ? "프로필은 이 브라우저에만 저장돼요. 로그인하면 계정에 저장돼요."
+              : // error: 이 상태의 쓰기는 storage가 localStorage로 폴백 — 지금 수정하면 이 브라우저에만 저장됨.
+                "지금은 로그인 상태를 확인할 수 없어요 — 이 상태에서 수정한 프로필은 이 브라우저에만 저장돼요."}
         </p>
       </header>
 
@@ -169,6 +260,8 @@ export default function MePage() {
         confirmDelete={confirmDelete}
         setConfirmDelete={setConfirmDelete}
         onDelete={handleDelete}
+        deleteError={deleteError}
+        session={status === "authed" ? "authed" : status === "error" ? "error" : "guest"}
       />
     </main>
   );
@@ -180,20 +273,41 @@ export default function MePage() {
 function DataDeleteSection({
   confirmDelete,
   setConfirmDelete,
+  session,
   onDelete,
+  deleteError,
 }: {
   confirmDelete: boolean;
   setConfirmDelete: (v: boolean) => void;
-  onDelete: () => void;
+  onDelete: () => void | Promise<void>;
+  // PR #115 결함 3: DELETE 실패 안내(있으면 표시, 이동 안 함).
+  deleteError?: string | null;
+  // 저장 위치·삭제 범위 고지 분기 — error(인증서버 미확인)는 게스트로 단정하지 않는다(use-auth 계약).
+  //   handleDelete가 authed 아닐 때 로컬만 지우므로, error에선 "브라우저 데이터만 삭제됨"을 드러낸다.
+  session?: "authed" | "guest" | "error";
 }) {
   return (
     <section className="border-band-warn-surface bg-band-warn-surface/30 mt-10 rounded-xl border p-5">
       <h2 className="text-band-warn-foreground text-sm font-semibold">데이터 삭제</h2>
       <p className="text-muted-foreground break-keep mt-2 text-justify text-xs leading-relaxed">
-        이 브라우저에 저장된 <strong className="text-foreground">모든 데이터</strong>를 지웁니다:
+        {session === "authed" ? "내 계정과 이 브라우저에 저장된 " : "이 브라우저에 저장된 "}
+        <strong className="text-foreground">모든 데이터</strong>를 지웁니다:
         프로필·동의 기록, 본문 임시 저장본, 수정 이력, 채점 결과(최대 20건), 자주 쓰는 메타.
         이 작업은 되돌릴 수 없습니다.
+        {session === "error" && (
+          <>
+            {" "}지금은 로그인 상태를 확인할 수 없어 이 삭제는{" "}
+            <strong className="text-foreground">이 브라우저 데이터만</strong> 지워요 — 계정 데이터는
+            로그인 상태에서 삭제할 수 있어요.
+          </>
+        )}
       </p>
+
+      {deleteError && (
+        <p role="alert" className="text-band-warn-foreground mt-3 text-xs font-medium">
+          {deleteError}
+        </p>
+      )}
 
       {!confirmDelete ? (
         <button
@@ -211,7 +325,7 @@ function DataDeleteSection({
           <div className="mt-3 flex gap-2">
             <button
               type="button"
-              onClick={onDelete}
+              onClick={() => void onDelete()}
               className="bg-band-warn hover:bg-band-warn/90 inline-flex h-9 items-center rounded-lg px-4 text-xs font-semibold text-white"
             >
               네, 삭제할게요

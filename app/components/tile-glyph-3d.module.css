@@ -1,0 +1,35 @@
+/* 바로시작 타일 라인 아이콘의 절제된 3D — 의존성 0. 정적은 살짝 기운 평면, 타일(.group) 호버 시 정면으로
+   돌며 앞으로 솟는다(깊이감). 모던하게 상시 부유는 제거하고 호버 마이크로 인터랙션만. reduced-motion 정지. */
+
+.wrap {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  perspective: 360px;
+}
+
+.glyph {
+  display: grid;
+  place-items: center;
+  transform: rotateY(-10deg);
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.glyph svg {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+
+/* Tailwind group 마커(.group) 호버 — 정면으로 돌며 앞으로 솟음(깊이). */
+:global(.group):hover .glyph {
+  transform: rotateY(8deg) translateZ(10px) scale(1.06);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glyph { transition: none; transform: none; }
+  /* 호버 규칙(.group:hover .glyph)이 specificity가 더 높아 reduced-motion에서도 적용되므로 동일 셀렉터로 무력화. */
+  :global(.group):hover .glyph { transform: none; }
+}

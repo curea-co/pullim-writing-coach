@@ -10,6 +10,10 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./scripts/vitest.setup.ts"],
+    // 컴포넌트 테스트는 NEXT_PUBLIC_DEMO_TOKEN 미설정(.env 기본=빈값)을 가정한다 — 셸 env가 새어들어와
+    //   TokenGate 자동 데모 입장이 게이트 테스트를 오염시키는 것 방지. 토큰이 필요한 테스트는
+    //   sessionStorage.setItem(DEMO_TOKEN_KEY, ...)로 명시 주입한다(ScoreWizard·useScoreForm·CoachClient).
+    env: { NEXT_PUBLIC_DEMO_TOKEN: "" },
     // 컴포넌트 테스트만 scripts/components/*.test.tsx 패턴으로 분리.
     include: ["scripts/components/**/*.test.{ts,tsx}"],
     // node:test 파일은 제외(별 runner)
