@@ -108,3 +108,20 @@ test("relay 5xx → 일반 Error(상태코드만 포함 — 본문·자격증명
     (e) => e instanceof Error && !(e instanceof db.PullimDataAuthError) && /503/.test(e.message),
   );
 });
+
+test("mutation 404 → throw (성공 위장 금지 — 표면 미배포 시 조용한 유실 방지)", async () => {
+  // 회귀 배경: 표면 미배포 dev-api 에 PUT 이 404 를 받고도 {ok:true} 로 위장 성공(2026-07-07 로컬 종단 검증 실사고).
+  mockFetch(404, {});
+  await assert.rejects(
+    () => db.setUserData(makeReq({ cookie: "pullim-at=t" }), "drafts", { a: 1 }),
+    (e) => e instanceof db.RelayStatusError && e.status === 404,
+  );
+  await assert.rejects(
+    () => db.deleteUserData(makeReq({ cookie: "pullim-at=t" }), "drafts"),
+    (e) => e instanceof db.RelayStatusError && e.status === 404,
+  );
+  await assert.rejects(
+    () => db.deleteAllUserData(makeReq({ cookie: "pullim-at=t" })),
+    (e) => e instanceof db.RelayStatusError && e.status === 404,
+  );
+});

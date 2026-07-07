@@ -41,6 +41,9 @@ function cookieValue(cookieHeader: string | null, names: readonly string[]): str
 
 // KV 표면 relay. 401 → PullimDataAuthError(라우트 E-AUTH), 그 외 비2xx → throw(라우트 E8).
 //   redirect:manual — 302 추종으로 인한 인가 우회(false-positive) 방지(pullim-session과 동일).
+//   ⚠ 404 도 throw — mutation 이 404 를 성공으로 삼키면 조용한 데이터 유실(로컬 종단 검증에서
+//   표면 미배포 dev-api 에 PUT 이 {ok:true} 로 위장 성공한 실사고로 확정). GET 의 "미존재=404"
+//   수용은 getUserData 가 catch 로 처리한다.
 async function relay(req: Request, method: "GET" | "PUT" | "DELETE", path: string, body?: unknown): Promise<Response> {
   const cookieHeader = req.headers.get("cookie");
   const origin = req.headers.get("origin") ?? process.env.NEXT_PUBLIC_WEB_URL ?? "";
@@ -62,13 +65,31 @@ async function relay(req: Request, method: "GET" | "PUT" | "DELETE", path: strin
     redirect: "manual",
   });
   if (res.status === 401) throw new PullimDataAuthError();
-  if (!res.ok && res.status !== 404) throw new Error(`[db] relay ${res.status}`); // 상태코드만 — 본문/자격증명 금지
+  if (!res.ok) throw new RelayStatusError(res.status); // 상태코드만 — 본문/자격증명 금지
   return res;
 }
 
+/** relay 비2xx 상태 — getUserData 의 404 특례 판별용(그 외엔 라우트 E8 낙하). */
+export class RelayStatusError extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super(`[db] relay ${status}`);
+    this.name = "RelayStatusError";
+    this.status = status;
+  }
+}
+
 export async function getUserData(req: Request, key: DataKey): Promise<unknown | null> {
-  const res = await relay(req, "GET", `/${key}`);
-  if (res.status === 404) return null; // 미존재 키를 404로 주는 표면 구현도 수용(계약 기본은 200+null)
+  let res: Response;
+  try {
+    res = await relay(req, "GET", `/${key}`);
+  } catch (e) {
+    // GET 한정 특례: 미존재 키를 404로 주는 표면 구현도 null 로 수용(계약 기본은 200+null).
+    //   mutation 은 특례 없음 — 404 는 표면 부재/경로 오류이므로 실패로 전파(위 relay 주석).
+    if (e instanceof RelayStatusError && e.status === 404) return null;
+    throw e;
+  }
   const body = (await res.json().catch(() => null)) as { payload?: unknown } | null;
   return body?.payload ?? null;
 }
