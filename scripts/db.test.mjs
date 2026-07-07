@@ -1,20 +1,30 @@
-// db.ts 단위 테스트 — sql 태그드 템플릿을 모킹(__setSqlForTest)해 쿼리 형태·스코프 검증.
+// db.ts 단위 테스트 — pullim-api KV 표면 relay(fetch 모킹) 검증 (2026-07-07 RDS 전환).
+//   검증 축: URL·메서드, 쿠키 relay, mutation CSRF(double-submit) 헤더, 상태코드 매핑(401→AuthError·404→null).
 //   실행: node --import ./scripts/register-ts.mjs --test scripts/db.test.mjs
 import assert from "node:assert/strict";
 import { test, beforeEach, afterEach } from "node:test";
 
 const db = await import("../app/lib/server/db.ts");
 
+const realFetch = globalThis.fetch;
 let calls;
-beforeEach(() => {
+
+function mockFetch(status = 200, json = { payload: { ok: true } }) {
   calls = [];
-  db.__setSqlForTest(async (strings, ...values) => {
-    calls.push({ text: strings.join("?"), values });
-    // getUserData가 기대하는 row 형태를 기본 반환(setUserData/delete는 무시).
-    return [{ payload: { ok: true } }];
-  });
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url: String(url), init: init ?? {} });
+    return { ok: status >= 200 && status < 300, status, json: async () => json };
+  };
+}
+
+beforeEach(() => mockFetch());
+afterEach(() => {
+  globalThis.fetch = realFetch;
 });
-afterEach(() => db.__setSqlForTest(null));
+
+function makeReq(headers = {}) {
+  return new Request("https://w/api/data/results", { method: "POST", headers });
+}
 
 test("isDataKey — 화이트리스트만 true", () => {
   assert.equal(db.isDataKey("results"), true);
@@ -23,29 +33,78 @@ test("isDataKey — 화이트리스트만 true", () => {
   assert.equal(db.isDataKey(123), false);
 });
 
-test("getUserData — sub·key 바인딩 + payload 반환", async () => {
-  const out = await db.getUserData("user-abc", "results");
+// ── getUserData ──────────────────────────────────────────────────────
+test("getUserData — GET /writing/data/:key + 쿠키 relay + payload 반환", async () => {
+  const req = makeReq({ cookie: "pullim-at=tok; pullim-csrf=c1" });
+  const out = await db.getUserData(req, "results");
   assert.deepEqual(out, { ok: true });
-  assert.deepEqual(calls[0].values, ["user-abc", "results"]);
-  assert.match(calls[0].text, /select payload/i);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /\/writing\/data\/results$/);
+  assert.equal(calls[0].init.method, "GET");
+  assert.equal(calls[0].init.headers.cookie, "pullim-at=tok; pullim-csrf=c1");
+  assert.equal(calls[0].init.redirect, "manual"); // 302 추종 인가 우회 방지
+  assert.equal(calls[0].init.headers["x-csrf-token"], undefined); // GET엔 CSRF 불필요
 });
 
-test("getUserData — row 없으면 null", async () => {
-  db.__setSqlForTest(async () => []);
-  assert.equal(await db.getUserData("u", "results"), null);
+test("getUserData — 표면 404 → null (미존재 키 수용)", async () => {
+  mockFetch(404, {});
+  assert.equal(await db.getUserData(makeReq({ cookie: "pullim-at=t" }), "results"), null);
 });
 
-test("setUserData — upsert에 sub·key·payload(jsonb 직렬화) 바인딩", async () => {
-  await db.setUserData("user-abc", "profile", { nickname: "민수" });
-  assert.match(calls[0].text, /insert into writing_user_data/i);
-  assert.match(calls[0].text, /on conflict/i);
-  assert.match(calls[0].text, /::jsonb/i); // payload는 ::jsonb 캐스트로 바인딩
-  // payload는 JSON 문자열로 직렬화돼 바인딩(postgres 드라이버는 객체 자동 직렬화 안 함).
-  assert.deepEqual(calls[0].values, ["user-abc", "profile", JSON.stringify({ nickname: "민수" })]);
+test("getUserData — payload 없음(200) → null", async () => {
+  mockFetch(200, {});
+  assert.equal(await db.getUserData(makeReq({ cookie: "pullim-at=t" }), "results"), null);
 });
 
-test("deleteAllUserData — sub만 바인딩", async () => {
-  await db.deleteAllUserData("user-abc");
-  assert.match(calls[0].text, /delete from writing_user_data/i);
-  assert.deepEqual(calls[0].values, ["user-abc"]);
+// ── setUserData (mutation: CSRF relay) ───────────────────────────────
+test("setUserData — PUT + payload 봉투 + CSRF double-submit(prod 쿠키명)", async () => {
+  const req = makeReq({ cookie: "pwc-rl-id=x; pullim-at=tok; pullim-csrf=csrf-v1" });
+  await db.setUserData(req, "profile", { nickname: "민수" });
+  assert.match(calls[0].url, /\/writing\/data\/profile$/);
+  assert.equal(calls[0].init.method, "PUT");
+  assert.equal(calls[0].init.headers["x-csrf-token"], "csrf-v1"); // csrf 쿠키값 → 헤더 재전송
+  assert.equal(calls[0].init.headers["content-type"], "application/json");
+  assert.deepEqual(JSON.parse(calls[0].init.body), { payload: { nickname: "민수" } });
+});
+
+test("setUserData — dev 쿠키명(dev-pullim-csrf)도 인식", async () => {
+  const req = makeReq({ cookie: "dev-pullim-at=tok; dev-pullim-csrf=csrf-dev" });
+  await db.setUserData(req, "drafts", "x");
+  assert.equal(calls[0].init.headers["x-csrf-token"], "csrf-dev");
+});
+
+test("setUserData — payload undefined → null로 정규화", async () => {
+  await db.setUserData(makeReq({ cookie: "pullim-at=t" }), "drafts", undefined);
+  assert.deepEqual(JSON.parse(calls[0].init.body), { payload: null });
+});
+
+// ── 삭제 ─────────────────────────────────────────────────────────────
+test("deleteUserData — DELETE /writing/data/:key", async () => {
+  await db.deleteUserData(makeReq({ cookie: "pullim-at=t; pullim-csrf=c" }), "drafts");
+  assert.match(calls[0].url, /\/writing\/data\/drafts$/);
+  assert.equal(calls[0].init.method, "DELETE");
+  assert.equal(calls[0].init.headers["x-csrf-token"], "c");
+});
+
+test("deleteAllUserData — DELETE /writing/data (전체)", async () => {
+  await db.deleteAllUserData(makeReq({ cookie: "pullim-at=t; pullim-csrf=c" }));
+  assert.match(calls[0].url, /\/writing\/data$/);
+  assert.equal(calls[0].init.method, "DELETE");
+});
+
+// ── 상태코드 매핑 ────────────────────────────────────────────────────
+test("relay 401 → PullimDataAuthError (라우트 E-AUTH 매핑용)", async () => {
+  mockFetch(401, {});
+  await assert.rejects(
+    () => db.getUserData(makeReq({ cookie: "pullim-at=expired" }), "results"),
+    db.PullimDataAuthError,
+  );
+});
+
+test("relay 5xx → 일반 Error(상태코드만 포함 — 본문·자격증명 비포함)", async () => {
+  mockFetch(503, {});
+  await assert.rejects(
+    () => db.setUserData(makeReq({ cookie: "pullim-at=t" }), "results", {}),
+    (e) => e instanceof Error && !(e instanceof db.PullimDataAuthError) && /503/.test(e.message),
+  );
 });

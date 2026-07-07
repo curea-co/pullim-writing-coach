@@ -1,10 +1,12 @@
-// Pullim Writing Coach — 관리형 Postgres 접속 + per-user 데이터 CRUD (server 전용).
-//   모듈 경계: 부수효과(env·DB 커넥션). app/lib/server/* 만 server 전용 부수효과 가능.
-//   자격증명·payload 본문 로깅 금지. DATABASE_URL 미설정 시 fail-closed throw.
-//   드라이버 = postgres(porsager). Supabase Transaction pooler(Supavisor) 전제 — 아래 prepare:false·max:1·ssl.
-//   프로비저닝: docs/ops-db-provisioning.md.
+// Pullim Writing Coach — per-user 데이터 CRUD (server 전용).
+//   저장소 = pullim-api RDS `writing` 스키마. 접근 = pullim-api KV 표면(`/writing/data`)으로 HTTP relay.
+//   (2026-07-07 전환: Supabase 직결 → pullim-api 표면. Vercel 유동 egress IP라 RDS 직결은
+//    0.0.0.0/0 공개뿐이라 금지 — 접속 주체를 VPC 안(pullim-api)으로 옮긴 것. docs/plan §3-0 계약안.)
+//   인증 = 세션 쿠키 relay(sub는 pullim-api가 토큰에서 판정 — 서버 간 이중 /me 조회 없음).
+//   mutation CSRF = double-submit relay(브라우저가 보낸 csrf 쿠키값을 X-CSRF-Token 헤더로 재전송).
+//   모듈 경계: 부수효과(env·fetch). 자격증명·쿠키값·payload 본문 로깅 금지.
 import "server-only";
-import postgres from "postgres";
+import { apiBase } from "./pullim-session";
 
 export type DataKey = "profile" | "results" | "revisions" | "drafts" | "meta_usage" | "consent";
 export const DATA_KEYS: readonly DataKey[] = ["profile", "results", "revisions", "drafts", "meta_usage", "consent"];
@@ -13,47 +15,72 @@ export function isDataKey(v: unknown): v is DataKey {
   return typeof v === "string" && (DATA_KEYS as readonly string[]).includes(v);
 }
 
-// sql 태그드 템플릿. 테스트는 __setSqlForTest로 교체. 실접속은 lazy(첫 쿼리 시 DATABASE_URL 검증).
-type Sql = (strings: TemplateStringsArray, ...values: unknown[]) => Promise<unknown[]>;
-let injected: Sql | null = null;
-let cached: Sql | null = null;
+// csrf 쿠키 이름 — 환경별: prod=pullim-csrf · dev=dev-pullim-csrf · local=local-pullim-csrf.
+//   (access 쿠키의 환경별 이름 사고(PR #127)와 동형 — 세 이름 모두 인식.)
+const CSRF_COOKIES = ["pullim-csrf", "dev-pullim-csrf", "local-pullim-csrf"] as const;
 
-function sql(): Sql {
-  if (injected) return injected;
-  if (cached) return cached;
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error("[db] DATABASE_URL 미설정 — 계정 데이터 store 비활성(fail-closed)");
-  // 서버리스(Vercel) + Supabase Transaction pooler(Supavisor, 6543):
-  //   max:1        — 함수 인스턴스당 커넥션 1개(실풀링은 Supavisor가 다중화).
-  //   idle_timeout — 유휴 커넥션 정리(인스턴스 단명).
-  //   prepare:false — 트랜잭션 풀러는 prepared statement 미지원 → 필수 비활성.
-  //   ssl:'require' — TLS 필수(암호화).
-  cached = postgres(url, { max: 1, idle_timeout: 20, prepare: false, ssl: "require" }) as unknown as Sql;
-  return cached;
+// pullim-api가 세션을 거부(401)했을 때 — 라우트에서 E-AUTH(401)로 매핑.
+export class PullimDataAuthError extends Error {
+  constructor() {
+    super("pullim-api session rejected");
+    this.name = "PullimDataAuthError";
+  }
 }
 
-export function __setSqlForTest(fn: Sql | null): void {
-  injected = fn;
-  cached = null;
+// cookie 헤더에서 이름 목록 중 첫 일치 값 추출(없으면 null). 값은 relay 헤더에만 사용, 로깅 금지.
+function cookieValue(cookieHeader: string | null, names: readonly string[]): string | null {
+  if (!cookieHeader) return null;
+  for (const pair of cookieHeader.split(";")) {
+    const trimmed = pair.trim();
+    for (const name of names) {
+      if (trimmed.startsWith(`${name}=`)) return trimmed.slice(name.length + 1);
+    }
+  }
+  return null;
 }
 
-export async function getUserData(sub: string, key: DataKey): Promise<unknown | null> {
-  const rows = (await sql()`
-    select payload from writing_user_data where user_id = ${sub} and data_key = ${key}
-  `) as Array<{ payload: unknown }>;
-  return rows.length > 0 ? rows[0].payload : null;
+// KV 표면 relay. 401 → PullimDataAuthError(라우트 E-AUTH), 그 외 비2xx → throw(라우트 E8).
+//   redirect:manual — 302 추종으로 인한 인가 우회(false-positive) 방지(pullim-session과 동일).
+async function relay(req: Request, method: "GET" | "PUT" | "DELETE", path: string, body?: unknown): Promise<Response> {
+  const cookieHeader = req.headers.get("cookie");
+  const origin = req.headers.get("origin") ?? process.env.NEXT_PUBLIC_WEB_URL ?? "";
+  const headers: Record<string, string> = {
+    ...(cookieHeader ? { cookie: cookieHeader } : {}),
+    ...(origin ? { origin } : {}),
+  };
+  if (method !== "GET") {
+    const csrf = cookieValue(cookieHeader, CSRF_COOKIES);
+    if (csrf) headers["x-csrf-token"] = csrf;
+  }
+  if (body !== undefined) headers["content-type"] = "application/json";
+
+  const res = await fetch(`${apiBase()}/writing/data${path}`, {
+    method,
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    cache: "no-store",
+    redirect: "manual",
+  });
+  if (res.status === 401) throw new PullimDataAuthError();
+  if (!res.ok && res.status !== 404) throw new Error(`[db] relay ${res.status}`); // 상태코드만 — 본문/자격증명 금지
+  return res;
 }
 
-export async function setUserData(sub: string, key: DataKey, payload: unknown): Promise<void> {
-  // payload는 JSON 직렬화 후 ::jsonb 캐스트로 바인딩 — postgres 드라이버는 객체를 jsonb로 자동
-  //   직렬화하지 않으므로 명시한다(읽기는 jsonb→JS 객체 자동 파싱).
-  await sql()`
-    insert into writing_user_data (user_id, data_key, payload, updated_at)
-    values (${sub}, ${key}, ${JSON.stringify(payload)}::jsonb, now())
-    on conflict (user_id, data_key) do update set payload = excluded.payload, updated_at = now()
-  `;
+export async function getUserData(req: Request, key: DataKey): Promise<unknown | null> {
+  const res = await relay(req, "GET", `/${key}`);
+  if (res.status === 404) return null; // 미존재 키를 404로 주는 표면 구현도 수용(계약 기본은 200+null)
+  const body = (await res.json().catch(() => null)) as { payload?: unknown } | null;
+  return body?.payload ?? null;
 }
 
-export async function deleteAllUserData(sub: string): Promise<void> {
-  await sql()`delete from writing_user_data where user_id = ${sub}`;
+export async function setUserData(req: Request, key: DataKey, payload: unknown): Promise<void> {
+  await relay(req, "PUT", `/${key}`, { payload: payload ?? null });
+}
+
+export async function deleteUserData(req: Request, key: DataKey): Promise<void> {
+  await relay(req, "DELETE", `/${key}`);
+}
+
+export async function deleteAllUserData(req: Request): Promise<void> {
+  await relay(req, "DELETE", "");
 }

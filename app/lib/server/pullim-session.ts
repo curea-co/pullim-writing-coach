@@ -23,7 +23,8 @@ const ACCESS_COOKIES = ["pullim-at", "dev-pullim-at"] as const;
 
 // 인증 API 호스트 — env로 주입. prod에서 미설정 시 dev로 fallback하면 서버 인증 검증이 dev-api로
 //   새므로 빈 값(=상대요청 → 서버 fetch 실패 → verify catch에서 fail-closed). dev/local만 기본값.
-function apiBase(): string {
+//   export: db.ts(writing 데이터 relay)와 공유 — pullim-api 호스트 규칙의 단일 SoT.
+export function apiBase(): string {
   const v = process.env.NEXT_PUBLIC_API_URL;
   if (v) return v.replace(/\/$/, "");
   return process.env.NODE_ENV === "production" ? "" : "https://dev-api.pullim.ai";
