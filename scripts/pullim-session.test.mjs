@@ -1,5 +1,5 @@
 // pullim-session 단위 테스트 (Phase 3 — 로그인/entitlement 게이팅).
-//   verifyWritingAccess(req): access 쿠키(dev-pullim-at) → {API}/me 200=인가.
+//   verifyWritingAccess(req): access 쿠키(pullim-at·dev-pullim-at) → {API}/me 200=인가.
 //   /me 비200 또는 쿠키 없음: 비prod이면 데모토큰 fallback / prod이면 false(fail-closed).
 // 실행: node --import ./scripts/register-ts.mjs --test scripts/pullim-session.test.mjs
 //   (ts-ext-hooks.mjs가 server-only를 no-op로 단락 → server-only import 통과)
@@ -148,4 +148,37 @@ test("getSessionSub — 비prod + 데모토큰 불일치 → null", async () => 
   process.env.NODE_ENV = "test";
   process.env.DEMO_ACCESS_TOKEN = "secret";
   assert.equal(await getSessionSub(makeReq({ "x-demo-token": "wrong" })), null);
+});
+
+// ── prod 쿠키명(pullim-at) 회귀 — 2026-07-06 prod 종단검증 사고 ────────────
+//   prod api 는 `pullim-at`, dev-api 는 `dev-pullim-at` 을 발급한다. dev 이름만 보던 게이트가
+//   prod 쿠키를 못 찾아 전 서버 인가가 fail-closed 401 → 두 이름 모두 인식해야 한다.
+test("prod 쿠키명 pullim-at + /me 200 → true (2026-07-06 회귀)", async () => {
+  process.env.NODE_ENV = "production";
+  globalThis.fetch = async () => ({ status: 200 });
+  const req = makeReq({ cookie: "pwc-rl-id=x; pullim-at=abc; pullim-csrf=y" });
+  assert.equal(await verifyWritingAccess(req), true);
+});
+
+test("prod 쿠키명 pullim-at → /me relay 호출됨 (게이트 통과 확인)", async () => {
+  process.env.NODE_ENV = "production";
+  let called = false;
+  globalThis.fetch = async () => { called = true; return { status: 200 }; };
+  await verifyWritingAccess(makeReq({ cookie: "pullim-at=abc" }));
+  assert.equal(called, true);
+});
+
+test("getSessionSub — prod 쿠키명 pullim-at + /me 200 + sub → sub 반환", async () => {
+  process.env.NODE_ENV = "production";
+  globalThis.fetch = async () => ({ status: 200, json: async () => ({ sub: "user-prod" }) });
+  const req = makeReq({ cookie: "pullim-at=tok" });
+  assert.equal(await getSessionSub(req), "user-prod");
+});
+
+test("유사 이름 쿠키(pullim-atx=, xpullim-at=)만 있으면 게이트 미통과 → /me 미호출", async () => {
+  process.env.NODE_ENV = "production";
+  let called = false;
+  globalThis.fetch = async () => { called = true; return { status: 200 }; };
+  assert.equal(await verifyWritingAccess(makeReq({ cookie: "pullim-atx=a; xpullim-at=b" })), false);
+  assert.equal(called, false);
 });
