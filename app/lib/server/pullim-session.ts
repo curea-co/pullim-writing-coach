@@ -1,6 +1,6 @@
 // Pullim Writing Coach — 서버 세션 인가 (Phase 3, ITEM 1)
 //   데모토큰 게이트 → 중앙 SSO 세션 소비로 전환.
-//   verifyWritingAccess(req): access 쿠키(dev-pullim-at)가 있으면 서버에서 {API}/me 를 호출(쿠키 relay)
+//   verifyWritingAccess(req): access 쿠키(pullim-at·dev-pullim-at)가 있으면 서버에서 {API}/me 를 호출(쿠키 relay)
 //   → 200 이면 writing 권한 보유(회원) → true. (/me는 flags 미반환, 모든 회원 writing>=1이라 200=인가)
 //
 //   /me 200 아님 또는 access 쿠키 없음:
@@ -15,8 +15,11 @@
 import "server-only";
 import { createHash, timingSafeEqual } from "node:crypto";
 
-// access 쿠키 이름 — dev/prod는 Domain=.pullim.ai 로 writing-coach 서버에 도달.
-const ACCESS_COOKIE = "dev-pullim-at";
+// access 쿠키 이름 — 환경별로 다르다: prod api = `pullim-at` · dev-api = `dev-pullim-at`.
+//   (2026-07-06 prod 종단검증에서 발견: dev 이름만 보던 게이트가 prod 쿠키를 못 찾아 전 서버 인가가
+//    fail-closed 401. 이름 게이트는 /me 호출 절약용 프리체크일 뿐 — 실검증은 /me relay가 한다.)
+//   dev/prod 모두 Domain=.pullim.ai 로 writing-coach 서버에 도달.
+const ACCESS_COOKIES = ["pullim-at", "dev-pullim-at"] as const;
 
 // 인증 API 호스트 — env로 주입. prod에서 미설정 시 dev로 fallback하면 서버 인증 검증이 dev-api로
 //   새므로 빈 값(=상대요청 → 서버 fetch 실패 → verify catch에서 fail-closed). dev/local만 기본값.
@@ -36,7 +39,10 @@ function timingSafeEqualStr(a: string, b: string): boolean {
 // cookie 헤더 문자열에서 access 쿠키 존재 여부만 확인(값은 디코드/사용 안 함 — fetch에 원본 relay).
 function hasAccessCookie(cookieHeader: string | null): boolean {
   if (!cookieHeader) return false;
-  return cookieHeader.split(";").some((pair) => pair.trim().startsWith(`${ACCESS_COOKIE}=`));
+  return cookieHeader.split(";").some((pair) => {
+    const trimmed = pair.trim();
+    return ACCESS_COOKIES.some((name) => trimmed.startsWith(`${name}=`));
+  });
 }
 
 // 로컬 전용 데모토큰 fallback — 기존 isAuthorized 로직 이식. fail-closed 보존.
