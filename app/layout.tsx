@@ -3,7 +3,7 @@ import "./globals.css";
 import { AppShell } from "./components/app-shell";
 
 export const metadata: Metadata = {
-  title: "풀림 라이팅 코치",
+  title: "풀림 라이팅 코치 — 수행평가 글쓰기 코칭",
   description:
     "수행평가 글, AI가 5가지 기준으로 채점하고 잘한 점·고칠 점·수정 가이드를 코칭 말투로 보여드려요.",
 };
