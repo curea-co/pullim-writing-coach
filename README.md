@@ -81,7 +81,7 @@ AI는 글을 대신 써주지 않고, 학생이 직접 쓰도록 안내합니다
 | `NEXT_PUBLIC_DEMO_TOKEN` | 설정 시 TokenGate 자동 입력(비번 0회 입장). ⚠ 번들 노출 → rate limit·예산 알람 필수 |
 | `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | 에러 모니터링 (미설정 시 no-op) |
 | ~~`DATABASE_URL`~~ | **(2026-07-07 폐기 — RDS 전환)** per-user 계정 데이터 store는 Supabase 직결에서 **pullim-api KV 표면(`/writing/data`) relay**로 전환됨. 저장소는 pullim-api RDS `writing` 스키마, 접속 호스트는 `NEXT_PUBLIC_API_URL` 규칙을 따름. 런타임에서 더는 읽지 않음 — Vercel에 남아 있으면 제거 |
-| `DEMO_SESSION_SUB` | (선택) 비prod 로컬 e2e용 데모 세션 sub. prod 무시. 미설정 시 `"demo-sub"` |
+| ~~`DEMO_SESSION_SUB`~~ | **(2026-07-07 폐기 — RDS 전환)** 구 `getSessionSub` 데모 fallback용 sub. per-user store가 pullim-api KV relay로 전환되며 `getSessionSub` 제거 → 소비처 없음. (제품 API 데모 게이트는 `DEMO_ACCESS_TOKEN`이 담당 — 별개) |
 
 ---
 
