@@ -93,7 +93,9 @@ export default function CoachSetupFlow({ onAuthExpired }: { onAuthExpired?: () =
       setAssignment(saved.assignment);
       setMode(saved.mode);
       // plan(참고 메모)을 아직 안 끝냈으면 그 화면으로 복원 — 새 전용 단계의 refresh-resume(Codex #134).
-      setPhase(saved.phase === "plan" ? "plan" : "ready");
+      //   단, 실제 plan이 필요한 모드일 때만 — 손상 데이터({mode:free,phase:plan})나 voice→free 다운그레이드
+      //   후 plan 진입을 막는다(NEEDS_PLAN 가드).
+      setPhase(saved.phase === "plan" && NEEDS_PLAN(saved.mode) ? "plan" : "ready");
     } else {
       // setup 미확정 — 과제 draft가 있으면 복원해 입력 유실 방지(새로고침 후에도 보존).
       const draft = loadAssignmentDraft();

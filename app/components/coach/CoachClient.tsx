@@ -618,9 +618,14 @@ export default function CoachClient({
       //   되돌려 유실시키던 회귀 차단(Codex #134). 세션 draft와 다르면(=더 최신) state.body도 동기화.
       const savedHtmlEntry = loadBodyHtml();
       const rsig = assignmentSig(assignment);
-      // bodyHtml이 마지막 점검(세션 저장) 이후 저장분(ts>=)일 때만 최신으로 신뢰 — stale bodyHtml이 세션의
-      //   더 최신 draft를 되돌리는 것 방지(Codex #134). 점검 후 편집분(더 최신)은 유지, quota로 stale이면 세션 우선.
-      const bodyFresh = !!savedHtmlEntry && savedHtmlEntry.sig === rsig && savedHtmlEntry.ts >= loadCheckTs(rsig);
+      const checkTs = loadCheckTs(rsig);
+      const sameSig = !!savedHtmlEntry && savedHtmlEntry.sig === rsig;
+      // 점검 시각(checkTs)이 있으면 ts 비교로 최신성 판단(점검 후 편집분 유지, stale이면 세션 우선). 없으면
+      //   (구 포맷 마이그레이션 — ts 없이 저장된 bodyHtml) 이전 안전 가드(bodyHtml 평문 == 세션 draft)로
+      //   폴백 — ts 부재(0)를 최신으로 오인해 stale을 우선하지 않게(Codex #134).
+      const bodyFresh = !!savedHtmlEntry && sameSig && (
+        checkTs > 0 ? savedHtmlEntry.ts >= checkTs : htmlToPlain(savedHtmlEntry.html) === lastDraft.body
+      );
       if (bodyFresh && savedHtmlEntry) {
         setBodyHtml(savedHtmlEntry.html);
         const htmlPlain = htmlToPlain(savedHtmlEntry.html);
