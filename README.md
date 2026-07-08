@@ -90,7 +90,7 @@ AI는 글을 대신 써주지 않고, 학생이 직접 쓰도록 안내합니다
 로그인 회원의 6종 데이터(프로필·결과·수정이력·임시저장·메타·동의)는 localStorage가 아니라 **계정 귀속 서버 저장**으로 전환됩니다. 로그인하면 다른 기기/브라우저에서도 같은 데이터가 보입니다. 게스트·로컬은 기존 localStorage 동작을 그대로 유지합니다.
 
 - 동선: writing-coach 자체 Next API `/api/data/*`(BFF) → **pullim-api KV 표면 `/writing/data`**(세션 쿠키 + CSRF relay) → **pullim-api RDS `writing` 스키마**. 어댑터 = `app/lib/server/db.ts`.
-- **저장소·마이그레이션은 pullim-api 소유**(ADR-068 — `writing.writing_user_data`). writing-coach 레포에는 더 이상 자체 DB 접속·마이그레이션이 없습니다(구 Supabase 직결 `DATABASE_URL`·`scripts/db-migrate.mjs`·`db/migrations/` 경로는 폐기 — RDS 전환).
+- **저장소·마이그레이션은 pullim-api 소유**(ADR-068 — `writing.writing_user_data`). writing-coach 레포에는 자체 DB 접속·마이그레이션이 없습니다 — 구 Supabase 직결 경로(`postgres` 드라이버·`scripts/db-migrate.mjs`·`db/migrations/`·`db:migrate` 스크립트·`DATABASE_URL`)는 **RDS 전환으로 제거**됨.
 - 접속 호스트는 `NEXT_PUBLIC_API_URL`(=`pullim-session.apiBase`)를 공유. Vercel Production에 남은 구 `DATABASE_URL`은 제거.
 
 ### 로컬 검증 한계 (host-only)
