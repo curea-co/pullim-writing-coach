@@ -6,7 +6,7 @@
 //   아이콘은 인라인 SVG(ServiceIcon) — 아이콘 파일/next Image·dangerouslyAllowSVG 불필요.
 //   외부 클릭·Escape 닫기는 HeaderActions 아바타 메뉴와 동형.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { ServiceIcon } from "@/components/ui/service-icon";
 import { osHubUrl } from "@/app/lib/pullim-login";
 import { CURRENT_SLUG, switcherServices } from "@/app/lib/pullim-services";
@@ -14,6 +14,7 @@ import { CURRENT_SLUG, switcherServices } from "@/app/lib/pullim-services";
 export default function ServiceSwitcher() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const menuId = useId();
   const services = switcherServices();
   const current = services.find((s) => s.slug === CURRENT_SLUG);
 
@@ -32,8 +33,8 @@ export default function ServiceSwitcher() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-haspopup="listbox"
         aria-expanded={open}
+        aria-controls={menuId}
         aria-label="서비스 전환"
         title="서비스 전환"
         className="flex h-[38px] items-center gap-1.5 rounded-[11px] border border-[var(--line,#e6eaf0)] bg-white pl-1.5 pr-2 text-[#45555c] transition-colors hover:border-[#bcd7f7] hover:bg-[var(--surface-sunken,#eef1f6)]"
@@ -50,7 +51,9 @@ export default function ServiceSwitcher() {
       </button>
 
       {open && (
-        <div role="listbox" aria-label="서비스 전환" className="absolute right-0 top-[calc(100%+8px)] z-[120] w-[min(330px,92vw)] overflow-hidden rounded-[14px] border border-[var(--line,#e6eaf0)] bg-[var(--surface,#fff)] p-1.5 shadow-[0_8px_28px_rgba(13,26,31,.14)]">
+        // 실제 동작은 '링크 목록'이라 listbox/option 대신 nav+링크로 둔다(Codex #135): listbox는 화살표 이동·
+        //   roving tabindex·active descendant를 기대시키는데 이 UI엔 그 계약이 없어 보조기기 사용성이 깨진다.
+        <nav id={menuId} aria-label="서비스 전환" className="absolute right-0 top-[calc(100%+8px)] z-[120] w-[min(330px,92vw)] overflow-hidden rounded-[14px] border border-[var(--line,#e6eaf0)] bg-[var(--surface,#fff)] p-1.5 shadow-[0_8px_28px_rgba(13,26,31,.14)]">
           <div className="px-2.5 pb-1.5 pt-2 font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--text-tertiary,#8a94a3)]">
             서비스 전환
           </div>
@@ -58,8 +61,6 @@ export default function ServiceSwitcher() {
           {/* OS 홈 */}
           <a
             href={osHubUrl()}
-            role="option"
-            aria-selected={false}
             onClick={() => setOpen(false)}
             className="flex items-center gap-3 rounded-[12px] p-2.5 no-underline transition-colors hover:bg-[var(--surface-sunken,#eef1f6)]"
           >
@@ -77,8 +78,6 @@ export default function ServiceSwitcher() {
               <a
                 key={svc.slug}
                 href={svc.href}
-                role="option"
-                aria-selected={isCurrent}
                 aria-current={isCurrent ? "page" : undefined}
                 onClick={() => setOpen(false)}
                 className={`flex items-center gap-3 rounded-[12px] p-2.5 no-underline transition-colors ${isCurrent ? "bg-[#f4faff]" : "hover:bg-[var(--surface-sunken,#eef1f6)]"}`}
@@ -98,7 +97,7 @@ export default function ServiceSwitcher() {
               </a>
             );
           })}
-        </div>
+        </nav>
       )}
     </div>
   );

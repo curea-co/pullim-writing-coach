@@ -4,6 +4,7 @@
 //   누락돼도 티어가 유지되는 OS의 검증된 규칙). NEXT_PUBLIC_* 는 빌드타임 인라인 → 런타임 분기 없음.
 
 import type { ServiceIconName } from "@/components/ui/service-icon";
+import { osHubUrl } from "@/app/lib/pullim-login";
 
 // 배포 티어를 OS origin(NEXT_PUBLIC_OS_URL)에서 파생:
 //   dev-os.pullim.ai → 'dev' · os.pullim.ai → 'prod' · os.localhost/.pullim.local/미설정 → 'local'.
@@ -13,10 +14,15 @@ function osTier(): "dev" | "prod" | "local" {
   return os.replace(/^https?:\/\//, "").startsWith("dev-") ? "dev" : "prod";
 }
 
-// 독립 앱 핸드오프 origin. dev-os 표면 → https://dev-<app>.pullim.ai · 그 외(prod·local) → https://<app>.pullim.ai.
-//   로컬은 앱별 독립 origin이 없으므로 prod로 폴백(OS도 앱별 .env.local 없으면 동일하게 동작).
-function appUrl(app: string): string {
-  return osTier() === "dev" ? `https://dev-${app}.pullim.ai` : `https://${app}.pullim.ai`;
+// 독립 앱 핸드오프 URL. dev-os 표면 → https://dev-<app>.pullim.ai · prod-os → https://<app>.pullim.ai (+path).
+//   **로컬은 실서비스 도메인으로 새지 않게 OS 허브(osHubUrl, 로컬 os.pullim.local)로 위임**한다(Codex #135):
+//   writing-coach 로컬엔 앱별 NEXT_PUBLIC_<APP>_URL이 없어 prod로 폴백하면 로컬 SSO 검증 중 운영 도메인으로
+//   튀어 쿠키/세션 조건이 달라지는 회귀가 생긴다. 로컬은 path도 붙이지 않고 OS 허브 자체로 보낸다.
+function appHref(app: string, path = ""): string {
+  const tier = osTier();
+  if (tier === "local") return osHubUrl();
+  const base = tier === "dev" ? `https://dev-${app}.pullim.ai` : `https://${app}.pullim.ai`;
+  return `${base}${path}`;
 }
 
 export type SwitcherService = {
@@ -33,15 +39,15 @@ export const CURRENT_SLUG = "writing";
 
 export function switcherServices(): SwitcherService[] {
   return [
-    { slug: "planner", name: "플래너", icon: "planner", href: `${appUrl("planner")}/planner`, desc: "내 공부, 내가 설계한다." },
-    { slug: "classbot", name: "클래스봇", icon: "classbot", href: appUrl("classbot"), desc: "선생님의 분신을 만든다." },
-    { slug: "q", name: "문제큐", icon: "q", href: appUrl("q"), desc: "풀고, 틀리고, 다시 자라난다." },
-    { slug: "games", name: "게임즈", icon: "games", href: `${appUrl("games")}/games`, desc: "숙제 끝나고 30분 더 한다." },
+    { slug: "planner", name: "플래너", icon: "planner", href: appHref("planner", "/planner"), desc: "내 공부, 내가 설계한다." },
+    { slug: "classbot", name: "클래스봇", icon: "classbot", href: appHref("classbot"), desc: "선생님의 분신을 만든다." },
+    { slug: "q", name: "문제큐", icon: "q", href: appHref("q"), desc: "풀고, 틀리고, 다시 자라난다." },
+    { slug: "games", name: "게임즈", icon: "games", href: appHref("games", "/games"), desc: "숙제 끝나고 30분 더 한다." },
     { slug: "writing", name: "라이팅 코치", icon: "writing", href: "/", desc: "한 줄, 한 단락이 더 좋아진다." },
-    { slug: "exam", name: "입시 코치", icon: "exam", href: appUrl("admissions"), desc: "입시 준비를 데이터로 한다." },
-    { slug: "store", name: "스토어", icon: "store", href: appUrl("store"), desc: "검증된 콘텐츠만 사고 판다." },
-    { slug: "studio", name: "스튜디오", icon: "studio", href: appUrl("studio"), desc: "제작은 AI가, 검증은 사람이." },
-    { slug: "junior", name: "주니어", icon: "pullim", href: appUrl("jr"), desc: "초등, 즐겁게 시작하는 첫 학습." },
-    { slug: "arcade", name: "아케이드", icon: "games", href: appUrl("arcade"), desc: "무료로 즐기는 학습 아케이드." },
+    { slug: "exam", name: "입시 코치", icon: "exam", href: appHref("admissions"), desc: "입시 준비를 데이터로 한다." },
+    { slug: "store", name: "스토어", icon: "store", href: appHref("store"), desc: "검증된 콘텐츠만 사고 판다." },
+    { slug: "studio", name: "스튜디오", icon: "studio", href: appHref("studio"), desc: "제작은 AI가, 검증은 사람이." },
+    { slug: "junior", name: "주니어", icon: "pullim", href: appHref("jr"), desc: "초등, 즐겁게 시작하는 첫 학습." },
+    { slug: "arcade", name: "아케이드", icon: "games", href: appHref("arcade"), desc: "무료로 즐기는 학습 아케이드." },
   ];
 }
