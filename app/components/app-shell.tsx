@@ -10,6 +10,7 @@ import { ServiceIcon } from "@/components/ui/service-icon";
 import { railItems, tabItems } from "./nav-adapter";
 import { AuthProvider, useAuth } from "@/app/lib/use-auth";
 import { loginUrl, signupUrl, osHubUrl } from "@/app/lib/pullim-login";
+import ServiceSwitcher from "@/app/components/service-switcher";
 
 // os.pullim.ai 헤더 우측 정합(실측 스펙): 아이콘 38·radius11·#45555c · pill h42·radius12·#f4faff/#0362da · 앱런처 36 · 간격 6.
 const ICON_BTN =
@@ -90,9 +91,8 @@ function HeaderActions() {
           <button type="button" onClick={() => { window.location.href = signupUrl(); }} className={PILL}>회원가입</button>
         </>
       )}
-      <a href={osHubUrl()} aria-label="풀림 OS" title="풀림 OS" className="ml-0.5 flex h-9 w-9 items-center justify-center rounded-[11px] bg-[var(--color-action-primary)] text-white no-underline">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>
-      </a>
+      {/* 서비스 전환 드롭다운 — 풀림 OS의 앱 스위처 정합(기존 4-square OS 런처를 대체). */}
+      <ServiceSwitcher />
     </div>
   );
 }
