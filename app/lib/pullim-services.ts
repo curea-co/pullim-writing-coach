@@ -14,11 +14,30 @@ function osTier(): "dev" | "prod" | "local" {
   return os.replace(/^https?:\/\//, "").startsWith("dev-") ? "dev" : "prod";
 }
 
-// 독립 앱 핸드오프 URL. dev-os 표면 → https://dev-<app>.pullim.ai · prod-os → https://<app>.pullim.ai (+path).
-//   **로컬은 실서비스 도메인으로 새지 않게 OS 허브(osHubUrl, 로컬 os.pullim.local)로 위임**한다(Codex #135):
-//   writing-coach 로컬엔 앱별 NEXT_PUBLIC_<APP>_URL이 없어 prod로 폴백하면 로컬 SSO 검증 중 운영 도메인으로
-//   튀어 쿠키/세션 조건이 달라지는 회귀가 생긴다. 로컬은 path도 붙이지 않고 OS 허브 자체로 보낸다.
+// 앱별 명시 origin override(OS siblingAppUrl의 explicit 분기 정합). **최우선** — 있으면 티어 파생을 건너뛴다.
+//   OS가 로컬에서 앱별 핸드오프를 검증하는 방식과 동일: .env.local에 로컬 앱 origin을 넣으면 서비스 전환이
+//   그 로컬 앱으로 실제 위임된다(Codex #135: 로컬에서 전 항목이 OS 허브 하나로 붕괴하지 않게 하는 경로).
+//   NEXT_PUBLIC_* 는 빌드타임 인라인 → 리터럴 접근이어야 하므로 동적 키 조회 대신 정적 맵.
+const APP_ORIGIN_OVERRIDE: Record<string, string | undefined> = {
+  planner: process.env.NEXT_PUBLIC_PLANNER_URL,
+  classbot: process.env.NEXT_PUBLIC_CLASSBOT_URL,
+  q: process.env.NEXT_PUBLIC_Q_URL,
+  games: process.env.NEXT_PUBLIC_GAMES_URL,
+  admissions: process.env.NEXT_PUBLIC_ADMISSIONS_URL,
+  store: process.env.NEXT_PUBLIC_STORE_URL,
+  studio: process.env.NEXT_PUBLIC_STUDIO_URL,
+  jr: process.env.NEXT_PUBLIC_JR_URL,
+  arcade: process.env.NEXT_PUBLIC_ARCADE_URL,
+};
+
+// 독립 앱 핸드오프 URL. 우선순위:
+//   1) 앱별 명시 override(NEXT_PUBLIC_<APP>_URL) — 로컬에서 서비스별 핸드오프 검증에 사용(위 맵).
+//   2) dev-os 표면 → https://dev-<app>.pullim.ai · prod-os → https://<app>.pullim.ai (+path).
+//   3) override 없는 **로컬**은 실서비스 도메인으로 새지 않게 OS 허브(osHubUrl, os.pullim.local)로 위임 —
+//      로컬 SSO 검증 중 운영 도메인으로 튀어 쿠키/세션 조건이 달라지는 회귀(Codex #135) 차단. path 미부착.
 function appHref(app: string, path = ""): string {
+  const override = APP_ORIGIN_OVERRIDE[app];
+  if (override) return `${override.replace(/\/$/, "")}${path}`;
   const tier = osTier();
   if (tier === "local") return osHubUrl();
   const base = tier === "dev" ? `https://dev-${app}.pullim.ai` : `https://${app}.pullim.ai`;
