@@ -32,7 +32,8 @@ function initialOf(name: string): string {
 
 function HeaderActions() {
   const { status, user, logout } = useAuth();
-  const name = user?.displayName ?? user?.email ?? user?.name ?? "";
+  // 배지 표시 이름 — KCB 실명(한글, /me `name`) 우선 → 표시이름 → 이메일. "" 는 falsy 폴백(‖).
+  const name = user?.name || user?.displayName || user?.email || "";
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 

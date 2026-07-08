@@ -2,6 +2,8 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { setAccountMode } from "./storage";
 
+// /me 신원 필드 — name = KCB 실명(한글, AES 복호 PII, 본인조회 한정) · displayName = 표시이름 · email.
+//   배지는 한글 실명(name) 우선 표시(app-shell). 자격증명·PII 로깅 금지.
 type User = { email?: string; displayName?: string; name?: string };
 // 중앙 SSO 세션의 소비자 — 로그인/로그아웃/refresh는 중앙(web/api)이 담당.
 //   로컬 SSO 런북: 모든 표면이 api 호스트를 브라우저에서 직접 호출(credentials include) + host-only same-site 쿠키.
