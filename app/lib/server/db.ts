@@ -16,8 +16,17 @@ export function isDataKey(v: unknown): v is DataKey {
 }
 
 // csrf 쿠키 이름 — 환경별: prod=pullim-csrf · dev=dev-pullim-csrf · local=local-pullim-csrf.
-//   (access 쿠키의 환경별 이름 사고(PR #127)와 동형 — 세 이름 모두 인식.)
+//   (access 쿠키의 환경별 이름 사고(PR #127)와 동형.)
 const CSRF_COOKIES = ["pullim-csrf", "dev-pullim-csrf", "local-pullim-csrf"] as const;
+
+// 현재 API 환경(apiBase)에 대응하는 csrf 쿠키 이름 하나. relay 는 전체 쿠키를 forward 하고 dev-api CsrfGuard 는
+//   자기 환경 이름(dev=dev-pullim-csrf)의 쿠키값과 x-csrf-token 을 비교하므로, **그 이름의 값**을 echo 해야
+//   double-submit 이 성립한다. 타 환경 쿠키(예: dev 브라우저에 남은 prod pullim-csrf)를 echo 하면 403(Codex #130).
+function envCsrfCookieName(base: string): string {
+  if (base.includes("pullim.local")) return "local-pullim-csrf";
+  if (base.includes("dev-")) return "dev-pullim-csrf"; // dev-api.pullim.ai
+  return "pullim-csrf"; // api.pullim.ai(prod) · 상대경로("")
+}
 
 // pullim-api가 인증/보안(세션·CSRF·엔타이틀먼트)을 거부(401·403)했을 때 — 라우트에서 E-AUTH(401)로 매핑.
 //   401(세션 만료·무효)·403(CSRF 불일치·flags 미보유)은 모두 "재인증/재로그인" 계열이지 일시 장애(E8)가
@@ -58,13 +67,16 @@ async function relay(req: Request, method: "GET" | "PUT" | "DELETE", path: strin
     ...(cookieHeader ? { cookie: cookieHeader } : {}),
     ...(origin ? { origin } : {}),
   };
+  const base = apiBase();
   if (method !== "GET") {
-    const csrf = cookieValue(cookieHeader, CSRF_COOKIES);
+    // 현재 환경 쿠키를 우선(정확 매칭) → 없으면 관용 폴백(과도기·로컬). 환경 이름이 있으면 그 값이 dev-api 가
+    //   읽는 쿠키와 동일해 double-submit 성립(Codex #130 — 타 환경 쿠키 오echo 방지).
+    const csrf = cookieValue(cookieHeader, [envCsrfCookieName(base)]) ?? cookieValue(cookieHeader, CSRF_COOKIES);
     if (csrf) headers["x-csrf-token"] = csrf;
   }
   if (body !== undefined) headers["content-type"] = "application/json";
 
-  const res = await fetch(`${apiBase()}/writing/data${path}`, {
+  const res = await fetch(`${base}/writing/data${path}`, {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
