@@ -67,11 +67,17 @@ function HeaderActions() {
           </button>
           {menuOpen && (
             <div role="menu" aria-label="사용자 메뉴" className="absolute right-0 top-[calc(100%+8px)] z-[120] w-[min(260px,92vw)] overflow-hidden rounded-[14px] border border-[var(--line,#e6eaf0)] bg-[var(--surface,#fff)] shadow-[0_8px_28px_rgba(13,26,31,.14)]">
+              {/* 신원 — 한글 이름 + 로그인 여부(OsTopbar 정합) */}
               <div className="border-b border-[var(--line,#e6eaf0)] px-4 py-3.5">
                 <span className="block truncate text-[14px] font-bold text-[var(--text-primary,#1a1f27)]">{name || "회원"}</span>
                 <span className="mt-0.5 block text-[12px] text-[var(--text-tertiary,#8a94a3)]">로그인됨</span>
               </div>
-              <div className="p-1.5">
+              {/* 설정 — 중앙 계정 설정(풀림 OS). osHubUrl(.../os) + /settings. */}
+              <nav className="p-1.5" aria-label="사용자 메뉴 링크">
+                <a href={`${osHubUrl()}/settings`} role="menuitem" onClick={() => setMenuOpen(false)} className="block rounded-[8px] px-3 py-2.5 text-[14px] font-medium text-[var(--text-secondary,#45555c)] no-underline transition-colors hover:bg-[var(--surface-sunken,#eef1f6)]">설정</a>
+              </nav>
+              {/* 로그아웃 */}
+              <div className="border-t border-[var(--line,#e6eaf0)] p-1.5">
                 <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); void logout(); }} className="block w-full rounded-[8px] px-3 py-2.5 text-left text-[14px] font-medium text-[var(--text-secondary,#45555c)] transition-colors hover:bg-[var(--surface-sunken,#eef1f6)]">로그아웃</button>
               </div>
             </div>
