@@ -29,14 +29,12 @@ export default function NudgeCard({
   why,
   busy = false,
   checksLeft,
-  onFinish,
 }: {
   nudge: CoachNudge;
   onFixed: () => void; // "고쳤어 ✓" — 재점검 트리거
   why?: string; // (옵션) "왜 중요해?" 펼침 설명(메타 근거 — 대안 문장 아님)
   busy?: boolean;
-  checksLeft?: number; // 남은 코치 호출 수(비용 캡). 0이면 [고쳤어] 대신 [결과 보기] 노출.
-  onFinish?: () => void; // 캡 소진 시 결과(완료) 화면으로.
+  checksLeft?: number; // 남은 점검(표시용 소프트 카운터 — 실제 제한 아님). >0 일 때만 "남은 점검 N회" 노출.
 }) {
   const [whyOpen, setWhyOpen] = useState(false);
   const whyId = useId();
@@ -85,30 +83,20 @@ export default function NudgeCard({
             왜 중요해?
           </button>
         )}
-        {checksLeft !== undefined && checksLeft <= 0 ? (
-          // 비용 캡 소진 — 재점검 대신 지금까지의 결과로 마무리.
-          <button
-            type="button"
-            onClick={onFinish}
-            className={`${styles.brandFont} inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[var(--pullim-blue)] px-4 py-3 text-[14px] font-semibold tracking-[-0.01em] text-white shadow-[0_4px_14px_rgba(3,98,218,0.24)] transition active:scale-[0.98]`}
-          >
-            결과 보기 ▸
-          </button>
-        ) : (
-          <button
-            type="button"
-            data-testid="coach-fixed"
-            onClick={onFixed}
-            disabled={busy}
-            className={`${styles.brandFont} inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border-0 bg-[var(--pullim-lemon)] px-4 py-3 text-[14px] font-semibold tracking-[-0.01em] text-[var(--pullim-ink)] shadow-[0_4px_14px_rgba(230,255,76,0.5)] transition hover:brightness-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60`}
-          >
-            고쳤어 ✓
-          </button>
-        )}
+        <button
+          type="button"
+          data-testid="coach-fixed"
+          onClick={onFixed}
+          disabled={busy}
+          className={`${styles.brandFont} inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border-0 bg-[var(--pullim-lemon)] px-4 py-3 text-[14px] font-semibold tracking-[-0.01em] text-[var(--pullim-ink)] shadow-[0_4px_14px_rgba(230,255,76,0.5)] transition hover:brightness-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60`}
+        >
+          고쳤어 ✓
+        </button>
       </div>
-      {checksLeft !== undefined && (
+      {/* 남은 점검 소프트 카운터(넛지) — >0 일 때만. 0에선 숨겨 '0인데 되네' 모순을 피한다. */}
+      {checksLeft !== undefined && checksLeft > 0 && (
         <p className={`${styles.monoFont} mt-2 text-center text-[10.5px] text-[var(--ink-5)]`}>
-          {checksLeft <= 0 ? "무료 점검을 모두 사용했어요 — 지금까지의 결과로 마무리해요" : `남은 점검 ${checksLeft}회`}
+          남은 점검 {checksLeft}회
         </p>
       )}
     </div>

@@ -89,9 +89,9 @@ const SESSION_KEY = "pwc-coach-session-v1";
 const PROCESS_LOG_KEY = "pwc-process-log-v1";
 const TEACHER_RUBRIC_KEY = "pwc-teacher-rubric-v1";
 const BODY_HTML_KEY = "pwc-coach-body-html-v1";
-const CHECKS_KEY = "pwc-coach-checks-v1"; // 코치 LLM 호출 횟수(비용 캡) — 과제 sig별 영속(새로고침 우회 방지).
-
-// LLM 호출 상한 — 첫 [봐줘] + 수정 2회 = 총 3회. 이후 [고쳤어]/[봐줘] 차단하고 [결과 보기]로 유도(비용 제한).
+// 점검 안내용 **소프트 카운터** — 첫 [봐줘] + 수정 2회 = 3회를 기준으로 "남은 점검 N회"를 표시(넛지).
+//   ★ 하드 제한/영속/BE 없음(2026-07-08 오너 결정): 실제 호출은 막지 않는다. 진짜 비용 상한이 필요하면
+//   서버측 rate limit 로 별도 구현. state.checks는 in-memory 표시 전용(새 라운드=RESET 시 0으로).
 const MAX_CHECKS = 3;
 
 // 과제 서명: sameAssignment 4필드(school_level·subject·genre·prompt_text)와 동일 필드.
@@ -120,34 +120,6 @@ function clearBodyHtml(): void {
   try { window.localStorage.removeItem(BODY_HTML_KEY); } catch {}
 }
 
-// ── 코치 호출 횟수 영속(비용 캡) — **과제 sig → count 맵**으로 저장(Codex #134). 단일 {sig,count}는
-//   과제 전환 시 서로 덮어써 이전 과제 카운트가 유실되고 캡이 무력화된다. 맵이라 과제별로 독립 유지된다. ──
-type ChecksMap = Record<string, number>;
-function loadChecksMap(): ChecksMap {
-  if (typeof window === "undefined") return {};
-  try {
-    const o = JSON.parse(window.localStorage.getItem(CHECKS_KEY) || "{}") as unknown;
-    if (!o || typeof o !== "object" || Array.isArray(o)) return {};
-    const out: ChecksMap = {};
-    for (const [k, v] of Object.entries(o as Record<string, unknown>)) {
-      if (typeof v === "number" && Number.isFinite(v) && v >= 0) out[k] = v;
-    }
-    return out;
-  } catch { return {}; }
-}
-function getChecks(sig: string): number {
-  return loadChecksMap()[sig] ?? 0;
-}
-// 동기 저장 — 성공 처리(persist) 직후 함께 호출해 새로고침/탭 종료로 증가분이 유실되지 않게(Codex #134).
-function setChecks(sig: string, count: number): void {
-  if (typeof window === "undefined") return;
-  try {
-    const map = loadChecksMap();
-    map[sig] = count;
-    window.localStorage.setItem(CHECKS_KEY, JSON.stringify(map));
-  } catch {}
-}
-
 // ── 상태머신 ────────────────────────────────────────────────────────
 type Phase =
   | "write" // 작성 중 — peek로 [봐줘] CTA
@@ -171,7 +143,7 @@ type State = {
   // Codex PR #71 round 2: 직전 CHECK/RECHECK 응답 nudges 캐시. growth → [다음] 시 같은 응답 안의
   //   다음 우선순위 nudge로 이어가 (서버 재호출 없이) UX 약속 충족.
   lastNudges: CoachNudge[];
-  checks: number; // 지금까지 성공한 코치 LLM 호출 수(봐줘+고쳤어). MAX_CHECKS 초과 차단(비용 캡).
+  checks: number; // 성공한 코치 호출 수(봐줘+고쳤어) — "남은 점검 N회" 표시용 소프트 카운터. 실제 차단 아님.
   error: ErrorState;
 };
 
@@ -193,9 +165,7 @@ type Action =
       scores: Record<AreaName, number>;
       baseline: Record<AreaName, number>;
       revisions: number;
-      checks: number;
     }
-  | { type: "SET_CHECKS"; count: number } // 마운트 시 영속된 호출 수 복원(세션 유무 무관).
   | { type: "RESET" };
 
 function emptyScores(): Record<AreaName, number> {
@@ -314,10 +284,7 @@ function reducer(state: State, action: Action): State {
         scores: action.scores,
         baseline: action.baseline,
         revisions: action.revisions,
-        checks: action.checks,
       };
-    case "SET_CHECKS":
-      return { ...state, checks: action.count };
     case "RESET":
       return { ...initial };
     default:
@@ -597,20 +564,17 @@ export default function CoachClient({
       sa.subject === assignment.subject &&
       sa.genre === assignment.genre &&
       sa.prompt_text === assignment.prompt_text;
-    // 코치 호출 수(비용 캡) 복원 — 이 과제 sig의 값(맵). RESTORE가 ...initial로 checks를 0으로 두므로
-    //   그 액션에 실어 함께 복원한다(새로고침으로 캡 우회 방지).
-    const restoredChecks = getChecks(assignmentSig(assignment));
     if (saved && sameAssignment) {
       sessionRef.current = saved;
       const lastDraft = saved.draftHistory[saved.draftHistory.length - 1];
       // 본문·점수·기준선·회차를 write 단계로 복원(다음 [봐줘]로 라이브 루프 재개).
+      //   checks(점검 카운터)는 표시 전용·in-memory라 복원 안 함 — 새로고침 시 "남은 점검 3회"로 재시작.
       dispatch({
         type: "RESTORE",
         body: lastDraft.body,
         scores: fromAreaScores(saved.areaScores),
         baseline: fromAreaScores(saved.baseline),
         revisions: Math.max(0, saved.draftHistory.length - 1),
-        checks: restoredChecks,
       });
       // 리치 HTML 복원(reducer 외부): sig + htmlToPlain(html) === savedBody 둘 다 만족할 때만
       // 저장 HTML을 신뢰한다. sig는 같더라도 html의 평문이 세션 마지막 draft와 다르면
@@ -643,29 +607,18 @@ export default function CoachClient({
         setBodyHtml(draft.html);
         dispatch({ type: "EDIT", body: htmlToPlain(draft.html) });
       }
-      // 같은 과제의 호출 수 기록이 있으면 복원(캡 유지 — 새로고침/과제 왕복 우회 방지).
-      if (restoredChecks > 0) dispatch({ type: "SET_CHECKS", count: restoredChecks });
+      // checks(점검 카운터)는 표시 전용·in-memory라 복원하지 않는다(하드 제한 아님).
     }
     // 마운트 1회(루브릭 읽기 + 세션 복원). dispatch는 안정적이라 deps 불필요.
   }, []);
 
-  const checksLeft = Math.max(0, MAX_CHECKS - state.checks); // 남은 코치 호출 수(표시·차단용)
-  // 영속은 성공 처리(persist)와 같은 시점에 setChecks로 동기 저장한다(runCheck·runRecheck) — 후행 effect에
-  //   맡기면 CHECK_OK 직후 새로고침/탭 종료 시 증가분이 유실될 수 있다(Codex #134).
-
-  // 비용 캡 소진 시 결과(완료) 화면으로 — 추가 LLM 호출 없이 지금까지의 성장으로 마무리.
-  const finishNow = () => {
-    setCurrentNudge(null);
-    if (sessionRef.current) persist(sessionRef.current);
-    dispatch({ type: "FINISH" });
-  };
+  const checksLeft = Math.max(0, MAX_CHECKS - state.checks); // 남은 점검 표시용 소프트 카운터(차단 아님).
 
   // ── 첫 점검 (봐줘) ──
   // 매 렌더 새 클로저 — 호출 시점의 최신 state.body를 캡처(stale 방지). 의존성 추적 불필요.
   // Codex/E2E 가드: 빈 캔버스에서 [봐줘] 클릭 시 코치 호출 안 함 (write 상태 유지, nudge 미생성).
   const runCheck = async () => {
     if (!state.body.trim()) return;
-    if (state.checks >= MAX_CHECKS) return; // 비용 캡 — UI가 이미 [결과 보기]로 대체하지만 방어적 차단.
     dispatch({ type: "CHECK_START" });
     const r = await callCoach(state.body, assignment, rubricRef.current, mode);
     if (!r.ok) {
@@ -706,7 +659,6 @@ export default function CoachClient({
       }
     }
     persist(sessionRef.current);
-    setChecks(assignmentSig(assignment), state.checks + 1); // 호출 성공 — 비용 캡 카운트를 세션과 같은 시점에 동기 저장.
 
     dispatch({ type: "CHECK_OK", scores, nudges: r.output.nudges });
     // Codex PR #71 round 2: process log에 revision 기록 시 학생 화면 카운트도 동기화.
@@ -718,7 +670,6 @@ export default function CoachClient({
     // Codex PR #71 round 2: 본문이 직전 draft에서 실제로 변경됐는지 먼저 확인.
     //   안 바뀐 채 [고쳤어 ✓] = 새 회차 기록 X. 학생이 안 고치고 클릭만 했는데 교사 로그에
     //   '직접 고쳐 쓴 과정'이 부풀려지는 회귀 차단.
-    if (state.checks >= MAX_CHECKS) return; // 비용 캡 — 소진 시 [고쳤어] 대신 [결과 보기]가 렌더됨.
     const lastBody = sessionRef.current?.draftHistory[sessionRef.current.draftHistory.length - 1]?.body ?? "";
     const wasRevised = sessionRef.current ? state.body !== lastBody : true;
     dispatch({ type: "RECHECK_START" });
@@ -750,7 +701,6 @@ export default function CoachClient({
       sessionRef.current = { ...sessionRef.current, areaScores };
     }
     persist(sessionRef.current);
-    setChecks(assignmentSig(assignment), state.checks + 1); // 재점검 성공 — 캡 카운트 동기 저장(Codex #134).
 
     dispatch({ type: "RECHECK_OK", scores, nudges: r.output.nudges, wasRevised });
   };
@@ -759,7 +709,6 @@ export default function CoachClient({
   // Codex PR #71 round 2: 직전 lastNudges + 현재 scores로 next focus 추출 — 남은 약점이 있으면
   //   추가 서버 호출 없이 nudge phase로 직접 진입(UX 약속). 없으면 FINISH.
   const runNext = () => {
-    if (state.checks >= MAX_CHECKS) { finishNow(); return; } // 캡 소진 — 추가 nudge 없이 결과로.
     const scores = state.scores ?? emptyScores();
     const nextFocus = pickFocus(scores, state.lastNudges);
     if (!nextFocus) {
@@ -803,12 +752,7 @@ export default function CoachClient({
     sessionRef.current = null;
     clearSession();
     clearProcessLog();
-    // '다시 해보기'는 **새 라운드** — 이 과제의 캡도 0부터 재시작한다(Codex #134 재검토). 캡을 유지한 채
-    //   세션·점수만 비우면 checksLeft=0 · write 조합으로 들어가 CompletionView가 0점 세션으로 '통과'를 잘못
-    //   그린다. 새 라운드엔 checks도 함께 리셋해 정상 흐름([봐줘]부터)으로 되돌린다. 진짜 새 과제('다른
-    //   과제로 쓰기')는 sig가 달라 독립 카운트라 서로 영향 없음. (엄격한 과제별 상한은 서버측 트랙.)
-    setChecks(assignmentSig(assignment), 0);
-    dispatch({ type: "RESET" });
+    dispatch({ type: "RESET" }); // checks도 0으로(소프트 카운터 리셋 — 새 라운드 "남은 점검 3회").
   };
 
   const handleNewAssignment = () => {
@@ -933,7 +877,6 @@ export default function CoachClient({
               onAsk={runCheck}
               onFixed={runRecheck}
               onNext={runNext}
-              onFinish={finishNow}
               onRetry={state.phase === "rechecking" ? runRecheck : runCheck}
             />
           </BottomSheet>
@@ -959,7 +902,6 @@ function SheetBody({
   onAsk,
   onFixed,
   onNext,
-  onFinish,
   onRetry,
 }: {
   state: State;
@@ -969,7 +911,6 @@ function SheetBody({
   onAsk: () => void;
   onFixed: () => void;
   onNext: () => void;
-  onFinish: () => void;
   onRetry: () => void;
 }) {
   // 에러 우선.
@@ -1004,21 +945,6 @@ function SheetBody({
   }
 
   if (state.phase === "write") {
-    // 비용 캡 소진 — 더 이상 코치 호출 없이 결과(완료)로.
-    if (checksLeft <= 0) {
-      return (
-        <div className="py-1 text-center">
-          <p className="text-[12.5px] text-[var(--ink-4)]">무료 점검 {MAX_CHECKS}회를 모두 사용했어요.</p>
-          <button
-            type="button"
-            onClick={onFinish}
-            className={`${styles.brandFont} mt-2 inline-flex w-full items-center justify-center rounded-xl bg-[var(--pullim-blue)] px-4 py-3 text-[14px] font-semibold text-white shadow-[0_4px_14px_rgba(3,98,218,0.24)]`}
-          >
-            결과 보기 ▸
-          </button>
-        </div>
-      );
-    }
     return (
       <div>
         <button
@@ -1029,9 +955,12 @@ function SheetBody({
         >
           ✍️ 다 썼으면 코치에게 봐달라고 해봐 <span className={styles.arrowBob}>↑</span>
         </button>
-        <p className={`${styles.monoFont} -mt-1 text-center text-[10.5px] text-[var(--ink-5)]`}>
-          남은 점검 {checksLeft}회
-        </p>
+        {/* 남은 점검 소프트 카운터(넛지 — 실제 제한 아님). 0일 땐 숨겨 '0인데 되네' 모순 방지. */}
+        {checksLeft > 0 && (
+          <p className={`${styles.monoFont} -mt-1 text-center text-[10.5px] text-[var(--ink-5)]`}>
+            남은 점검 {checksLeft}회
+          </p>
+        )}
       </div>
     );
   }
@@ -1044,7 +973,6 @@ function SheetBody({
         why={WHY_BY_AREA[currentNudge.rubric_area]}
         busy={busy}
         checksLeft={checksLeft}
-        onFinish={onFinish}
       />
     );
   }
