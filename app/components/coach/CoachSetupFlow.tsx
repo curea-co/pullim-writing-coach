@@ -111,7 +111,15 @@ export default function CoachSetupFlow({ onAuthExpired }: { onAuthExpired?: () =
         mode={mode}
         onAuthExpired={onAuthExpired}
         // 개요/가이드만 plan 화면이 있어 '메모 다시 보기' 복귀 가능. 본문은 영속되어 왕복해도 유지.
-        onBackToPlan={NEEDS_PLAN(mode) ? () => setPhase("plan") : undefined}
+        //   복귀 시 setup의 phase도 "plan"으로 갱신 — 그 화면에서 새로고침해도 plan으로 복원되게(Codex #134).
+        onBackToPlan={
+          NEEDS_PLAN(mode)
+            ? () => {
+                saveSetup({ assignment, mode, phase: "plan" });
+                setPhase("plan");
+              }
+            : undefined
+        }
         onNewAssignment={() => {
           if (typeof window !== "undefined") {
             try {
