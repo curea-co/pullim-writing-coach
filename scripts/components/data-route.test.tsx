@@ -26,7 +26,7 @@ const req = (body?: unknown) =>
 beforeEach(() => vi.clearAllMocks());
 
 it("GET — relay가 세션 거부(PullimDataAuthError) → 401", async () => {
-  (getUserData as any).mockRejectedValue(new PullimDataAuthError());
+  (getUserData as any).mockRejectedValue(new PullimDataAuthError(401));
   const res = await GET(req(), ctx("results"));
   expect(res.status).toBe(401);
 });
@@ -61,7 +61,7 @@ it("PUT — payload 봉투를 relay로 전달", async () => {
 });
 
 it("PUT — relay 세션 거부 → 401", async () => {
-  (setUserData as any).mockRejectedValue(new PullimDataAuthError());
+  (setUserData as any).mockRejectedValue(new PullimDataAuthError(401));
   const res = await PUT(req({ payload: 1 }), ctx("results"));
   expect(res.status).toBe(401);
 });
@@ -75,7 +75,7 @@ it("DELETE(단일 키) — deleteUserData 호출", async () => {
 });
 
 it("DELETE(전체) — relay 세션 거부 → 401", async () => {
-  (deleteAllUserData as any).mockRejectedValue(new PullimDataAuthError());
+  (deleteAllUserData as any).mockRejectedValue(new PullimDataAuthError(401));
   expect((await DELETE_ALL(new Request("https://w/api/data", { method: "DELETE" }))).status).toBe(401);
 });
 

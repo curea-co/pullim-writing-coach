@@ -97,7 +97,15 @@ test("relay 401 → PullimDataAuthError (라우트 E-AUTH 매핑용)", async () 
   mockFetch(401, {});
   await assert.rejects(
     () => db.getUserData(makeReq({ cookie: "pullim-at=expired" }), "results"),
-    db.PullimDataAuthError,
+    (e) => e instanceof db.PullimDataAuthError && e.status === 401,
+  );
+});
+
+test("relay 403 → PullimDataAuthError (CSRF·flags 실패도 E-AUTH — E8 오분류 금지, Codex #129)", async () => {
+  mockFetch(403, {});
+  await assert.rejects(
+    () => db.setUserData(makeReq({ cookie: "pullim-at=t; pullim-csrf=c" }), "results", { a: 1 }),
+    (e) => e instanceof db.PullimDataAuthError && e.status === 403,
   );
 });
 

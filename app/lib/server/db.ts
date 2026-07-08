@@ -19,11 +19,17 @@ export function isDataKey(v: unknown): v is DataKey {
 //   (access 쿠키의 환경별 이름 사고(PR #127)와 동형 — 세 이름 모두 인식.)
 const CSRF_COOKIES = ["pullim-csrf", "dev-pullim-csrf", "local-pullim-csrf"] as const;
 
-// pullim-api가 세션을 거부(401)했을 때 — 라우트에서 E-AUTH(401)로 매핑.
+// pullim-api가 인증/보안(세션·CSRF·엔타이틀먼트)을 거부(401·403)했을 때 — 라우트에서 E-AUTH(401)로 매핑.
+//   401(세션 만료·무효)·403(CSRF 불일치·flags 미보유)은 모두 "재인증/재로그인" 계열이지 일시 장애(E8)가
+//   아니다. use-auth.tsx도 401·403 둘 다 세션/CSRF 실패로 취급 — 여기서 403을 E8로 번역하면 그 계약이
+//   끊겨 세션 만료가 "일시 오류"로 오분류된다(Codex #129).
 export class PullimDataAuthError extends Error {
-  constructor() {
-    super("pullim-api session rejected");
+  readonly status: number;
+
+  constructor(status: number) {
+    super(`pullim-api auth rejected (${status})`);
     this.name = "PullimDataAuthError";
+    this.status = status;
   }
 }
 
@@ -39,7 +45,7 @@ function cookieValue(cookieHeader: string | null, names: readonly string[]): str
   return null;
 }
 
-// KV 표면 relay. 401 → PullimDataAuthError(라우트 E-AUTH), 그 외 비2xx → throw(라우트 E8).
+// KV 표면 relay. 401·403 → PullimDataAuthError(라우트 E-AUTH), 그 외 비2xx → throw(라우트 E8).
 //   redirect:manual — 302 추종으로 인한 인가 우회(false-positive) 방지(pullim-session과 동일).
 //   ⚠ 404 도 throw — mutation 이 404 를 성공으로 삼키면 조용한 데이터 유실(로컬 종단 검증에서
 //   표면 미배포 dev-api 에 PUT 이 {ok:true} 로 위장 성공한 실사고로 확정). GET 의 "미존재=404"
@@ -64,7 +70,7 @@ async function relay(req: Request, method: "GET" | "PUT" | "DELETE", path: strin
     cache: "no-store",
     redirect: "manual",
   });
-  if (res.status === 401) throw new PullimDataAuthError();
+  if (res.status === 401 || res.status === 403) throw new PullimDataAuthError(res.status);
   if (!res.ok) throw new RelayStatusError(res.status); // 상태코드만 — 본문/자격증명 금지
   return res;
 }
