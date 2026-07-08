@@ -31,10 +31,9 @@ export function signupUrl(returnTo?: string): string {
   return withNext("/signup", returnTo, () => (typeof window !== "undefined" ? window.location.href : "/"));
 }
 
-// 로그아웃 URL. 공유 세션 쿠키는 중앙(web/api)만 정리 가능하므로 중앙으로 보낸다.
-export function logoutUrl(returnTo?: string): string {
-  return withNext("/logout", returnTo, () => (typeof window !== "undefined" ? window.location.origin : "/"));
-}
+// [제거됨 2026-07-08] logoutUrl — pullim-web 에는 GET `/logout` 페이지가 없어(404) 리다이렉트가 성립하지
+//   않는다(실측: dev.pullim.ai/logout → 404). 로그아웃은 중앙 세션(api)을 POST `${API}/auth/logout`
+//   (CSRF double-submit)으로 직접 정리한다 — useAuth().logout()(app/lib/use-auth.tsx). 헤더 아바타 메뉴가 호출.
 
 // 풀림 OS 허브 — 앱런처 목적지. OS 진입은 `/os` 경로(통합로그인 배포 문서 정본).
 //   local = http://os.pullim.local:3001/os · dev = https://dev-os.pullim.ai/os · prod = https://os.pullim.ai/os.

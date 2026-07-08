@@ -9,7 +9,8 @@ type User = { email?: string; displayName?: string; name?: string };
 //   error = /me가 5xx/네트워크 실패 — 게스트로 단정하지 않음(인증서버 장애를 미로그인으로 은폐 안 함).
 export type Status = "loading" | "authed" | "guest" | "error";
 // refresh는 최종 Status를 반환한다 — storage.onAuthExpired가 refresh 결과로 재요청 여부를 판단(Constraint 10).
-type AuthCtx = { user: User | null; status: Status; refresh: () => Promise<Status> };
+//   logout은 중앙 세션(api)을 POST /auth/logout(CSRF)으로 정리 — pullim-web /logout 페이지는 없다(404).
+type AuthCtx = { user: User | null; status: Status; refresh: () => Promise<Status>; logout: () => Promise<void> };
 
 const Ctx = createContext<AuthCtx | null>(null);
 
@@ -88,6 +89,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // 로그아웃 — 공유 세션 쿠키는 중앙(api)만 정리 가능. pullim-web에는 GET /logout 페이지가 없어(404)
+  //   리다이렉트가 아니라 POST ${API}/auth/logout 을 직접 호출한다(pullim-web session.ts logout 패턴 동형).
+  //   /auth/logout 은 CsrfGuard 대상 → GET /auth/csrf 로 토큰 부트스트랩 후 x-csrf-token echo.
+  //   서버 정리 성공·실패와 무관하게 클라 상태를 게스트로 두고 홈으로 이동(멱등 — 무세션도 2xx).
+  const logout = useCallback(async (): Promise<void> => {
+    try {
+      const cr = await fetch(`${API_BASE}/auth/csrf`, { credentials: "include", cache: "no-store" });
+      if (cr.ok) {
+        const cj = (await cr.json().catch(() => null)) as { csrfToken?: string; token?: string } | null;
+        const csrf = cj?.csrfToken ?? cj?.token;
+        if (csrf) {
+          await fetch(`${API_BASE}/auth/logout`, {
+            method: "POST",
+            credentials: "include",
+            cache: "no-store",
+            headers: { "x-csrf-token": csrf },
+          });
+        }
+      }
+    } catch {
+      // 네트워크/CORS 실패 — 서버 세션이 남을 수 있으나 클라는 게스트로 낙하(장애로 UI가 로그인 상태에 갇히지 않게).
+    }
+    setUser(null);
+    setStatus("guest");
+    if (typeof window !== "undefined") window.location.href = "/";
+  }, []);
+
   useEffect(() => { void refresh(); }, [refresh]);
 
   // 계정 store 어댑터에 모드 주입 — authed && !local이면 /api/data path. local(host-only 쿠키)은 localStorage 폴백.
@@ -107,7 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onAuthExpired: async () => (await refresh()) === "authed",
   });
 
-  return <Ctx.Provider value={{ user, status, refresh }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ user, status, refresh, logout }}>{children}</Ctx.Provider>;
 }
 
 export function useAuth(): AuthCtx {
