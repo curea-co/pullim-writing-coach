@@ -628,20 +628,22 @@ export default function CoachClient({
       } else {
         setBodyHtml(plainToHtml(savedBody)); // mismatch/stale/other-assignment → reconstruct from session plain
       }
-    } else if (saved) {
-      clearSession();
-      clearProcessLog();
-      // checks 맵은 지우지 않는다 — 과제별로 독립 유지(다른 과제 세션 정리와 무관, Codex #134).
     } else {
-      // 세션은 아직 없지만([봐줘] 전) 같은 과제의 draft(bodyHtml)가 있으면 복원. plan↔캔버스 왕복
-      //   ('메모 다시 보기')으로 CoachClient가 재마운트돼도 작성 중이던 본문이 유실되지 않게 한다
-      //   (onChange마다 saveBodyHtml로 영속됨). sig 일치일 때만 — 타 과제 draft 오염 방지.
+      // 세션이 없거나(첫 [봐줘] 전) **다른 과제 세션**이 남아 있는 경우 — 후자면 정리한다. 어느 쪽이든
+      //   현재 과제의 bodyHtml 초안·호출 캡(checks)은 이어서 복원해야 한다(Codex #134): foreign session을
+      //   지운 뒤 fallback 복원을 건너뛰면, 다른 과제를 열었다 돌아왔을 때 작성 중 본문이 사라지거나
+      //   과제별 캡이 0으로 풀리는 회귀가 생긴다.
+      if (saved) {
+        clearSession(); // 다른 과제 세션 정리(checks 맵은 과제별 독립이라 건드리지 않음).
+        clearProcessLog();
+      }
+      // 같은 과제의 draft(bodyHtml)가 있으면 복원(plan↔캔버스 왕복·재마운트에도 본문 유지). sig 일치만.
       const draft = loadBodyHtml();
       if (draft && draft.sig === assignmentSig(assignment)) {
         setBodyHtml(draft.html);
         dispatch({ type: "EDIT", body: htmlToPlain(draft.html) });
       }
-      // 세션이 없어도 같은 과제의 호출 수 기록이 있으면 복원(캡 유지).
+      // 같은 과제의 호출 수 기록이 있으면 복원(캡 유지 — 새로고침/과제 왕복 우회 방지).
       if (restoredChecks > 0) dispatch({ type: "SET_CHECKS", count: restoredChecks });
     }
     // 마운트 1회(루브릭 읽기 + 세션 복원). dispatch는 안정적이라 deps 불필요.
