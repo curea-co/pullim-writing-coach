@@ -15,7 +15,9 @@ export type SheetPosition = "peek" | "open" | "hidden";
 const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 // peek 시 화면에 남기는 손잡이+CTA 영역 높이(px).
-const PEEK_VISIBLE = 56;
+//   write 단계 '봐줘' CTA = grip 블록(~26) + content pt(6) + 버튼(py-3+14px텍스트 ~45) ≈ 77px 필요.
+//   56 은 버튼 하단 텍스트를 잘라 먹었다(2026-07-08) → 80 으로 전체 노출. Canvas pb-[130px] 가 여전히 덮어 무간섭.
+const PEEK_VISIBLE = 80;
 
 export default function BottomSheet({
   position,

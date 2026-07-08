@@ -47,8 +47,6 @@ import type { CoachAssignment, WritingMode } from "@/app/lib/coach-setup";
 import { DEMO_TOKEN_KEY } from "@/app/components/TokenGate";
 import styles from "@/app/coach/coach.module.css";
 import Canvas from "./Canvas";
-import GuidePanel from "./GuidePanel";
-import OutlinePanel from "./OutlinePanel";
 import VoicePanel from "./VoicePanel";
 import BottomSheet, { type SheetPosition } from "./BottomSheet";
 import NudgeCard from "./NudgeCard";
@@ -91,6 +89,16 @@ const SESSION_KEY = "pwc-coach-session-v1";
 const PROCESS_LOG_KEY = "pwc-process-log-v1";
 const TEACHER_RUBRIC_KEY = "pwc-teacher-rubric-v1";
 const BODY_HTML_KEY = "pwc-coach-body-html-v1";
+const CHECK_TS_KEY = "pwc-coach-checkts-v1"; // 마지막 점검(세션 저장) 시각 — bodyHtml 최신성 비교용(Codex #134).
+// 점검 안내용 **소프트 카운터** — 첫 [봐줘] + 수정 2회 = 3회를 기준으로 "남은 점검 N회"를 표시(넛지).
+//   ★ 하드 제한/영속/BE 없음(2026-07-08 오너 결정): 실제 호출은 막지 않는다. 진짜 비용 상한이 필요하면
+//   서버측 rate limit 로 별도 구현. state.checks는 in-memory 표시 전용(새 라운드=RESET 시 0으로).
+const MAX_CHECKS = 3;
+
+// 라운드 점검 카운터를 **모듈 스코프**에 과제 sig별 보관 — CoachClient가 plan 왕복('메모 다시 보기')으로
+//   언마운트/재마운트돼도 카운터가 0으로 리셋되지 않게(Codex #134). 새로고침(모듈 재적재) 시엔 비므로
+//   소프트 카운터 성격(영속/BE 아님)은 유지된다. reset('다시 해보기'/'다른 과제')에서 해당 sig 삭제.
+const roundChecks = new Map<string, number>();
 
 // 과제 서명: sameAssignment 4필드(school_level·subject·genre·prompt_text)와 동일 필드.
 // 다른 과제의 body_html이 현재 세션을 덮어쓰는 교차 오염 방지(Codex 리뷰).
@@ -98,24 +106,51 @@ function assignmentSig(a: Pick<CoachAssignment, "school_level" | "subject" | "ge
   return [a.school_level, a.subject, a.genre, a.prompt_text].join("\0");
 }
 
-function loadBodyHtml(): { sig: string; html: string } | null {
+// bodyHtml에 저장 시각(ts)을 실어 세션 draft와의 **최신성**을 비교한다(Codex #134): bodyHtml은 매 입력마다
+//   저장되지만, saveBodyHtml 실패(quota/탭 경합)로 stale일 수 있어 무조건 우선하면 세션의 최신 draft를
+//   되돌릴 수 있다. 마지막 점검 시각(CHECK_TS)보다 새 bodyHtml만 최신으로 신뢰한다.
+function loadBodyHtml(): { sig: string; html: string; ts: number } | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(BODY_HTML_KEY);
     if (!raw) return null;
-    const o = JSON.parse(raw) as { sig?: unknown; html?: unknown };
+    const o = JSON.parse(raw) as { sig?: unknown; html?: unknown; ts?: unknown };
     if (typeof o !== "object" || o === null) return null;
     if (typeof o.sig !== "string" || typeof o.html !== "string") return null;
-    return { sig: o.sig, html: o.html };
+    return { sig: o.sig, html: o.html, ts: typeof o.ts === "number" ? o.ts : 0 };
   } catch { return null; }
 }
 function saveBodyHtml(sig: string, html: string): void {
   if (typeof window === "undefined") return;
-  try { window.localStorage.setItem(BODY_HTML_KEY, JSON.stringify({ sig, html })); } catch {}
+  try { window.localStorage.setItem(BODY_HTML_KEY, JSON.stringify({ sig, html, ts: Date.now() })); } catch {}
 }
 function clearBodyHtml(): void {
   if (typeof window === "undefined") return;
   try { window.localStorage.removeItem(BODY_HTML_KEY); } catch {}
+}
+// 마지막 점검(봐줘/고쳤어=세션 저장) 시각 — bodyHtml 최신성 비교 기준. **과제 sig→ts 맵**으로 저장(Codex #134):
+//   단일 슬롯이면 과제 B 점검이 A의 점검 시각을 지워 loadCheckTs(A)=0 → stale bodyHtml이 통과해 A 세션의
+//   최신 draft를 되돌릴 수 있다. 맵이라 과제별로 독립 유지된다.
+function loadCheckTsMap(): Record<string, number> {
+  if (typeof window === "undefined") return {};
+  try {
+    const o = JSON.parse(window.localStorage.getItem(CHECK_TS_KEY) || "{}") as unknown;
+    if (!o || typeof o !== "object" || Array.isArray(o)) return {};
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(o as Record<string, unknown>)) if (typeof v === "number" && Number.isFinite(v)) out[k] = v;
+    return out;
+  } catch { return {}; }
+}
+function saveCheckTs(sig: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    const map = loadCheckTsMap();
+    map[sig] = Date.now();
+    window.localStorage.setItem(CHECK_TS_KEY, JSON.stringify(map));
+  } catch {}
+}
+function loadCheckTs(sig: string): number {
+  return loadCheckTsMap()[sig] ?? 0;
 }
 
 // ── 상태머신 ────────────────────────────────────────────────────────
@@ -141,6 +176,7 @@ type State = {
   // Codex PR #71 round 2: 직전 CHECK/RECHECK 응답 nudges 캐시. growth → [다음] 시 같은 응답 안의
   //   다음 우선순위 nudge로 이어가 (서버 재호출 없이) UX 약속 충족.
   lastNudges: CoachNudge[];
+  checks: number; // 성공한 코치 호출 수(봐줘+고쳤어) — "남은 점검 N회" 표시용 소프트 카운터. 실제 차단 아님.
   error: ErrorState;
 };
 
@@ -163,6 +199,7 @@ type Action =
       baseline: Record<AreaName, number>;
       revisions: number;
     }
+  | { type: "SET_CHECKS"; count: number } // 재마운트 시 모듈 스코프 라운드 카운터 복원(표시용).
   | { type: "RESET" };
 
 function emptyScores(): Record<AreaName, number> {
@@ -200,6 +237,7 @@ const initial: State = {
   focusAfter: 0,
   revisions: 0,
   lastNudges: [],
+  checks: 0,
   error: null,
 };
 
@@ -211,9 +249,10 @@ function reducer(state: State, action: Action): State {
       return { ...state, phase: "checking", error: null };
     case "CHECK_OK": {
       const baseline = state.baseline ?? action.scores;
+      const checks = state.checks + 1; // 성공한 코치 호출 1회 소진
       const focus = pickFocus(action.scores, action.nudges);
       if (!focus) {
-        return { ...state, phase: "done", scores: action.scores, baseline, lastNudges: action.nudges };
+        return { ...state, phase: "done", scores: action.scores, baseline, lastNudges: action.nudges, checks };
       }
       return {
         ...state,
@@ -223,6 +262,7 @@ function reducer(state: State, action: Action): State {
         focusArea: focus.area,
         focusBefore: action.scores[focus.area] ?? 0,
         lastNudges: action.nudges, // growth → [다음] 시 직전 응답에서 next focus 추출
+        checks,
       };
     }
     case "RECHECK_START":
@@ -239,6 +279,7 @@ function reducer(state: State, action: Action): State {
         focusAfter: after,
         lastNudges: action.nudges,
         revisions: state.revisions + (action.wasRevised ? 1 : 0),
+        checks: state.checks + 1, // 재점검도 코치 호출 1회 소진
       };
     }
     case "REVISION_TRACKED":
@@ -278,6 +319,8 @@ function reducer(state: State, action: Action): State {
         baseline: action.baseline,
         revisions: action.revisions,
       };
+    case "SET_CHECKS":
+      return { ...state, checks: action.count };
     case "RESET":
       return { ...initial };
     default:
@@ -512,16 +555,17 @@ export default function CoachClient({
   mode = "free",
   onAuthExpired,
   onNewAssignment,
+  onBackToPlan,
 }: {
   assignment?: CoachAssignment;
   mode?: WritingMode;
   onAuthExpired?: () => void;
   onNewAssignment?: () => void;
+  onBackToPlan?: () => void; // 개요/가이드 메모 화면(plan)으로 복귀 — 있으면 캔버스에 '메모 다시 보기' chevron 노출.
 }) {
   const [state, dispatch] = useReducer(reducer, undefined, initState);
   const [currentNudge, setCurrentNudge] = useState<CoachNudge | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(false); // nudge/growth open↔peek 토글
-  const [outlineCollapsed, setOutlineCollapsed] = useState(false); // outline 패널 접기(로컬 UI state)
   const [bodyHtml, setBodyHtml] = useState(""); // 리치 에디터 HTML(reducer 외부 — body는 계속 평문)
   const [coachSpellcheck, setCoachSpellcheck] = useState(false);
   const editorRef = useRef<RichEditorHandle>(null);
@@ -560,6 +604,7 @@ export default function CoachClient({
       sessionRef.current = saved;
       const lastDraft = saved.draftHistory[saved.draftHistory.length - 1];
       // 본문·점수·기준선·회차를 write 단계로 복원(다음 [봐줘]로 라이브 루프 재개).
+      //   checks(점검 카운터)는 표시 전용·in-memory라 복원 안 함 — 새로고침 시 "남은 점검 3회"로 재시작.
       dispatch({
         type: "RESTORE",
         body: lastDraft.body,
@@ -567,28 +612,50 @@ export default function CoachClient({
         baseline: fromAreaScores(saved.baseline),
         revisions: Math.max(0, saved.draftHistory.length - 1),
       });
-      // 리치 HTML 복원(reducer 외부): sig + htmlToPlain(html) === savedBody 둘 다 만족할 때만
-      // 저장 HTML을 신뢰한다. sig는 같더라도 html의 평문이 세션 마지막 draft와 다르면
-      // (quota 실패·탭 레이스 등으로 html이 stalе) 세션 평문에서 HTML을 재생성한다.
-      // state.body는 RESTORE 액션으로 이미 savedBody로 설정되어 있으며,
-      // html 신뢰 분기에서도 htmlToPlain(html) === savedBody이므로 추가 EDIT 동기화 불필요.
-      const savedBody = lastDraft.body;
+      // 리치 HTML 복원(reducer 외부). bodyHtml은 **매 입력마다** 저장되어 세션 draft(봐줘/고쳤어 시점)보다
+      //   최신이거나 같다 → 같은 과제의 bodyHtml이 있으면 그걸 **최신 본문으로 신뢰**한다. plan 왕복
+      //   ('메모 다시 보기')으로 CoachClient가 재마운트될 때, 아직 재점검 안 한 최신 편집을 세션 draft로
+      //   되돌려 유실시키던 회귀 차단(Codex #134). 세션 draft와 다르면(=더 최신) state.body도 동기화.
       const savedHtmlEntry = loadBodyHtml();
-      if (
-        savedHtmlEntry &&
-        savedHtmlEntry.sig === assignmentSig(assignment) &&
-        htmlToPlain(savedHtmlEntry.html) === savedBody
-      ) {
-        setBodyHtml(savedHtmlEntry.html); // html is the formatted version of exactly the session's last draft → safe
+      const rsig = assignmentSig(assignment);
+      const checkTs = loadCheckTs(rsig);
+      const sameSig = !!savedHtmlEntry && savedHtmlEntry.sig === rsig;
+      // 점검 시각(checkTs)이 있으면 ts 비교로 최신성 판단(점검 후 편집분 유지, stale이면 세션 우선). 없으면
+      //   (구 포맷 마이그레이션 — ts 없이 저장된 bodyHtml) 이전 안전 가드(bodyHtml 평문 == 세션 draft)로
+      //   폴백 — ts 부재(0)를 최신으로 오인해 stale을 우선하지 않게(Codex #134).
+      const bodyFresh = !!savedHtmlEntry && sameSig && (
+        checkTs > 0 ? savedHtmlEntry.ts >= checkTs : htmlToPlain(savedHtmlEntry.html) === lastDraft.body
+      );
+      if (bodyFresh && savedHtmlEntry) {
+        setBodyHtml(savedHtmlEntry.html);
+        const htmlPlain = htmlToPlain(savedHtmlEntry.html);
+        if (htmlPlain !== lastDraft.body) dispatch({ type: "EDIT", body: htmlPlain });
       } else {
-        setBodyHtml(plainToHtml(savedBody)); // mismatch/stale/other-assignment → reconstruct from session plain
+        setBodyHtml(plainToHtml(lastDraft.body)); // bodyHtml 없음/stale/타 과제 → 세션 평문에서 재생성.
       }
-    } else if (saved) {
-      clearSession();
-      clearProcessLog();
+    } else {
+      // 세션이 없거나(첫 [봐줘] 전) **다른 과제 세션**이 남아 있는 경우 — 후자면 정리한다. 어느 쪽이든
+      //   현재 과제의 bodyHtml 초안·호출 캡(checks)은 이어서 복원해야 한다(Codex #134): foreign session을
+      //   지운 뒤 fallback 복원을 건너뛰면, 다른 과제를 열었다 돌아왔을 때 작성 중 본문이 사라지거나
+      //   과제별 캡이 0으로 풀리는 회귀가 생긴다.
+      if (saved) {
+        clearSession(); // 다른 과제 세션 정리(checks 맵은 과제별 독립이라 건드리지 않음).
+        clearProcessLog();
+      }
+      // 같은 과제의 draft(bodyHtml)가 있으면 복원(plan↔캔버스 왕복·재마운트에도 본문 유지). sig 일치만.
+      const draft = loadBodyHtml();
+      if (draft && draft.sig === assignmentSig(assignment)) {
+        setBodyHtml(draft.html);
+        dispatch({ type: "EDIT", body: htmlToPlain(draft.html) });
+      }
     }
-    // 마운트 1회(루브릭 읽기 + 세션 복원). dispatch는 안정적이라 deps 불필요.
+    // 라운드 점검 카운터(표시용) 복원 — plan 왕복 재마운트에도 유지되게 모듈 스코프 Map에서 현재 sig 값을 읽는다.
+    const rc = roundChecks.get(assignmentSig(assignment)) ?? 0;
+    if (rc > 0) dispatch({ type: "SET_CHECKS", count: rc });
+    // 마운트 1회(루브릭 읽기 + 세션·카운터 복원). dispatch는 안정적이라 deps 불필요.
   }, []);
+
+  const checksLeft = Math.max(0, MAX_CHECKS - state.checks); // 남은 점검 표시용 소프트 카운터(차단 아님).
 
   // ── 첫 점검 (봐줘) ──
   // 매 렌더 새 클로저 — 호출 시점의 최신 state.body를 캡처(stale 방지). 의존성 추적 불필요.
@@ -635,6 +702,8 @@ export default function CoachClient({
       }
     }
     persist(sessionRef.current);
+    saveCheckTs(assignmentSig(assignment)); // 점검(세션 저장) 시각 — bodyHtml 최신성 비교 기준.
+    roundChecks.set(assignmentSig(assignment), state.checks + 1); // 라운드 카운터 갱신(표시용 — plan 왕복에도 유지).
 
     dispatch({ type: "CHECK_OK", scores, nudges: r.output.nudges });
     // Codex PR #71 round 2: process log에 revision 기록 시 학생 화면 카운트도 동기화.
@@ -677,6 +746,8 @@ export default function CoachClient({
       sessionRef.current = { ...sessionRef.current, areaScores };
     }
     persist(sessionRef.current);
+    saveCheckTs(assignmentSig(assignment)); // 점검(세션 저장) 시각 — bodyHtml 최신성 비교 기준.
+    roundChecks.set(assignmentSig(assignment), state.checks + 1); // 라운드 카운터 갱신(표시용).
 
     dispatch({ type: "RECHECK_OK", scores, nudges: r.output.nudges, wasRevised });
   };
@@ -721,7 +792,6 @@ export default function CoachClient({
   const reset = () => {
     setCurrentNudge(null);
     setSheetExpanded(false);
-    setOutlineCollapsed(false); // 새 라운드는 개요 패널 다시 열림
     setBodyHtml("");
     clearBodyHtml();
     setCoachSpellcheck(false); // 새 라운드는 맞춤법 토글 OFF로 초기화(기본값)
@@ -729,7 +799,8 @@ export default function CoachClient({
     sessionRef.current = null;
     clearSession();
     clearProcessLog();
-    dispatch({ type: "RESET" });
+    roundChecks.delete(assignmentSig(assignment)); // 새 라운드 → 라운드 카운터도 리셋("남은 점검 3회"부터).
+    dispatch({ type: "RESET" }); // checks 0으로.
   };
 
   const handleNewAssignment = () => {
@@ -811,6 +882,9 @@ export default function CoachClient({
             </div>
           )}
 
+          {/* 개요/가이드 참고 메모는 별도 화면(CoachSetupFlow의 plan 스텝)으로 분리 — 좁은 캔버스 프레임에
+              끼우면 잘려서(2026-07-08). 여기(캔버스)는 본문 작성에만 집중. voice 는 실시간 입력이라 위 유지. */}
+
           {/* 캔버스 */}
           <Canvas
             valueHtml={bodyHtml}
@@ -821,37 +895,17 @@ export default function CoachClient({
             editorRef={editorRef}
           />
 
-          {/* 가이드 패널 — mode=guide + write 단계일 때만. 직교 패널(reducer 무수정). */}
-          {mode === "guide" && state.phase === "write" && (
-            <div className="px-[18px] pb-[64px]">
-              <GuidePanel genre={assignment.genre} />
-            </div>
-          )}
-
-          {/* 개요 패널 — mode=outline + write 단계 + 패널 미접힘일 때만. 직교 패널(reducer 무수정). */}
-          {mode === "outline" && state.phase === "write" && !outlineCollapsed && (
-            <div className="px-[18px] pb-[64px]">
-              <OutlinePanel
-                genre={assignment.genre}
-                onStartBody={() => {
-                  setOutlineCollapsed(true);
-                  editorRef.current?.focus();
-                }}
-              />
-            </div>
-          )}
-
-          {/* 접은 뒤 재오픈 affordance — '개요를 계속 참고하며 쓰기'를 보장(한 번 보고 숨김 회귀 방지). */}
-          {mode === "outline" && state.phase === "write" && outlineCollapsed && (
-            <div className="px-[18px] pb-[64px]">
-              <button
-                type="button"
-                onClick={() => setOutlineCollapsed(false)}
-                className="text-subtle-foreground hover:text-foreground text-xs underline underline-offset-2"
-              >
-                개요 다시 보기
-              </button>
-            </div>
+          {/* 개요·가이드 메모 다시 보기 — 캔버스 하단과 '봐줘' CTA(시트 peek) 사이. plan 화면으로 복귀해
+              무엇을 메모했는지 확인. 본문(bodyHtml)은 localStorage 영속이라 왕복해도 유지됨. write 단계·해당 모드에서만. */}
+          {onBackToPlan && state.phase === "write" && (
+            <button
+              type="button"
+              onClick={onBackToPlan}
+              aria-label="개요·가이드 메모 다시 보기"
+              className="absolute inset-x-0 bottom-[86px] z-20 mx-auto flex w-fit items-center gap-1 rounded-[var(--r-pill)] border border-[var(--line)] bg-white/95 px-3 py-1.5 text-[12px] font-medium text-[var(--ink-3)] shadow-[var(--sh-1)] backdrop-blur transition hover:text-[var(--pullim-ink)]"
+            >
+              <span aria-hidden className="text-[15px] leading-none">‹</span> 메모 다시 보기
+            </button>
           )}
 
           {/* 바텀시트 */}
@@ -867,6 +921,7 @@ export default function CoachClient({
               state={state}
               currentNudge={currentNudge}
               busy={busy}
+              checksLeft={checksLeft}
               onAsk={runCheck}
               onFixed={runRecheck}
               onNext={runNext}
@@ -891,6 +946,7 @@ function SheetBody({
   state,
   currentNudge,
   busy,
+  checksLeft,
   onAsk,
   onFixed,
   onNext,
@@ -899,6 +955,7 @@ function SheetBody({
   state: State;
   currentNudge: CoachNudge | null;
   busy: boolean;
+  checksLeft: number;
   onAsk: () => void;
   onFixed: () => void;
   onNext: () => void;
@@ -936,6 +993,7 @@ function SheetBody({
   }
 
   if (state.phase === "write") {
+    // 카운터는 peek(80px)에 잘려 여기 두지 않는다 — 열린 시트의 NudgeCard(고쳤어 버튼 아래)에서 노출한다(Codex #134).
     return (
       <button
         type="button"
@@ -955,6 +1013,7 @@ function SheetBody({
         onFixed={onFixed}
         why={WHY_BY_AREA[currentNudge.rubric_area]}
         busy={busy}
+        checksLeft={checksLeft}
       />
     );
   }
