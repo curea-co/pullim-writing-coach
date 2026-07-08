@@ -47,8 +47,6 @@ import type { CoachAssignment, WritingMode } from "@/app/lib/coach-setup";
 import { DEMO_TOKEN_KEY } from "@/app/components/TokenGate";
 import styles from "@/app/coach/coach.module.css";
 import Canvas from "./Canvas";
-import GuidePanel from "./GuidePanel";
-import OutlinePanel from "./OutlinePanel";
 import VoicePanel from "./VoicePanel";
 import BottomSheet, { type SheetPosition } from "./BottomSheet";
 import NudgeCard from "./NudgeCard";
@@ -91,6 +89,10 @@ const SESSION_KEY = "pwc-coach-session-v1";
 const PROCESS_LOG_KEY = "pwc-process-log-v1";
 const TEACHER_RUBRIC_KEY = "pwc-teacher-rubric-v1";
 const BODY_HTML_KEY = "pwc-coach-body-html-v1";
+const CHECKS_KEY = "pwc-coach-checks-v1"; // 코치 LLM 호출 횟수(비용 캡) — 과제 sig별 영속(새로고침 우회 방지).
+
+// LLM 호출 상한 — 첫 [봐줘] + 수정 2회 = 총 3회. 이후 [고쳤어]/[봐줘] 차단하고 [결과 보기]로 유도(비용 제한).
+const MAX_CHECKS = 3;
 
 // 과제 서명: sameAssignment 4필드(school_level·subject·genre·prompt_text)와 동일 필드.
 // 다른 과제의 body_html이 현재 세션을 덮어쓰는 교차 오염 방지(Codex 리뷰).
@@ -118,6 +120,26 @@ function clearBodyHtml(): void {
   try { window.localStorage.removeItem(BODY_HTML_KEY); } catch {}
 }
 
+// ── 코치 호출 횟수 영속(비용 캡) — 과제 sig 일치할 때만 복원(타 과제와 분리). ──
+function loadChecks(): { sig: string; count: number } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(CHECKS_KEY);
+    if (!raw) return null;
+    const o = JSON.parse(raw) as { sig?: unknown; count?: unknown };
+    if (typeof o?.sig === "string" && typeof o?.count === "number" && o.count >= 0) return { sig: o.sig, count: o.count };
+    return null;
+  } catch { return null; }
+}
+function saveChecks(sig: string, count: number): void {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(CHECKS_KEY, JSON.stringify({ sig, count })); } catch {}
+}
+function clearChecks(): void {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.removeItem(CHECKS_KEY); } catch {}
+}
+
 // ── 상태머신 ────────────────────────────────────────────────────────
 type Phase =
   | "write" // 작성 중 — peek로 [봐줘] CTA
@@ -141,6 +163,7 @@ type State = {
   // Codex PR #71 round 2: 직전 CHECK/RECHECK 응답 nudges 캐시. growth → [다음] 시 같은 응답 안의
   //   다음 우선순위 nudge로 이어가 (서버 재호출 없이) UX 약속 충족.
   lastNudges: CoachNudge[];
+  checks: number; // 지금까지 성공한 코치 LLM 호출 수(봐줘+고쳤어). MAX_CHECKS 초과 차단(비용 캡).
   error: ErrorState;
 };
 
@@ -162,7 +185,9 @@ type Action =
       scores: Record<AreaName, number>;
       baseline: Record<AreaName, number>;
       revisions: number;
+      checks: number;
     }
+  | { type: "SET_CHECKS"; count: number } // 마운트 시 영속된 호출 수 복원(세션 유무 무관).
   | { type: "RESET" };
 
 function emptyScores(): Record<AreaName, number> {
@@ -200,6 +225,7 @@ const initial: State = {
   focusAfter: 0,
   revisions: 0,
   lastNudges: [],
+  checks: 0,
   error: null,
 };
 
@@ -211,9 +237,10 @@ function reducer(state: State, action: Action): State {
       return { ...state, phase: "checking", error: null };
     case "CHECK_OK": {
       const baseline = state.baseline ?? action.scores;
+      const checks = state.checks + 1; // 성공한 코치 호출 1회 소진
       const focus = pickFocus(action.scores, action.nudges);
       if (!focus) {
-        return { ...state, phase: "done", scores: action.scores, baseline, lastNudges: action.nudges };
+        return { ...state, phase: "done", scores: action.scores, baseline, lastNudges: action.nudges, checks };
       }
       return {
         ...state,
@@ -223,6 +250,7 @@ function reducer(state: State, action: Action): State {
         focusArea: focus.area,
         focusBefore: action.scores[focus.area] ?? 0,
         lastNudges: action.nudges, // growth → [다음] 시 직전 응답에서 next focus 추출
+        checks,
       };
     }
     case "RECHECK_START":
@@ -239,6 +267,7 @@ function reducer(state: State, action: Action): State {
         focusAfter: after,
         lastNudges: action.nudges,
         revisions: state.revisions + (action.wasRevised ? 1 : 0),
+        checks: state.checks + 1, // 재점검도 코치 호출 1회 소진
       };
     }
     case "REVISION_TRACKED":
@@ -277,7 +306,10 @@ function reducer(state: State, action: Action): State {
         scores: action.scores,
         baseline: action.baseline,
         revisions: action.revisions,
+        checks: action.checks,
       };
+    case "SET_CHECKS":
+      return { ...state, checks: action.count };
     case "RESET":
       return { ...initial };
     default:
@@ -512,16 +544,17 @@ export default function CoachClient({
   mode = "free",
   onAuthExpired,
   onNewAssignment,
+  onBackToPlan,
 }: {
   assignment?: CoachAssignment;
   mode?: WritingMode;
   onAuthExpired?: () => void;
   onNewAssignment?: () => void;
+  onBackToPlan?: () => void; // 개요/가이드 메모 화면(plan)으로 복귀 — 있으면 캔버스에 '메모 다시 보기' chevron 노출.
 }) {
   const [state, dispatch] = useReducer(reducer, undefined, initState);
   const [currentNudge, setCurrentNudge] = useState<CoachNudge | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(false); // nudge/growth open↔peek 토글
-  const [outlineCollapsed, setOutlineCollapsed] = useState(false); // outline 패널 접기(로컬 UI state)
   const [bodyHtml, setBodyHtml] = useState(""); // 리치 에디터 HTML(reducer 외부 — body는 계속 평문)
   const [coachSpellcheck, setCoachSpellcheck] = useState(false);
   const editorRef = useRef<RichEditorHandle>(null);
@@ -556,6 +589,10 @@ export default function CoachClient({
       sa.subject === assignment.subject &&
       sa.genre === assignment.genre &&
       sa.prompt_text === assignment.prompt_text;
+    // 코치 호출 수(비용 캡) 복원 — 같은 과제면 그 값을, 아니면 0. RESTORE가 ...initial로 checks를 0으로
+    //   두므로 그 액션에 실어 함께 복원한다(새로고침으로 캡 우회 방지).
+    const savedChecks = loadChecks();
+    const restoredChecks = savedChecks && savedChecks.sig === assignmentSig(assignment) ? savedChecks.count : 0;
     if (saved && sameAssignment) {
       sessionRef.current = saved;
       const lastDraft = saved.draftHistory[saved.draftHistory.length - 1];
@@ -566,6 +603,7 @@ export default function CoachClient({
         scores: fromAreaScores(saved.areaScores),
         baseline: fromAreaScores(saved.baseline),
         revisions: Math.max(0, saved.draftHistory.length - 1),
+        checks: restoredChecks,
       });
       // 리치 HTML 복원(reducer 외부): sig + htmlToPlain(html) === savedBody 둘 다 만족할 때만
       // 저장 HTML을 신뢰한다. sig는 같더라도 html의 평문이 세션 마지막 draft와 다르면
@@ -586,15 +624,44 @@ export default function CoachClient({
     } else if (saved) {
       clearSession();
       clearProcessLog();
+      clearChecks(); // 다른 과제 세션 정리 시 호출 수 캡도 초기화.
+    } else {
+      // 세션은 아직 없지만([봐줘] 전) 같은 과제의 draft(bodyHtml)가 있으면 복원. plan↔캔버스 왕복
+      //   ('메모 다시 보기')으로 CoachClient가 재마운트돼도 작성 중이던 본문이 유실되지 않게 한다
+      //   (onChange마다 saveBodyHtml로 영속됨). sig 일치일 때만 — 타 과제 draft 오염 방지.
+      const draft = loadBodyHtml();
+      if (draft && draft.sig === assignmentSig(assignment)) {
+        setBodyHtml(draft.html);
+        dispatch({ type: "EDIT", body: htmlToPlain(draft.html) });
+      }
+      // 세션이 없어도 같은 과제의 호출 수 기록이 있으면 복원(캡 유지).
+      if (restoredChecks > 0) dispatch({ type: "SET_CHECKS", count: restoredChecks });
     }
     // 마운트 1회(루브릭 읽기 + 세션 복원). dispatch는 안정적이라 deps 불필요.
   }, []);
+
+  // 코치 호출 수 변경 시 과제 sig별 영속 — 새로고침으로 비용 캡 우회 방지(0은 clear가 담당).
+  useEffect(() => {
+    if (state.checks > 0) saveChecks(assignmentSig(assignment), state.checks);
+    // assignment는 렌더 간 안정 — checks 변화에만 반응.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.checks]);
+
+  const checksLeft = Math.max(0, MAX_CHECKS - state.checks); // 남은 코치 호출 수(표시·차단용)
+
+  // 비용 캡 소진 시 결과(완료) 화면으로 — 추가 LLM 호출 없이 지금까지의 성장으로 마무리.
+  const finishNow = () => {
+    setCurrentNudge(null);
+    if (sessionRef.current) persist(sessionRef.current);
+    dispatch({ type: "FINISH" });
+  };
 
   // ── 첫 점검 (봐줘) ──
   // 매 렌더 새 클로저 — 호출 시점의 최신 state.body를 캡처(stale 방지). 의존성 추적 불필요.
   // Codex/E2E 가드: 빈 캔버스에서 [봐줘] 클릭 시 코치 호출 안 함 (write 상태 유지, nudge 미생성).
   const runCheck = async () => {
     if (!state.body.trim()) return;
+    if (state.checks >= MAX_CHECKS) return; // 비용 캡 — UI가 이미 [결과 보기]로 대체하지만 방어적 차단.
     dispatch({ type: "CHECK_START" });
     const r = await callCoach(state.body, assignment, rubricRef.current, mode);
     if (!r.ok) {
@@ -646,6 +713,7 @@ export default function CoachClient({
     // Codex PR #71 round 2: 본문이 직전 draft에서 실제로 변경됐는지 먼저 확인.
     //   안 바뀐 채 [고쳤어 ✓] = 새 회차 기록 X. 학생이 안 고치고 클릭만 했는데 교사 로그에
     //   '직접 고쳐 쓴 과정'이 부풀려지는 회귀 차단.
+    if (state.checks >= MAX_CHECKS) return; // 비용 캡 — 소진 시 [고쳤어] 대신 [결과 보기]가 렌더됨.
     const lastBody = sessionRef.current?.draftHistory[sessionRef.current.draftHistory.length - 1]?.body ?? "";
     const wasRevised = sessionRef.current ? state.body !== lastBody : true;
     dispatch({ type: "RECHECK_START" });
@@ -685,6 +753,7 @@ export default function CoachClient({
   // Codex PR #71 round 2: 직전 lastNudges + 현재 scores로 next focus 추출 — 남은 약점이 있으면
   //   추가 서버 호출 없이 nudge phase로 직접 진입(UX 약속). 없으면 FINISH.
   const runNext = () => {
+    if (state.checks >= MAX_CHECKS) { finishNow(); return; } // 캡 소진 — 추가 nudge 없이 결과로.
     const scores = state.scores ?? emptyScores();
     const nextFocus = pickFocus(scores, state.lastNudges);
     if (!nextFocus) {
@@ -721,7 +790,6 @@ export default function CoachClient({
   const reset = () => {
     setCurrentNudge(null);
     setSheetExpanded(false);
-    setOutlineCollapsed(false); // 새 라운드는 개요 패널 다시 열림
     setBodyHtml("");
     clearBodyHtml();
     setCoachSpellcheck(false); // 새 라운드는 맞춤법 토글 OFF로 초기화(기본값)
@@ -729,6 +797,7 @@ export default function CoachClient({
     sessionRef.current = null;
     clearSession();
     clearProcessLog();
+    clearChecks(); // 새 라운드는 비용 캡도 리셋(호출 수 0부터).
     dispatch({ type: "RESET" });
   };
 
@@ -811,6 +880,9 @@ export default function CoachClient({
             </div>
           )}
 
+          {/* 개요/가이드 참고 메모는 별도 화면(CoachSetupFlow의 plan 스텝)으로 분리 — 좁은 캔버스 프레임에
+              끼우면 잘려서(2026-07-08). 여기(캔버스)는 본문 작성에만 집중. voice 는 실시간 입력이라 위 유지. */}
+
           {/* 캔버스 */}
           <Canvas
             valueHtml={bodyHtml}
@@ -821,37 +893,17 @@ export default function CoachClient({
             editorRef={editorRef}
           />
 
-          {/* 가이드 패널 — mode=guide + write 단계일 때만. 직교 패널(reducer 무수정). */}
-          {mode === "guide" && state.phase === "write" && (
-            <div className="px-[18px] pb-[64px]">
-              <GuidePanel genre={assignment.genre} />
-            </div>
-          )}
-
-          {/* 개요 패널 — mode=outline + write 단계 + 패널 미접힘일 때만. 직교 패널(reducer 무수정). */}
-          {mode === "outline" && state.phase === "write" && !outlineCollapsed && (
-            <div className="px-[18px] pb-[64px]">
-              <OutlinePanel
-                genre={assignment.genre}
-                onStartBody={() => {
-                  setOutlineCollapsed(true);
-                  editorRef.current?.focus();
-                }}
-              />
-            </div>
-          )}
-
-          {/* 접은 뒤 재오픈 affordance — '개요를 계속 참고하며 쓰기'를 보장(한 번 보고 숨김 회귀 방지). */}
-          {mode === "outline" && state.phase === "write" && outlineCollapsed && (
-            <div className="px-[18px] pb-[64px]">
-              <button
-                type="button"
-                onClick={() => setOutlineCollapsed(false)}
-                className="text-subtle-foreground hover:text-foreground text-xs underline underline-offset-2"
-              >
-                개요 다시 보기
-              </button>
-            </div>
+          {/* 개요·가이드 메모 다시 보기 — 캔버스 하단과 '봐줘' CTA(시트 peek) 사이. plan 화면으로 복귀해
+              무엇을 메모했는지 확인. 본문(bodyHtml)은 localStorage 영속이라 왕복해도 유지됨. write 단계·해당 모드에서만. */}
+          {onBackToPlan && state.phase === "write" && (
+            <button
+              type="button"
+              onClick={onBackToPlan}
+              aria-label="개요·가이드 메모 다시 보기"
+              className="absolute inset-x-0 bottom-[86px] z-20 mx-auto flex w-fit items-center gap-1 rounded-[var(--r-pill)] border border-[var(--line)] bg-white/95 px-3 py-1.5 text-[12px] font-medium text-[var(--ink-3)] shadow-[var(--sh-1)] backdrop-blur transition hover:text-[var(--pullim-ink)]"
+            >
+              <span aria-hidden className="text-[15px] leading-none">‹</span> 메모 다시 보기
+            </button>
           )}
 
           {/* 바텀시트 */}
@@ -867,9 +919,11 @@ export default function CoachClient({
               state={state}
               currentNudge={currentNudge}
               busy={busy}
+              checksLeft={checksLeft}
               onAsk={runCheck}
               onFixed={runRecheck}
               onNext={runNext}
+              onFinish={finishNow}
               onRetry={state.phase === "rechecking" ? runRecheck : runCheck}
             />
           </BottomSheet>
@@ -891,17 +945,21 @@ function SheetBody({
   state,
   currentNudge,
   busy,
+  checksLeft,
   onAsk,
   onFixed,
   onNext,
+  onFinish,
   onRetry,
 }: {
   state: State;
   currentNudge: CoachNudge | null;
   busy: boolean;
+  checksLeft: number;
   onAsk: () => void;
   onFixed: () => void;
   onNext: () => void;
+  onFinish: () => void;
   onRetry: () => void;
 }) {
   // 에러 우선.
@@ -936,15 +994,35 @@ function SheetBody({
   }
 
   if (state.phase === "write") {
+    // 비용 캡 소진 — 더 이상 코치 호출 없이 결과(완료)로.
+    if (checksLeft <= 0) {
+      return (
+        <div className="py-1 text-center">
+          <p className="text-[12.5px] text-[var(--ink-4)]">무료 점검 {MAX_CHECKS}회를 모두 사용했어요.</p>
+          <button
+            type="button"
+            onClick={onFinish}
+            className={`${styles.brandFont} mt-2 inline-flex w-full items-center justify-center rounded-xl bg-[var(--pullim-blue)] px-4 py-3 text-[14px] font-semibold text-white shadow-[0_4px_14px_rgba(3,98,218,0.24)]`}
+          >
+            결과 보기 ▸
+          </button>
+        </div>
+      );
+    }
     return (
-      <button
-        type="button"
-        data-testid="coach-ask"
-        onClick={onAsk}
-        className={`${styles.brandFont} flex w-full cursor-pointer items-center justify-center gap-[9px] py-3 text-[14px] font-semibold text-[var(--pullim-blue)]`}
-      >
-        ✍️ 다 썼으면 코치에게 봐달라고 해봐 <span className={styles.arrowBob}>↑</span>
-      </button>
+      <div>
+        <button
+          type="button"
+          data-testid="coach-ask"
+          onClick={onAsk}
+          className={`${styles.brandFont} flex w-full cursor-pointer items-center justify-center gap-[9px] py-3 text-[14px] font-semibold text-[var(--pullim-blue)]`}
+        >
+          ✍️ 다 썼으면 코치에게 봐달라고 해봐 <span className={styles.arrowBob}>↑</span>
+        </button>
+        <p className={`${styles.monoFont} -mt-1 text-center text-[10.5px] text-[var(--ink-5)]`}>
+          남은 점검 {checksLeft}회
+        </p>
+      </div>
     );
   }
 
@@ -955,6 +1033,8 @@ function SheetBody({
         onFixed={onFixed}
         why={WHY_BY_AREA[currentNudge.rubric_area]}
         busy={busy}
+        checksLeft={checksLeft}
+        onFinish={onFinish}
       />
     );
   }

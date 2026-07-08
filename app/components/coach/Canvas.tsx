@@ -34,7 +34,7 @@ export default function Canvas({
   const charCountId = "canvas-char-count-live";
 
   return (
-    <div className="relative flex-1 overflow-hidden">
+    <div className="relative min-h-[180px] flex-1 overflow-hidden">
       {/* 시각 글자수 배지 — 스크린리더에서는 숨김. pointer-events-none: 위에 떠도 툴바 클릭을 가로채지 않음 */}
       <span
         className={`${styles.monoFont} pointer-events-none absolute right-3.5 top-2 z-10 text-[10.5px] text-[var(--ink-5)]`}
