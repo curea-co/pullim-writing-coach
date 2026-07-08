@@ -1,8 +1,11 @@
 // OS 브랜드 favicon.ico 생성 — app/icon.svg(풀림 OS 마크)를 다중 크기 .ico 로 굽는다.
 //   왜: app/icon.svg 는 <link rel="icon" type="image/svg+xml"> 로 최신 브라우저·대다수 크롤러가 쓰지만,
 //   일부 메신저(카카오 등)·모니터링·구형 크롤러는 `/favicon.ico` 를 직접 조회한다 → .ico 도 OS 마크로 둔다.
-//   실행: `npm run gen:favicon` (아이콘 변경 시 1회 재생성 후 app/favicon.ico 커밋). Vercel 빌드 경로 밖 —
-//   네이티브 의존(sharp)을 배포 빌드에 묶지 않기 위함(2026-07-08 Vercel 빌드 사고 회피).
+//   실행: `npm run gen:favicon` (아이콘 변경 시 1회 재생성 후 app/favicon.ico 커밋). 산출물(.ico)이
+//   deliverable이고, 이 스크립트는 **빌드 COMMAND(prebuild 훅) 밖**의 유지보수 도구다 — 배포 시 래스터화가
+//   돌지 않게(빌드 지연/실패 결합 회피). sharp 는 이미 `next` 의 직접 의존(^0.34.5)이라 배포 install 에
+//   항상 존재하며, devDependencies 의 명시는 그 버전을 **고정**해 스크립트 재현성을 보장할 뿐 신규 네이티브
+//   패키지를 배포에 들이지 않는다(Codex #132).
 import sharp from "sharp";
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
