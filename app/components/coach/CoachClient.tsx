@@ -945,23 +945,16 @@ function SheetBody({
   }
 
   if (state.phase === "write") {
+    // 카운터는 peek(80px)에 잘려 여기 두지 않는다 — 열린 시트의 NudgeCard(고쳤어 버튼 아래)에서 노출한다(Codex #134).
     return (
-      <div>
-        <button
-          type="button"
-          data-testid="coach-ask"
-          onClick={onAsk}
-          className={`${styles.brandFont} flex w-full cursor-pointer items-center justify-center gap-[9px] py-3 text-[14px] font-semibold text-[var(--pullim-blue)]`}
-        >
-          ✍️ 다 썼으면 코치에게 봐달라고 해봐 <span className={styles.arrowBob}>↑</span>
-        </button>
-        {/* 남은 점검 소프트 카운터(넛지 — 실제 제한 아님). 0일 땐 숨겨 '0인데 되네' 모순 방지. */}
-        {checksLeft > 0 && (
-          <p className={`${styles.monoFont} -mt-1 text-center text-[10.5px] text-[var(--ink-5)]`}>
-            남은 점검 {checksLeft}회
-          </p>
-        )}
-      </div>
+      <button
+        type="button"
+        data-testid="coach-ask"
+        onClick={onAsk}
+        className={`${styles.brandFont} flex w-full cursor-pointer items-center justify-center gap-[9px] py-3 text-[14px] font-semibold text-[var(--pullim-blue)]`}
+      >
+        ✍️ 다 썼으면 코치에게 봐달라고 해봐 <span className={styles.arrowBob}>↑</span>
+      </button>
     );
   }
 
