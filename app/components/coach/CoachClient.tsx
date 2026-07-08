@@ -128,18 +128,29 @@ function clearBodyHtml(): void {
   if (typeof window === "undefined") return;
   try { window.localStorage.removeItem(BODY_HTML_KEY); } catch {}
 }
-// 마지막 점검(봐줘/고쳤어=세션 저장) 시각 — bodyHtml 최신성 비교 기준.
+// 마지막 점검(봐줘/고쳤어=세션 저장) 시각 — bodyHtml 최신성 비교 기준. **과제 sig→ts 맵**으로 저장(Codex #134):
+//   단일 슬롯이면 과제 B 점검이 A의 점검 시각을 지워 loadCheckTs(A)=0 → stale bodyHtml이 통과해 A 세션의
+//   최신 draft를 되돌릴 수 있다. 맵이라 과제별로 독립 유지된다.
+function loadCheckTsMap(): Record<string, number> {
+  if (typeof window === "undefined") return {};
+  try {
+    const o = JSON.parse(window.localStorage.getItem(CHECK_TS_KEY) || "{}") as unknown;
+    if (!o || typeof o !== "object" || Array.isArray(o)) return {};
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(o as Record<string, unknown>)) if (typeof v === "number" && Number.isFinite(v)) out[k] = v;
+    return out;
+  } catch { return {}; }
+}
 function saveCheckTs(sig: string): void {
   if (typeof window === "undefined") return;
-  try { window.localStorage.setItem(CHECK_TS_KEY, JSON.stringify({ sig, ts: Date.now() })); } catch {}
+  try {
+    const map = loadCheckTsMap();
+    map[sig] = Date.now();
+    window.localStorage.setItem(CHECK_TS_KEY, JSON.stringify(map));
+  } catch {}
 }
 function loadCheckTs(sig: string): number {
-  if (typeof window === "undefined") return 0;
-  try {
-    const o = JSON.parse(window.localStorage.getItem(CHECK_TS_KEY) || "null") as { sig?: unknown; ts?: unknown } | null;
-    if (o && o.sig === sig && typeof o.ts === "number") return o.ts;
-    return 0;
-  } catch { return 0; }
+  return loadCheckTsMap()[sig] ?? 0;
 }
 
 // ── 상태머신 ────────────────────────────────────────────────────────
