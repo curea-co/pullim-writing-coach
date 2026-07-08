@@ -25,17 +25,22 @@ const API_BASE = ((): string => {
   return "https://dev-api.pullim.ai";
 })();
 
-// CSRF 쿠키 이름 — 환경별(prod=pullim-csrf · dev=dev-pullim-csrf · local=local-pullim-csrf). db.ts 와 동일 집합.
-const CSRF_COOKIE_NAMES = ["pullim-csrf", "dev-pullim-csrf", "local-pullim-csrf"];
 const isLocalApi = API_BASE.includes("pullim.local");
 
-// double-submit CSRF 쿠키 존재 여부(비-httpOnly라 JS 가독). 값은 읽지 않는다 — 존재만 확인.
+// 현재 API 환경(API_BASE)에 대응하는 csrf 쿠키 이름 하나 — dev-api=dev-pullim-csrf · api(prod)=pullim-csrf ·
+//   local=local-pullim-csrf. 세 이름 전부를 보면(Codex #130) dev 브라우저에 남은 prod `pullim-csrf` 때문에
+//   부트스트랩을 건너뛰어 정작 dev-api 가 요구하는 `dev-pullim-csrf` 는 계속 부재 → 저장 401 지속. 환경 이름만 검사.
+function envCsrfCookieName(): string {
+  if (isLocalApi) return "local-pullim-csrf";
+  if (API_BASE.includes("dev-")) return "dev-pullim-csrf"; // dev-api.pullim.ai
+  return "pullim-csrf"; // api.pullim.ai(prod) · 상대경로("")
+}
+
+// double-submit CSRF 쿠키(현재 환경 이름) 존재 여부(비-httpOnly라 JS 가독). 값은 읽지 않는다 — 존재만 확인.
 function hasCsrfCookie(): boolean {
   if (typeof document === "undefined") return false;
-  return document.cookie.split(";").some((c) => {
-    const t = c.trim();
-    return CSRF_COOKIE_NAMES.some((n) => t.startsWith(`${n}=`));
-  });
+  const name = envCsrfCookieName();
+  return document.cookie.split(";").some((c) => c.trim().startsWith(`${name}=`));
 }
 
 // authed 사용자에 CSRF 쿠키를 **부재 시에만** 부트스트랩한다(GET /auth/csrf → Set-Cookie dev-pullim-csrf,
@@ -119,29 +124,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 로그아웃 — 공유 세션 쿠키는 중앙(api)만 정리 가능. pullim-web에는 GET /logout 페이지가 없어(404)
   //   리다이렉트가 아니라 POST ${API}/auth/logout 을 직접 호출한다(pullim-web session.ts logout 패턴 동형).
   //   /auth/logout 은 CsrfGuard 대상 → GET /auth/csrf 로 토큰 부트스트랩 후 x-csrf-token echo.
-  //   서버 정리 성공·실패와 무관하게 클라 상태를 게스트로 두고 홈으로 이동(멱등 — 무세션도 2xx).
+  //   ★ 서버 정리가 **확인(2xx, 무세션도 멱등 2xx)** 된 경우에만 게스트로 전환·이동한다(Codex #130):
+  //   실패(5xx·네트워크·CSRF)에도 게스트로 위장하면 중앙 쿠키가 살아 있어 다음 /me 에서 authed 로 복귀 →
+  //   "로그아웃했는데 실제 세션 유지" 착시. 미확인 시 상태를 refresh()로 재동기화하고 사용자에게 알린다.
   const logout = useCallback(async (): Promise<void> => {
+    let confirmed = false;
     try {
       const cr = await fetch(`${API_BASE}/auth/csrf`, { credentials: "include", cache: "no-store" });
       if (cr.ok) {
         const cj = (await cr.json().catch(() => null)) as { csrfToken?: string; token?: string } | null;
         const csrf = cj?.csrfToken ?? cj?.token;
         if (csrf) {
-          await fetch(`${API_BASE}/auth/logout`, {
+          const lr = await fetch(`${API_BASE}/auth/logout`, {
             method: "POST",
             credentials: "include",
             cache: "no-store",
             headers: { "x-csrf-token": csrf },
           });
+          confirmed = lr.ok; // 2xx = 세션 정리 확인(무세션도 2xx)
         }
       }
     } catch {
-      // 네트워크/CORS 실패 — 서버 세션이 남을 수 있으나 클라는 게스트로 낙하(장애로 UI가 로그인 상태에 갇히지 않게).
+      // 네트워크/CORS 실패 — confirmed=false 로 낙하(게스트 위장 금지).
     }
-    setUser(null);
-    setStatus("guest");
-    if (typeof window !== "undefined") window.location.href = "/";
-  }, []);
+    if (confirmed) {
+      setUser(null);
+      setStatus("guest");
+      if (typeof window !== "undefined") window.location.href = "/";
+      return;
+    }
+    // 미확인 — 실제 세션 상태로 재동기화(authed 유지 가능) 후 사용자 안내. UI 가 잘못 게스트로 갇히지 않게.
+    await refresh();
+    if (typeof window !== "undefined") window.alert("로그아웃에 실패했어요. 잠시 후 다시 시도해 주세요.");
+  }, [refresh]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 

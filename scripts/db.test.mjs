@@ -98,6 +98,14 @@ test("setUserData — dev 쿠키명(dev-pullim-csrf)도 인식", async () => {
   assert.equal(calls[0].init.headers["x-csrf-token"], "csrf-dev");
 });
 
+test("setUserData — 두 환경 csrf 공존 시 현재 환경(dev) 쿠키 우선 echo (Codex #130)", async () => {
+  // dev 브라우저에 prod `pullim-csrf` 가 남아 있어도, dev-api CsrfGuard 는 `dev-pullim-csrf` 값과 비교하므로
+  //   그 값을 echo 해야 double-submit 성립. (기본 apiBase=dev → 환경 이름=dev-pullim-csrf)
+  const req = makeReq({ cookie: "pullim-at=t; pullim-csrf=STALE-PROD; dev-pullim-csrf=DEV-OK" });
+  await db.setUserData(req, "drafts", "x");
+  assert.equal(calls[0].init.headers["x-csrf-token"], "DEV-OK");
+});
+
 test("setUserData — payload undefined → null로 정규화", async () => {
   await db.setUserData(makeReq({ cookie: "pullim-at=t" }), "drafts", undefined);
   assert.deepEqual(JSON.parse(calls[0].init.body), { payload: null });
