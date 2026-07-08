@@ -12,12 +12,12 @@ import Breadcrumb from "../components/Breadcrumb";
 export const metadata: Metadata = {
   title: "샘플 채점 결과 — Pullim Writing Coach",
   description:
-    "최상·중상·중·중하·하 — 5개 점수대 학생 글 샘플의 AI 채점 결과 미리보기.",
+    "상·중상·중·중하·하 — 5개 점수대 학생 글 샘플의 AI 채점 결과 미리보기.",
 };
 
-// 카테고리 칩 — 시맨틱 밴드/액센트 토큰 (최상→하, 색은 케이스별 유지)
+// 카테고리 칩 — 시맨틱 밴드/액센트 토큰 (상→하, 색은 케이스별 유지)
 const CATEGORY_CHIP: Record<string, string> = {
-  최상: "bg-band-good-surface text-band-good-foreground",
+  상: "bg-band-good-surface text-band-good-foreground",
   중상: "bg-accent-mid-surface text-accent-mid",
   중: "bg-band-normal-surface text-band-normal-foreground",
   중하: "bg-accent-gap-surface text-accent-gap",
@@ -34,7 +34,7 @@ export default function SamplesIndexPage() {
           학생 글 샘플 5종
         </h1>
         <p className="text-muted-foreground break-keep mt-3 text-sm leading-relaxed md:text-base">
-          최상 · 중상 · 중 · 중하 · 하 — 점수대별 5케이스의 채점 결과를 확인할 수 있어요.
+          상 · 중상 · 중 · 중하 · 하 — 점수대별 5케이스의 채점 결과를 확인할 수 있어요.
           각 카드를 누르면 영역별 점수, 잘한 점·고칠 점, 인라인 첨삭까지 보여줘요.
         </p>
       </header>

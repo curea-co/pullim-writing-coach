@@ -50,7 +50,7 @@ export type F3Output = {
   };
 };
 
-export type Category = "최상" | "중상" | "중" | "중하" | "하";
+export type Category = "상" | "중상" | "중" | "중하" | "하";
 
 export type Sample = {
   id: string;

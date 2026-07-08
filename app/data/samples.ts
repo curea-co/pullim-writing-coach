@@ -392,11 +392,11 @@ export const SAMPLES: Sample[] = [
       },
     },
   },
-  // A — 최상 (총점 86, 최고)
+  // A — 상 (총점 86, 최고)
   {
     id: "b",
     label: "A",
-    category: "최상",
+    category: "상",
     title: "고3 사회 설명문 — 영해·배타적 경제수역",
     intent: "한국지리 정리·복습 글 · §2 원칙 4 영역 경계 (객관 설명 + 동기 진술 혼합)",
     assignment: {
