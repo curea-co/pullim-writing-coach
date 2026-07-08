@@ -149,7 +149,13 @@ export default function CoachSetupFlow({ onAuthExpired }: { onAuthExpired?: () =
       <div className="mx-auto w-full max-w-[560px] px-5 py-8 md:py-12">
         <button
           type="button"
-          onClick={() => setPhase("mode")}
+          onClick={() => {
+            // 저장된 setup을 지워 새로고침 시 canvas(ready)로 직행하는 회귀 방지(Codex #134). 과제는 draft로
+            //   보존해 유실 없이 재개(loadSetup=null → loadAssignmentDraft로 과제 복원).
+            try { window.localStorage.removeItem(SETUP_KEY); } catch { /* swallow */ }
+            saveAssignmentDraft(assignment);
+            setPhase("mode");
+          }}
           className="text-subtle-foreground hover:text-foreground mb-4 text-sm"
         >
           ← 모드 다시 선택

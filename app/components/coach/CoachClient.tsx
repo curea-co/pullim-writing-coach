@@ -801,11 +801,12 @@ export default function CoachClient({
     sessionRef.current = null;
     clearSession();
     clearProcessLog();
+    // '다시 해보기'는 **새 라운드** — 이 과제의 캡도 0부터 재시작한다(Codex #134 재검토). 캡을 유지한 채
+    //   세션·점수만 비우면 checksLeft=0 · write 조합으로 들어가 CompletionView가 0점 세션으로 '통과'를 잘못
+    //   그린다. 새 라운드엔 checks도 함께 리셋해 정상 흐름([봐줘]부터)으로 되돌린다. 진짜 새 과제('다른
+    //   과제로 쓰기')는 sig가 달라 독립 카운트라 서로 영향 없음. (엄격한 과제별 상한은 서버측 트랙.)
+    setChecks(assignmentSig(assignment), 0);
     dispatch({ type: "RESET" });
-    // ★ 비용 캡은 과제별 유지 — '다시 해보기'로 같은 과제의 무료 점검을 다시 받지 못하게(Codex #134).
-    //   RESET이 checks를 0으로 두므로 영속된 이 과제 카운트를 즉시 재주입. 진짜 새 과제('다른 과제로
-    //   쓰기')는 sig가 달라 mount 시 getChecks=0 으로 자연히 새 캡을 받는다.
-    dispatch({ type: "SET_CHECKS", count: getChecks(assignmentSig(assignment)) });
   };
 
   const handleNewAssignment = () => {
