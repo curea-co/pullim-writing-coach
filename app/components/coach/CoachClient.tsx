@@ -120,24 +120,32 @@ function clearBodyHtml(): void {
   try { window.localStorage.removeItem(BODY_HTML_KEY); } catch {}
 }
 
-// ── 코치 호출 횟수 영속(비용 캡) — 과제 sig 일치할 때만 복원(타 과제와 분리). ──
-function loadChecks(): { sig: string; count: number } | null {
-  if (typeof window === "undefined") return null;
+// ── 코치 호출 횟수 영속(비용 캡) — **과제 sig → count 맵**으로 저장(Codex #134). 단일 {sig,count}는
+//   과제 전환 시 서로 덮어써 이전 과제 카운트가 유실되고 캡이 무력화된다. 맵이라 과제별로 독립 유지된다. ──
+type ChecksMap = Record<string, number>;
+function loadChecksMap(): ChecksMap {
+  if (typeof window === "undefined") return {};
   try {
-    const raw = window.localStorage.getItem(CHECKS_KEY);
-    if (!raw) return null;
-    const o = JSON.parse(raw) as { sig?: unknown; count?: unknown };
-    if (typeof o?.sig === "string" && typeof o?.count === "number" && o.count >= 0) return { sig: o.sig, count: o.count };
-    return null;
-  } catch { return null; }
+    const o = JSON.parse(window.localStorage.getItem(CHECKS_KEY) || "{}") as unknown;
+    if (!o || typeof o !== "object" || Array.isArray(o)) return {};
+    const out: ChecksMap = {};
+    for (const [k, v] of Object.entries(o as Record<string, unknown>)) {
+      if (typeof v === "number" && Number.isFinite(v) && v >= 0) out[k] = v;
+    }
+    return out;
+  } catch { return {}; }
 }
-function saveChecks(sig: string, count: number): void {
-  if (typeof window === "undefined") return;
-  try { window.localStorage.setItem(CHECKS_KEY, JSON.stringify({ sig, count })); } catch {}
+function getChecks(sig: string): number {
+  return loadChecksMap()[sig] ?? 0;
 }
-function clearChecks(): void {
+// 동기 저장 — 성공 처리(persist) 직후 함께 호출해 새로고침/탭 종료로 증가분이 유실되지 않게(Codex #134).
+function setChecks(sig: string, count: number): void {
   if (typeof window === "undefined") return;
-  try { window.localStorage.removeItem(CHECKS_KEY); } catch {}
+  try {
+    const map = loadChecksMap();
+    map[sig] = count;
+    window.localStorage.setItem(CHECKS_KEY, JSON.stringify(map));
+  } catch {}
 }
 
 // ── 상태머신 ────────────────────────────────────────────────────────
@@ -589,10 +597,9 @@ export default function CoachClient({
       sa.subject === assignment.subject &&
       sa.genre === assignment.genre &&
       sa.prompt_text === assignment.prompt_text;
-    // 코치 호출 수(비용 캡) 복원 — 같은 과제면 그 값을, 아니면 0. RESTORE가 ...initial로 checks를 0으로
-    //   두므로 그 액션에 실어 함께 복원한다(새로고침으로 캡 우회 방지).
-    const savedChecks = loadChecks();
-    const restoredChecks = savedChecks && savedChecks.sig === assignmentSig(assignment) ? savedChecks.count : 0;
+    // 코치 호출 수(비용 캡) 복원 — 이 과제 sig의 값(맵). RESTORE가 ...initial로 checks를 0으로 두므로
+    //   그 액션에 실어 함께 복원한다(새로고침으로 캡 우회 방지).
+    const restoredChecks = getChecks(assignmentSig(assignment));
     if (saved && sameAssignment) {
       sessionRef.current = saved;
       const lastDraft = saved.draftHistory[saved.draftHistory.length - 1];
@@ -624,7 +631,7 @@ export default function CoachClient({
     } else if (saved) {
       clearSession();
       clearProcessLog();
-      clearChecks(); // 다른 과제 세션 정리 시 호출 수 캡도 초기화.
+      // checks 맵은 지우지 않는다 — 과제별로 독립 유지(다른 과제 세션 정리와 무관, Codex #134).
     } else {
       // 세션은 아직 없지만([봐줘] 전) 같은 과제의 draft(bodyHtml)가 있으면 복원. plan↔캔버스 왕복
       //   ('메모 다시 보기')으로 CoachClient가 재마운트돼도 작성 중이던 본문이 유실되지 않게 한다
@@ -640,14 +647,9 @@ export default function CoachClient({
     // 마운트 1회(루브릭 읽기 + 세션 복원). dispatch는 안정적이라 deps 불필요.
   }, []);
 
-  // 코치 호출 수 변경 시 과제 sig별 영속 — 새로고침으로 비용 캡 우회 방지(0은 clear가 담당).
-  useEffect(() => {
-    if (state.checks > 0) saveChecks(assignmentSig(assignment), state.checks);
-    // assignment는 렌더 간 안정 — checks 변화에만 반응.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.checks]);
-
   const checksLeft = Math.max(0, MAX_CHECKS - state.checks); // 남은 코치 호출 수(표시·차단용)
+  // 영속은 성공 처리(persist)와 같은 시점에 setChecks로 동기 저장한다(runCheck·runRecheck) — 후행 effect에
+  //   맡기면 CHECK_OK 직후 새로고침/탭 종료 시 증가분이 유실될 수 있다(Codex #134).
 
   // 비용 캡 소진 시 결과(완료) 화면으로 — 추가 LLM 호출 없이 지금까지의 성장으로 마무리.
   const finishNow = () => {
@@ -702,6 +704,7 @@ export default function CoachClient({
       }
     }
     persist(sessionRef.current);
+    setChecks(assignmentSig(assignment), state.checks + 1); // 호출 성공 — 비용 캡 카운트를 세션과 같은 시점에 동기 저장.
 
     dispatch({ type: "CHECK_OK", scores, nudges: r.output.nudges });
     // Codex PR #71 round 2: process log에 revision 기록 시 학생 화면 카운트도 동기화.
@@ -745,6 +748,7 @@ export default function CoachClient({
       sessionRef.current = { ...sessionRef.current, areaScores };
     }
     persist(sessionRef.current);
+    setChecks(assignmentSig(assignment), state.checks + 1); // 재점검 성공 — 캡 카운트 동기 저장(Codex #134).
 
     dispatch({ type: "RECHECK_OK", scores, nudges: r.output.nudges, wasRevised });
   };
@@ -797,8 +801,11 @@ export default function CoachClient({
     sessionRef.current = null;
     clearSession();
     clearProcessLog();
-    clearChecks(); // 새 라운드는 비용 캡도 리셋(호출 수 0부터).
     dispatch({ type: "RESET" });
+    // ★ 비용 캡은 과제별 유지 — '다시 해보기'로 같은 과제의 무료 점검을 다시 받지 못하게(Codex #134).
+    //   RESET이 checks를 0으로 두므로 영속된 이 과제 카운트를 즉시 재주입. 진짜 새 과제('다른 과제로
+    //   쓰기')는 sig가 달라 mount 시 getChecks=0 으로 자연히 새 캡을 받는다.
+    dispatch({ type: "SET_CHECKS", count: getChecks(assignmentSig(assignment)) });
   };
 
   const handleNewAssignment = () => {
