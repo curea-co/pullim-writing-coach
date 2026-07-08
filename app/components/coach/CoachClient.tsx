@@ -89,6 +89,7 @@ const SESSION_KEY = "pwc-coach-session-v1";
 const PROCESS_LOG_KEY = "pwc-process-log-v1";
 const TEACHER_RUBRIC_KEY = "pwc-teacher-rubric-v1";
 const BODY_HTML_KEY = "pwc-coach-body-html-v1";
+const CHECK_TS_KEY = "pwc-coach-checkts-v1"; // 마지막 점검(세션 저장) 시각 — bodyHtml 최신성 비교용(Codex #134).
 // 점검 안내용 **소프트 카운터** — 첫 [봐줘] + 수정 2회 = 3회를 기준으로 "남은 점검 N회"를 표시(넛지).
 //   ★ 하드 제한/영속/BE 없음(2026-07-08 오너 결정): 실제 호출은 막지 않는다. 진짜 비용 상한이 필요하면
 //   서버측 rate limit 로 별도 구현. state.checks는 in-memory 표시 전용(새 라운드=RESET 시 0으로).
@@ -105,24 +106,40 @@ function assignmentSig(a: Pick<CoachAssignment, "school_level" | "subject" | "ge
   return [a.school_level, a.subject, a.genre, a.prompt_text].join("\0");
 }
 
-function loadBodyHtml(): { sig: string; html: string } | null {
+// bodyHtml에 저장 시각(ts)을 실어 세션 draft와의 **최신성**을 비교한다(Codex #134): bodyHtml은 매 입력마다
+//   저장되지만, saveBodyHtml 실패(quota/탭 경합)로 stale일 수 있어 무조건 우선하면 세션의 최신 draft를
+//   되돌릴 수 있다. 마지막 점검 시각(CHECK_TS)보다 새 bodyHtml만 최신으로 신뢰한다.
+function loadBodyHtml(): { sig: string; html: string; ts: number } | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(BODY_HTML_KEY);
     if (!raw) return null;
-    const o = JSON.parse(raw) as { sig?: unknown; html?: unknown };
+    const o = JSON.parse(raw) as { sig?: unknown; html?: unknown; ts?: unknown };
     if (typeof o !== "object" || o === null) return null;
     if (typeof o.sig !== "string" || typeof o.html !== "string") return null;
-    return { sig: o.sig, html: o.html };
+    return { sig: o.sig, html: o.html, ts: typeof o.ts === "number" ? o.ts : 0 };
   } catch { return null; }
 }
 function saveBodyHtml(sig: string, html: string): void {
   if (typeof window === "undefined") return;
-  try { window.localStorage.setItem(BODY_HTML_KEY, JSON.stringify({ sig, html })); } catch {}
+  try { window.localStorage.setItem(BODY_HTML_KEY, JSON.stringify({ sig, html, ts: Date.now() })); } catch {}
 }
 function clearBodyHtml(): void {
   if (typeof window === "undefined") return;
   try { window.localStorage.removeItem(BODY_HTML_KEY); } catch {}
+}
+// 마지막 점검(봐줘/고쳤어=세션 저장) 시각 — bodyHtml 최신성 비교 기준.
+function saveCheckTs(sig: string): void {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(CHECK_TS_KEY, JSON.stringify({ sig, ts: Date.now() })); } catch {}
+}
+function loadCheckTs(sig: string): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    const o = JSON.parse(window.localStorage.getItem(CHECK_TS_KEY) || "null") as { sig?: unknown; ts?: unknown } | null;
+    if (o && o.sig === sig && typeof o.ts === "number") return o.ts;
+    return 0;
+  } catch { return 0; }
 }
 
 // ── 상태머신 ────────────────────────────────────────────────────────
@@ -589,12 +606,16 @@ export default function CoachClient({
       //   ('메모 다시 보기')으로 CoachClient가 재마운트될 때, 아직 재점검 안 한 최신 편집을 세션 draft로
       //   되돌려 유실시키던 회귀 차단(Codex #134). 세션 draft와 다르면(=더 최신) state.body도 동기화.
       const savedHtmlEntry = loadBodyHtml();
-      if (savedHtmlEntry && savedHtmlEntry.sig === assignmentSig(assignment)) {
+      const rsig = assignmentSig(assignment);
+      // bodyHtml이 마지막 점검(세션 저장) 이후 저장분(ts>=)일 때만 최신으로 신뢰 — stale bodyHtml이 세션의
+      //   더 최신 draft를 되돌리는 것 방지(Codex #134). 점검 후 편집분(더 최신)은 유지, quota로 stale이면 세션 우선.
+      const bodyFresh = !!savedHtmlEntry && savedHtmlEntry.sig === rsig && savedHtmlEntry.ts >= loadCheckTs(rsig);
+      if (bodyFresh && savedHtmlEntry) {
         setBodyHtml(savedHtmlEntry.html);
         const htmlPlain = htmlToPlain(savedHtmlEntry.html);
         if (htmlPlain !== lastDraft.body) dispatch({ type: "EDIT", body: htmlPlain });
       } else {
-        setBodyHtml(plainToHtml(lastDraft.body)); // bodyHtml 없음/타 과제 → 세션 평문에서 재생성.
+        setBodyHtml(plainToHtml(lastDraft.body)); // bodyHtml 없음/stale/타 과제 → 세션 평문에서 재생성.
       }
     } else {
       // 세션이 없거나(첫 [봐줘] 전) **다른 과제 세션**이 남아 있는 경우 — 후자면 정리한다. 어느 쪽이든
@@ -665,6 +686,7 @@ export default function CoachClient({
       }
     }
     persist(sessionRef.current);
+    saveCheckTs(assignmentSig(assignment)); // 점검(세션 저장) 시각 — bodyHtml 최신성 비교 기준.
     roundChecks.set(assignmentSig(assignment), state.checks + 1); // 라운드 카운터 갱신(표시용 — plan 왕복에도 유지).
 
     dispatch({ type: "CHECK_OK", scores, nudges: r.output.nudges });
@@ -708,6 +730,7 @@ export default function CoachClient({
       sessionRef.current = { ...sessionRef.current, areaScores };
     }
     persist(sessionRef.current);
+    saveCheckTs(assignmentSig(assignment)); // 점검(세션 저장) 시각 — bodyHtml 최신성 비교 기준.
     roundChecks.set(assignmentSig(assignment), state.checks + 1); // 라운드 카운터 갱신(표시용).
 
     dispatch({ type: "RECHECK_OK", scores, nudges: r.output.nudges, wasRevised });

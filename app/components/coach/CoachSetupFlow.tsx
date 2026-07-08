@@ -92,7 +92,8 @@ export default function CoachSetupFlow({ onAuthExpired }: { onAuthExpired?: () =
     if (saved) {
       setAssignment(saved.assignment);
       setMode(saved.mode);
-      setPhase("ready");
+      // plan(참고 메모)을 아직 안 끝냈으면 그 화면으로 복원 — 새 전용 단계의 refresh-resume(Codex #134).
+      setPhase(saved.phase === "plan" ? "plan" : "ready");
     } else {
       // setup 미확정 — 과제 draft가 있으면 복원해 입력 유실 방지(새로고침 후에도 보존).
       const draft = loadAssignmentDraft();
@@ -135,13 +136,14 @@ export default function CoachSetupFlow({ onAuthExpired }: { onAuthExpired?: () =
         onSelect={(m) => {
           setMode(m);
           if (NEEDS_PLAN(m)) {
-            // 개요/가이드는 참고 메모(plan) 단계를 거친 뒤 캔버스로. **setup 확정 저장은 plan 완료 시로 미룬다**
-            //   (Codex #134): 여기서 저장하면 plan 화면 새로고침 시 loadSetup이 곧바로 ready(캔버스)로 보내
-            //   plan을 건너뛴다. 과제는 draft로 남아(미clear) 새로고침 시 assignment부터 재개된다.
+            // 개요/가이드는 참고 메모(plan) 단계를 거친 뒤 캔버스로. **phase:"plan"으로 저장**해 이 화면에서
+            //   새로고침해도 plan으로 복원되게 한다(Codex #134). enterCanvas에서 phase:"ready"로 갱신.
+            saveSetup({ assignment, mode: m, phase: "plan" });
+            clearAssignmentDraft();
             setPhase("plan");
           } else {
-            // 자유/음성은 plan 없이 바로 캔버스 — 여기서 확정 저장.
-            saveSetup({ assignment, mode: m });
+            // 자유/음성은 plan 없이 바로 캔버스.
+            saveSetup({ assignment, mode: m, phase: "ready" });
             clearAssignmentDraft();
             setPhase("ready");
           }
@@ -156,7 +158,7 @@ export default function CoachSetupFlow({ onAuthExpired }: { onAuthExpired?: () =
     //   새로고침 시 loadSetup이 곧바로 ready(캔버스)로 보내 준비 단계를 건너뛴다. 여기서 저장해야 이후
     //   새로고침이 정상적으로 ready로 복원된다.
     const enterCanvas = () => {
-      saveSetup({ assignment, mode });
+      saveSetup({ assignment, mode, phase: "ready" }); // plan 완료 → ready 확정(새로고침 시 canvas로 복원).
       clearAssignmentDraft();
       setPhase("ready");
     };

@@ -23,7 +23,9 @@ export type CoachAssignment = {
   title?: string;
 };
 
-export type CoachSetup = { assignment: CoachAssignment; mode: WritingMode };
+// phase: 개요/가이드의 참고 메모(plan) 단계를 아직 안 끝냈는지 — 새로고침 복원 시 plan/ready 구분(Codex #134).
+//   구 setup(phase 없음)은 ready로 정규화(과거 동작 유지).
+export type CoachSetup = { assignment: CoachAssignment; mode: WritingMode; phase?: "plan" | "ready" };
 
 // 실제 동작하는 모드 화이트리스트. voice(말하기)는 실마이크 QA·미성년자 동의 정책 전까지 비활성("준비 중").
 //   voice를 빼면 parseSetup이 저장된 voice 셋업도 거부하므로(미지원 브라우저 복원 데드엔드 방지) 가드가 일원화된다.
@@ -84,6 +86,7 @@ export function parseSetup(raw: string | null): CoachSetup | null {
       setup.assignment = { ...setup.assignment, title: undefined };
     }
     if (validateAssignment(setup.assignment).length > 0) return null;
+    setup.phase = setup.phase === "plan" ? "plan" : "ready"; // phase 정규화(구 setup=phase 없음 → ready).
     // 비활성 모드(예: voice 준비 중)면 과제는 보존하고 모드만 기본 활성 모드로 다운그레이드 —
     //   저장된 voice 셋업이 통째로 null이 돼 과제 입력을 잃거나(마이그레이션 손실) 미지원 브라우저에서
     //   voice로 직행하는 데드엔드를 동시에 막는다.
