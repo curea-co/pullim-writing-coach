@@ -64,6 +64,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
 
   const refresh = useCallback(async (): Promise<Status> => {
+    // 운영 안전장치 — 프로덕션 빌드에서 NEXT_PUBLIC_API_URL 미설정이면 API_BASE="" 라, `/me` 가 same-origin
+    //   (=우리 앱의 /me 페이지 HTML)로 나가 파싱 실패 → 조용히 guest 로 떨어진다. 그러면 사용자는 "로그인해도
+    //   계속 게스트"인 무한루프에 빠진다(무해한 척하는 치명 오류). 브라우저 런타임에서 즉시 error 로 노출해
+    //   배포 검증 단계에서 바로 잡히게 한다(사용자 도달 전). SSR/빌드(window undefined)엔 미발동 → 프리뷰 빌드 안전.
+    if (!API_BASE && typeof window !== "undefined") {
+      console.error("[use-auth] NEXT_PUBLIC_API_URL 미설정 — 인증 API 호스트 불명. 운영 Vercel env 확인 필요.");
+      setUser(null); setStatus("error");
+      return "error";
+    }
     const isUser = (j: { email?: string; displayName?: string; name?: string } | null) =>
       !!j && !!(j.email || j.displayName || j.name);
     // /me 응답을 상태로 매핑. authed 시 setUser. 401/403은 호출부가 회전 여부를 결정하므로 null 반환.

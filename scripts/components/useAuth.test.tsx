@@ -167,6 +167,22 @@ it("logout 성공(2xx) → 게스트 전환 + 홈 이동 + POST에 x-csrf-token"
   expect(lo[1].headers["x-csrf-token"]).toBe("csrf-xyz");
 });
 
+it("NEXT_PUBLIC_API_URL 미설정(prod build) → error 노출 + /me 미호출 (조용한 게스트 방지)", async () => {
+  // API_BASE 는 모듈 로드시 env 로 확정 → resetModules + stubEnv 후 동적 import 로 "" 케이스 재현.
+  vi.resetModules();
+  vi.stubEnv("NODE_ENV", "production");
+  vi.stubEnv("NEXT_PUBLIC_API_URL", "");
+  const fetchSpy = vi.fn();
+  globalThis.fetch = fetchSpy;
+  const { AuthProvider: AP, useAuth: uA } = await import("@/app/lib/use-auth");
+  function P() { const { status } = uA(); return <div>st:{status}</div>; }
+  render(<AP><P /></AP>);
+  await waitFor(() => expect(screen.getByText("st:error")).toBeInTheDocument());
+  expect(fetchSpy).not.toHaveBeenCalled(); // API_BASE="" → /me 조차 호출 안 함(즉시 error)
+  vi.unstubAllEnvs();
+  vi.resetModules();
+});
+
 it("logout 실패(비2xx) → 게스트 위장 안 함 + 재동기화(authed 유지) + 경고", async () => {
   const loc = { href: "" };
   Object.defineProperty(window, "location", { configurable: true, writable: true, value: loc });
