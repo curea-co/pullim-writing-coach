@@ -1,15 +1,28 @@
 // OS 브랜드 favicon.ico 생성 — app/icon.svg(풀림 OS 마크)를 다중 크기 .ico 로 굽는다.
 //   왜: app/icon.svg 는 <link rel="icon" type="image/svg+xml"> 로 최신 브라우저·대다수 크롤러가 쓰지만,
 //   일부 메신저(카카오 등)·모니터링·구형 크롤러는 `/favicon.ico` 를 직접 조회한다 → .ico 도 OS 마크로 둔다.
-//   실행: `npm run gen:favicon` (아이콘 변경 시 1회 재생성 후 app/favicon.ico 커밋). 산출물(.ico)이
-//   deliverable이고, 이 스크립트는 **빌드 COMMAND(prebuild 훅) 밖**의 유지보수 도구다 — 배포 시 래스터화가
-//   돌지 않게(빌드 지연/실패 결합 회피). sharp 는 이미 `next` 의 직접 의존(^0.34.5)이라 배포 install 에
-//   항상 존재하며, devDependencies 의 명시는 그 버전을 **고정**해 스크립트 재현성을 보장할 뿐 신규 네이티브
-//   패키지를 배포에 들이지 않는다(Codex #132).
-import sharp from "sharp";
+//   실행: `npm run gen:favicon` (아이콘 변경 시 1회 재생성 후 app/favicon.ico 커밋).
+//
+//   설계(Codex #132): 산출물 `app/favicon.ico` 가 **deliverable(커밋됨)** 이라 재생성은 상시 필요 없다.
+//   sharp 는 `next` 의 **optionalDependency** 라 보통 트리에 있지만, 이를 우리 package.json 의 상시
+//   의존성으로 **승격하지 않는다** — 승격 시 sharp 네이티브 빌드가 실패하는 환경에서 `npm install/ci`
+//   자체가 깨진다(optional 은 건너뛰면 그만). 대신 여기서 sharp 를 **동적 import + 친절한 에러**로 다뤄,
+//   부재 시 재생성만 막고(설치는 무해) 명확히 안내한다. 빌드 COMMAND(prebuild 훅) 밖의 유지보수 도구.
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+
+let sharp;
+try {
+  sharp = (await import("sharp")).default;
+} catch {
+  console.error(
+    "[gen-favicon] sharp 를 찾을 수 없어 재생성을 건너뜁니다.\n" +
+      "  sharp 는 next 의 optional dep 이라 보통 설치돼 있습니다. 없으면 `npm i -D sharp` 후 다시 실행하세요.\n" +
+      "  (산출물 app/favicon.ico 는 이미 커밋돼 있어 재생성은 아이콘 변경 시에만 필요합니다.)",
+  );
+  process.exit(1);
+}
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const svg = readFileSync(join(root, "app/icon.svg"));
