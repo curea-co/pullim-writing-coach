@@ -46,8 +46,17 @@ test("getUserData — GET /writing/data/:key + 쿠키 relay + payload 반환", a
   assert.equal(calls[0].init.headers["x-csrf-token"], undefined); // GET엔 CSRF 불필요
 });
 
-test("getUserData — 표면 404 → null (미존재 키 수용)", async () => {
+test("getUserData — 404 → throw (표면 부재/오라우팅을 빈 데이터로 위장 금지, Codex #129 2차)", async () => {
+  // 우리 표면은 미존재 키에 200 {payload:null} 을 준다 — 404 는 표면 부재/경로 오류이므로 라우트 E8.
   mockFetch(404, {});
+  await assert.rejects(
+    () => db.getUserData(makeReq({ cookie: "pullim-at=t" }), "results"),
+    (e) => e instanceof db.RelayStatusError && e.status === 404,
+  );
+});
+
+test("getUserData — 미존재 키는 200 {payload:null} → null (빈 데이터 정상 경로)", async () => {
+  mockFetch(200, { payload: null });
   assert.equal(await db.getUserData(makeReq({ cookie: "pullim-at=t" }), "results"), null);
 });
 

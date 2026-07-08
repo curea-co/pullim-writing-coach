@@ -1,5 +1,11 @@
 # DB 프로비저닝 런북 — writing-coach per-user store (Supabase Postgres)
 
+> ⛔ **폐기(SUPERSEDED) — 2026-07-07 RDS 전환.** 이 런북(Supabase 직결·`DATABASE_URL`·`db:migrate`)은
+> 더 이상 유효하지 않다. per-user store는 **pullim-api KV 표면(`/writing/data`) relay → pullim-api RDS
+> `writing` 스키마**로 전환됨(어댑터 `app/lib/server/db.ts`, 저장소·마이그레이션은 pullim-api 소유 —
+> ADR-068). 무료 티어 idle pause 로 prod 장애(전 `/api/data` 503)가 동인. **신규 온보딩/배포는
+> Supabase 프로비저닝을 수행하지 말 것** — 아래는 이력 참조용으로만 남긴다.
+
 writing-coach의 `/api/data/*`(per-user 데이터)가 쓰는 관리형 Postgres를 Supabase로 두고 Vercel에 연결한다.
 리포는 준비됨: `app/lib/server/db.ts`(`postgres` 드라이버) · `scripts/db-migrate.mjs` · `db/migrations/0001_init.sql`.
 

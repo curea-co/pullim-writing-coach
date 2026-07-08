@@ -45,11 +45,12 @@ function cookieValue(cookieHeader: string | null, names: readonly string[]): str
   return null;
 }
 
-// KV 표면 relay. 401·403 → PullimDataAuthError(라우트 E-AUTH), 그 외 비2xx → throw(라우트 E8).
+// KV 표면 relay. 401·403 → PullimDataAuthError(라우트 E-AUTH), 그 외 비2xx(404 포함) → throw(라우트 E8).
 //   redirect:manual — 302 추종으로 인한 인가 우회(false-positive) 방지(pullim-session과 동일).
-//   ⚠ 404 도 throw — mutation 이 404 를 성공으로 삼키면 조용한 데이터 유실(로컬 종단 검증에서
-//   표면 미배포 dev-api 에 PUT 이 {ok:true} 로 위장 성공한 실사고로 확정). GET 의 "미존재=404"
-//   수용은 getUserData 가 catch 로 처리한다.
+//   ⚠ 404 도 throw(GET·mutation 공통) — 우리 표면은 미존재 키에 200 {payload:null} 을 주지 404 를 주지
+//   않는다(services/writing/api.md §2). 따라서 404 = 표면 부재/오라우팅이며, null(빈 데이터)로 삼키면
+//   기존 데이터가 있어도 화면이 조용히 빈 상태가 된다(storage.ts 의 "읽기 실패" vs "빈 데이터" 계약 붕괴,
+//   PR #115). GET 도 404 를 E8 로 전파해 mutation 과 일관(Codex #129 2차).
 async function relay(req: Request, method: "GET" | "PUT" | "DELETE", path: string, body?: unknown): Promise<Response> {
   const cookieHeader = req.headers.get("cookie");
   const origin = req.headers.get("origin") ?? process.env.NEXT_PUBLIC_WEB_URL ?? "";
@@ -75,7 +76,7 @@ async function relay(req: Request, method: "GET" | "PUT" | "DELETE", path: strin
   return res;
 }
 
-/** relay 비2xx 상태 — getUserData 의 404 특례 판별용(그 외엔 라우트 E8 낙하). */
+/** relay 비2xx 상태(404 포함) — 라우트 mapRelayError 가 E8 로 낙하시킨다. */
 export class RelayStatusError extends Error {
   readonly status: number;
 
@@ -87,15 +88,9 @@ export class RelayStatusError extends Error {
 }
 
 export async function getUserData(req: Request, key: DataKey): Promise<unknown | null> {
-  let res: Response;
-  try {
-    res = await relay(req, "GET", `/${key}`);
-  } catch (e) {
-    // GET 한정 특례: 미존재 키를 404로 주는 표면 구현도 null 로 수용(계약 기본은 200+null).
-    //   mutation 은 특례 없음 — 404 는 표면 부재/경로 오류이므로 실패로 전파(위 relay 주석).
-    if (e instanceof RelayStatusError && e.status === 404) return null;
-    throw e;
-  }
+  // 미존재 키 = 200 {payload:null}(표면 계약). "빈 데이터"는 payload===null 로 오지, 404 가 아니다 —
+  //   404 는 relay 가 throw → 라우트 E8(표면 부재/오라우팅을 빈 상태로 위장하지 않음).
+  const res = await relay(req, "GET", `/${key}`);
   const body = (await res.json().catch(() => null)) as { payload?: unknown } | null;
   return body?.payload ?? null;
 }
