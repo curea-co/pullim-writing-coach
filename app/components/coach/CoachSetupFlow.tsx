@@ -134,10 +134,17 @@ export default function CoachSetupFlow({ onAuthExpired }: { onAuthExpired?: () =
         onBack={() => setPhase("assignment")}
         onSelect={(m) => {
           setMode(m);
-          saveSetup({ assignment, mode: m });
-          clearAssignmentDraft(); // 확정 setup에 포함됐으므로 draft 정리.
-          // 개요/가이드는 참고 메모 전용 화면(plan)을 한 번 거친 뒤 캔버스로. 자유/음성은 바로 캔버스.
-          setPhase(NEEDS_PLAN(m) ? "plan" : "ready");
+          if (NEEDS_PLAN(m)) {
+            // 개요/가이드는 참고 메모(plan) 단계를 거친 뒤 캔버스로. **setup 확정 저장은 plan 완료 시로 미룬다**
+            //   (Codex #134): 여기서 저장하면 plan 화면 새로고침 시 loadSetup이 곧바로 ready(캔버스)로 보내
+            //   plan을 건너뛴다. 과제는 draft로 남아(미clear) 새로고침 시 assignment부터 재개된다.
+            setPhase("plan");
+          } else {
+            // 자유/음성은 plan 없이 바로 캔버스 — 여기서 확정 저장.
+            saveSetup({ assignment, mode: m });
+            clearAssignmentDraft();
+            setPhase("ready");
+          }
         }}
       />
     );
@@ -145,6 +152,14 @@ export default function CoachSetupFlow({ onAuthExpired }: { onAuthExpired?: () =
 
   // 개요/가이드 참고 메모 — 전용 전체 화면(캔버스와 분리). '본문 쓰기 →'로 캔버스(ready)로 넘어간다.
   if (phase === "plan" && assignment) {
+    // plan 완료 → 캔버스. **이 시점에 setup 확정 저장**(Codex #134): plan 전에 저장하면 plan 화면
+    //   새로고침 시 loadSetup이 곧바로 ready(캔버스)로 보내 준비 단계를 건너뛴다. 여기서 저장해야 이후
+    //   새로고침이 정상적으로 ready로 복원된다.
+    const enterCanvas = () => {
+      saveSetup({ assignment, mode });
+      clearAssignmentDraft();
+      setPhase("ready");
+    };
     return (
       <div className="mx-auto w-full max-w-[560px] px-5 py-8 md:py-12">
         <button
@@ -161,13 +176,13 @@ export default function CoachSetupFlow({ onAuthExpired }: { onAuthExpired?: () =
           ← 모드 다시 선택
         </button>
         {mode === "outline" ? (
-          <OutlinePanel genre={assignment.genre} onStartBody={() => setPhase("ready")} />
+          <OutlinePanel genre={assignment.genre} onStartBody={enterCanvas} />
         ) : (
           <>
             <GuidePanel genre={assignment.genre} />
             <button
               type="button"
-              onClick={() => setPhase("ready")}
+              onClick={enterCanvas}
               className="border-border bg-surface text-foreground hover:bg-muted mt-3 w-full rounded-lg border px-3 py-2 text-sm font-medium"
             >
               이제 본문 쓰기 →
