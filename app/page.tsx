@@ -33,7 +33,7 @@ const FEATURES = [
   },
   {
     title: "점수대 5케이스 미리보기",
-    body: "저점 · 편차 · 중점 · 중상 · 고점 — 점수대마다 채점 결과가 어떻게 나오는지 샘플 글 5종으로 시연해요.",
+    body: "상 · 중상 · 중 · 중하 · 하 — 점수대마다 채점 결과가 어떻게 나오는지 샘플 글 5종으로 시연해요.",
     visual: "samples",
   },
 ] as const;
@@ -247,11 +247,11 @@ function FeatureVisual({ kind }: { kind: (typeof FEATURES)[number]["visual"] }) 
 
   // samples — 점수대 칩 5개 + 점수
   const cases = [
-    { label: "저점", score: 40, cls: "bg-band-warn-surface text-band-warn-foreground" },
-    { label: "편차", score: 61, cls: "bg-accent-gap-surface text-accent-gap" },
-    { label: "중점", score: 74, cls: "bg-band-normal-surface text-band-normal-foreground" },
+    { label: "하", score: 40, cls: "bg-band-warn-surface text-band-warn-foreground" },
+    { label: "중하", score: 61, cls: "bg-accent-gap-surface text-accent-gap" },
+    { label: "중", score: 74, cls: "bg-band-normal-surface text-band-normal-foreground" },
     { label: "중상", score: 85, cls: "bg-accent-mid-surface text-accent-mid" },
-    { label: "고점", score: 86, cls: "bg-band-good-surface text-band-good-foreground" },
+    { label: "상", score: 86, cls: "bg-band-good-surface text-band-good-foreground" },
   ];
   return (
     <div className="space-y-1.5">
