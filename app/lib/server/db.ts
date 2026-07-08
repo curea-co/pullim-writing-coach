@@ -87,12 +87,32 @@ export class RelayStatusError extends Error {
   }
 }
 
+/** 2xx 이지만 본문이 계약(`{payload}`)을 어긴 경우 — 라우트 mapRelayError 가 E8 로 낙하시킨다.
+ *  본문/자격증명은 담지 않는다(사유 문자열만). */
+export class RelayBodyError extends Error {
+  constructor(reason: string) {
+    super(`[db] relay body: ${reason}`);
+    this.name = "RelayBodyError";
+  }
+}
+
 export async function getUserData(req: Request, key: DataKey): Promise<unknown | null> {
   // 미존재 키 = 200 {payload:null}(표면 계약). "빈 데이터"는 payload===null 로 오지, 404 가 아니다 —
   //   404 는 relay 가 throw → 라우트 E8(표면 부재/오라우팅을 빈 상태로 위장하지 않음).
+  //   ⚠ 본문 파싱 실패·shape 불일치(payload 필드 부재)도 "읽기 실패"다 — null 로 삼키면 깨진 200 이
+  //   "저장된 데이터 없음"으로 둔갑해 storage.ts 의 "읽기 실패" vs "빈 데이터" 계약이 relay 층에서
+  //   다시 붕괴한다. 두 경우 모두 throw → 라우트 E8(Codex #129 3차).
   const res = await relay(req, "GET", `/${key}`);
-  const body = (await res.json().catch(() => null)) as { payload?: unknown } | null;
-  return body?.payload ?? null;
+  let body: unknown;
+  try {
+    body = await res.json();
+  } catch {
+    throw new RelayBodyError("본문 JSON 파싱 실패");
+  }
+  if (typeof body !== "object" || body === null || !("payload" in body)) {
+    throw new RelayBodyError("payload 필드 부재(shape 불일치)");
+  }
+  return (body as { payload: unknown }).payload ?? null;
 }
 
 export async function setUserData(req: Request, key: DataKey, payload: unknown): Promise<void> {
