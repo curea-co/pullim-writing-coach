@@ -94,6 +94,11 @@ const BODY_HTML_KEY = "pwc-coach-body-html-v1";
 //   서버측 rate limit 로 별도 구현. state.checks는 in-memory 표시 전용(새 라운드=RESET 시 0으로).
 const MAX_CHECKS = 3;
 
+// 라운드 점검 카운터를 **모듈 스코프**에 과제 sig별 보관 — CoachClient가 plan 왕복('메모 다시 보기')으로
+//   언마운트/재마운트돼도 카운터가 0으로 리셋되지 않게(Codex #134). 새로고침(모듈 재적재) 시엔 비므로
+//   소프트 카운터 성격(영속/BE 아님)은 유지된다. reset('다시 해보기'/'다른 과제')에서 해당 sig 삭제.
+const roundChecks = new Map<string, number>();
+
 // 과제 서명: sameAssignment 4필드(school_level·subject·genre·prompt_text)와 동일 필드.
 // 다른 과제의 body_html이 현재 세션을 덮어쓰는 교차 오염 방지(Codex 리뷰).
 function assignmentSig(a: Pick<CoachAssignment, "school_level" | "subject" | "genre" | "prompt_text">): string {
@@ -166,6 +171,7 @@ type Action =
       baseline: Record<AreaName, number>;
       revisions: number;
     }
+  | { type: "SET_CHECKS"; count: number } // 재마운트 시 모듈 스코프 라운드 카운터 복원(표시용).
   | { type: "RESET" };
 
 function emptyScores(): Record<AreaName, number> {
@@ -285,6 +291,8 @@ function reducer(state: State, action: Action): State {
         baseline: action.baseline,
         revisions: action.revisions,
       };
+    case "SET_CHECKS":
+      return { ...state, checks: action.count };
     case "RESET":
       return { ...initial };
     default:
@@ -576,21 +584,17 @@ export default function CoachClient({
         baseline: fromAreaScores(saved.baseline),
         revisions: Math.max(0, saved.draftHistory.length - 1),
       });
-      // 리치 HTML 복원(reducer 외부): sig + htmlToPlain(html) === savedBody 둘 다 만족할 때만
-      // 저장 HTML을 신뢰한다. sig는 같더라도 html의 평문이 세션 마지막 draft와 다르면
-      // (quota 실패·탭 레이스 등으로 html이 stalе) 세션 평문에서 HTML을 재생성한다.
-      // state.body는 RESTORE 액션으로 이미 savedBody로 설정되어 있으며,
-      // html 신뢰 분기에서도 htmlToPlain(html) === savedBody이므로 추가 EDIT 동기화 불필요.
-      const savedBody = lastDraft.body;
+      // 리치 HTML 복원(reducer 외부). bodyHtml은 **매 입력마다** 저장되어 세션 draft(봐줘/고쳤어 시점)보다
+      //   최신이거나 같다 → 같은 과제의 bodyHtml이 있으면 그걸 **최신 본문으로 신뢰**한다. plan 왕복
+      //   ('메모 다시 보기')으로 CoachClient가 재마운트될 때, 아직 재점검 안 한 최신 편집을 세션 draft로
+      //   되돌려 유실시키던 회귀 차단(Codex #134). 세션 draft와 다르면(=더 최신) state.body도 동기화.
       const savedHtmlEntry = loadBodyHtml();
-      if (
-        savedHtmlEntry &&
-        savedHtmlEntry.sig === assignmentSig(assignment) &&
-        htmlToPlain(savedHtmlEntry.html) === savedBody
-      ) {
-        setBodyHtml(savedHtmlEntry.html); // html is the formatted version of exactly the session's last draft → safe
+      if (savedHtmlEntry && savedHtmlEntry.sig === assignmentSig(assignment)) {
+        setBodyHtml(savedHtmlEntry.html);
+        const htmlPlain = htmlToPlain(savedHtmlEntry.html);
+        if (htmlPlain !== lastDraft.body) dispatch({ type: "EDIT", body: htmlPlain });
       } else {
-        setBodyHtml(plainToHtml(savedBody)); // mismatch/stale/other-assignment → reconstruct from session plain
+        setBodyHtml(plainToHtml(lastDraft.body)); // bodyHtml 없음/타 과제 → 세션 평문에서 재생성.
       }
     } else {
       // 세션이 없거나(첫 [봐줘] 전) **다른 과제 세션**이 남아 있는 경우 — 후자면 정리한다. 어느 쪽이든
@@ -607,9 +611,11 @@ export default function CoachClient({
         setBodyHtml(draft.html);
         dispatch({ type: "EDIT", body: htmlToPlain(draft.html) });
       }
-      // checks(점검 카운터)는 표시 전용·in-memory라 복원하지 않는다(하드 제한 아님).
     }
-    // 마운트 1회(루브릭 읽기 + 세션 복원). dispatch는 안정적이라 deps 불필요.
+    // 라운드 점검 카운터(표시용) 복원 — plan 왕복 재마운트에도 유지되게 모듈 스코프 Map에서 현재 sig 값을 읽는다.
+    const rc = roundChecks.get(assignmentSig(assignment)) ?? 0;
+    if (rc > 0) dispatch({ type: "SET_CHECKS", count: rc });
+    // 마운트 1회(루브릭 읽기 + 세션·카운터 복원). dispatch는 안정적이라 deps 불필요.
   }, []);
 
   const checksLeft = Math.max(0, MAX_CHECKS - state.checks); // 남은 점검 표시용 소프트 카운터(차단 아님).
@@ -659,6 +665,7 @@ export default function CoachClient({
       }
     }
     persist(sessionRef.current);
+    roundChecks.set(assignmentSig(assignment), state.checks + 1); // 라운드 카운터 갱신(표시용 — plan 왕복에도 유지).
 
     dispatch({ type: "CHECK_OK", scores, nudges: r.output.nudges });
     // Codex PR #71 round 2: process log에 revision 기록 시 학생 화면 카운트도 동기화.
@@ -701,6 +708,7 @@ export default function CoachClient({
       sessionRef.current = { ...sessionRef.current, areaScores };
     }
     persist(sessionRef.current);
+    roundChecks.set(assignmentSig(assignment), state.checks + 1); // 라운드 카운터 갱신(표시용).
 
     dispatch({ type: "RECHECK_OK", scores, nudges: r.output.nudges, wasRevised });
   };
@@ -752,7 +760,8 @@ export default function CoachClient({
     sessionRef.current = null;
     clearSession();
     clearProcessLog();
-    dispatch({ type: "RESET" }); // checks도 0으로(소프트 카운터 리셋 — 새 라운드 "남은 점검 3회").
+    roundChecks.delete(assignmentSig(assignment)); // 새 라운드 → 라운드 카운터도 리셋("남은 점검 3회"부터).
+    dispatch({ type: "RESET" }); // checks 0으로.
   };
 
   const handleNewAssignment = () => {
