@@ -25,6 +25,33 @@ const API_BASE = ((): string => {
   return "https://dev-api.pullim.ai";
 })();
 
+// CSRF 쿠키 이름 — 환경별(prod=pullim-csrf · dev=dev-pullim-csrf · local=local-pullim-csrf). db.ts 와 동일 집합.
+const CSRF_COOKIE_NAMES = ["pullim-csrf", "dev-pullim-csrf", "local-pullim-csrf"];
+const isLocalApi = API_BASE.includes("pullim.local");
+
+// double-submit CSRF 쿠키 존재 여부(비-httpOnly라 JS 가독). 값은 읽지 않는다 — 존재만 확인.
+function hasCsrfCookie(): boolean {
+  if (typeof document === "undefined") return false;
+  return document.cookie.split(";").some((c) => {
+    const t = c.trim();
+    return CSRF_COOKIE_NAMES.some((n) => t.startsWith(`${n}=`));
+  });
+}
+
+// authed 사용자에 CSRF 쿠키를 **부재 시에만** 부트스트랩한다(GET /auth/csrf → Set-Cookie dev-pullim-csrf,
+//   Domain=.pullim.ai). 왜 필요한가: 데이터 mutation 은 BFF(/api/data)가 브라우저의 csrf 쿠키를 relay 로
+//   echo 하는데(db.ts), /me 가 200(유효세션)이면 refresh 경로를 안 타 이 쿠키가 세팅될 계기가 없다 —
+//   결과적으로 첫 저장이 CsrfGuard 403(→ BFF 401)로 막힌다(2026-07-08 KCB 계정 dev 종단검증 실사고).
+//   존재하면 skip — 불필요한 토큰 회전(타 앱 캐시 무효화)을 피한다. local(host-only 쿠키)은 relay 미사용이라 skip.
+async function ensureCsrfCookie(): Promise<void> {
+  if (isLocalApi || hasCsrfCookie()) return;
+  try {
+    await fetch(`${API_BASE}/auth/csrf`, { credentials: "include", cache: "no-store" });
+  } catch {
+    // 부트스트랩 실패 — 다음 mutation 이 401→onAuthExpired→refresh 재시도로 또 시도(치명 아님).
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [status, setStatus] = useState<Status>("loading");
@@ -70,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (r2.status === 401 || r2.status === 403) { setUser(null); setStatus("guest"); return "guest"; }
           if (!r2.ok) { setUser(null); setStatus("error"); return "error"; }
           const s = await applyMe(r2);
-          if (s === "authed") { setStatus("authed"); return "authed"; }
+          if (s === "authed") { await ensureCsrfCookie(); setStatus("authed"); return "authed"; }
           setUser(null); setStatus("guest"); return "guest";
         }
         if (rr.status === 401 || rr.status === 403) { setUser(null); setStatus("guest"); return "guest"; }
@@ -80,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!r.ok) { setUser(null); setStatus("error"); return "error"; } // 5xx — 장애(게스트 단정 안 함)
       const s = await applyMe(r);
-      if (s === "authed") { setStatus("authed"); return "authed"; }
+      if (s === "authed") { await ensureCsrfCookie(); setStatus("authed"); return "authed"; }
       setUser(null); setStatus("guest"); return "guest";
     } catch {
       // 응답 자체를 못 받음(네트워크/CORS/미도달) — error(미로그인 위장 안 함, "장애를 로그아웃으로 은폐하지 않음" 계약).
