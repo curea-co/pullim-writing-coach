@@ -35,31 +35,31 @@ export function LoginWall() {
   // returnTo: 로그인/가입 후 지금 보던 경로로 복귀(중앙 SSO next 파라미터).
   const returnTo = typeof window !== "undefined" ? window.location.href : undefined;
   return (
-    // 독립 전체 화면(헤더·레일·탭바 없음 — 게이트가 DashboardShell 바깥에서 분기) + 연회색 캔버스.
-    <div data-testid="login-wall" className="grid min-h-[100dvh] place-items-center bg-[var(--surface-canvas,#f2f6fa)] p-6">
-      <div className="w-full max-w-[480px] rounded-[24px] bg-white px-10 py-12 shadow-[0_8px_40px_rgba(13,26,31,.06)]">
-        <h1 className="mb-3 text-[28px] font-extrabold tracking-[-0.02em] text-[var(--text-primary,#1a1f27)]">
+    // 독립 전체 화면(헤더·레일·탭바 없음 — 게이트가 DashboardShell 바깥에서 분기).
+    //   중앙 /login 토큰 정합: 캔버스 --pullim-paper(#f0f6fb) · 잉크 #0d1a1f/#45555c ·
+    //   카드 radius --r-lg(18px)·pad 28·max-w 400 · 버튼 --pullim-blue(#0362da).
+    <div data-testid="login-wall" className="grid min-h-[100dvh] place-items-center bg-[#f0f6fb] p-6">
+      <div className="w-full max-w-[400px] rounded-[18px] bg-white p-7 shadow-[0_8px_40px_rgba(13,26,31,.06)]">
+        <h1 className="mb-2 text-[24px] font-extrabold tracking-[-0.02em] text-[#0d1a1f]">
           풀림 라이팅 코치
         </h1>
-        <p className="mb-9 text-[16px] leading-relaxed text-[var(--text-secondary,#45555c)]">
-          풀림 회원 전용 서비스예요.
-        </p>
+        <p className="mb-6 text-[16px] leading-relaxed text-[#45555c]">풀림 회원 전용 서비스예요.</p>
         {/* 회원가입 우선(QA: 회원가입 유도) — 레퍼런스의 플랫한 큰 파란 버튼 */}
         <a
           href={signupUrl(returnTo)}
-          className="flex h-[54px] items-center justify-center rounded-[14px] bg-[var(--color-action-primary,#0362da)] text-[16px] font-bold text-white no-underline transition hover:brightness-105"
+          className="flex h-11 items-center justify-center rounded-[14px] bg-[#0362da] text-[15px] font-bold text-white no-underline transition hover:brightness-105"
         >
           회원가입하고 시작하기
         </a>
         {/* 중앙 로그인 푸터 링크 패턴("계정이 없으신가요? 회원가입") 동형 — 여기선 로그인이 보조 */}
-        <p className="mt-6 text-[15px] text-[var(--text-secondary,#45555c)]">
+        <p className="mt-4 text-[13px] text-[#45555c]">
           이미 계정이 있으신가요?{" "}
-          <a href={loginUrl(returnTo)} className="font-bold text-[var(--text-primary,#1a1f27)]">
+          <a href={loginUrl(returnTo)} className="font-bold text-[#0d1a1f]">
             로그인
           </a>
         </p>
-        <p className="mt-5 text-center text-[15px]">
-          <a href={osHubUrl()} className="text-[var(--text-secondary,#45555c)] no-underline">
+        <p className="mt-3 text-center text-[13px]">
+          <a href={osHubUrl()} className="text-[#45555c] no-underline">
             ← OS 홈으로 돌아가기
           </a>
         </p>
@@ -76,7 +76,7 @@ export function MemberGate({ children }: { children: React.ReactNode }) {
   //   게이트가 셸 바깥에 있어(헤더/레일 미노출 요구) 스피너도 전체 화면 기준.
   if (status === "loading")
     return (
-      <div role="status" aria-label="로그인 상태 확인 중" className="grid min-h-[100dvh] place-items-center bg-[var(--surface-canvas,#f2f6fa)]">
+      <div role="status" aria-label="로그인 상태 확인 중" className="grid min-h-[100dvh] place-items-center bg-[#f0f6fb]">
         <span aria-hidden className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-[var(--color-action-primary,#0362da)] border-t-transparent" />
       </div>
     );
