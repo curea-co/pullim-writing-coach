@@ -68,7 +68,14 @@ export function LoginWall() {
 // 페이지 콘텐츠 게이트 — AppShell(AuthProvider 내부)에서 children을 감싼다.
 export function MemberGate({ children }: { children: React.ReactNode }) {
   const { status } = useAuth();
-  if (status === "loading") return null; // 판별 전 콘텐츠/벽 플래시 방지
+  // 판별 전엔 콘텐츠/벽 어느 쪽도 플래시하지 않는다(회원 전용 표면 — 게스트에게 콘텐츠 선노출 금지).
+  //   빈 화면 대신 스피너로 "확인 중" 상태를 고지(Codex #142 — /me 지연 시 긴 공백 오인 방지).
+  if (status === "loading")
+    return (
+      <div role="status" aria-label="로그인 상태 확인 중" className="flex min-h-[40vh] items-center justify-center">
+        <span aria-hidden className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-[var(--color-action-primary,#0362da)] border-t-transparent" />
+      </div>
+    );
   if (status === "guest" && !demoBypass()) return <LoginWall />;
   // authed · error(위 주석: 장애를 벽으로 위장하지 않는다 — 헤더 '연결 오류'가 상태 고지)
   //   · guest+데모(비프로덕션 한정 — 하위 TokenGate·서버 x-demo-token 폴백이 이어받는 로컬 런북)

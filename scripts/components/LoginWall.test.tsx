@@ -41,10 +41,12 @@ describe("MemberGate", () => {
     expect(screen.queryByTestId("login-wall")).not.toBeInTheDocument();
   });
 
-  it("loading: 아무것도 렌더하지 않음(플래시 방지)", () => {
+  it("loading: 콘텐츠/벽 대신 스피너(플래시 방지 + 확인 중 고지)", () => {
     auth.status = "loading";
-    const { container } = render(<MemberGate><div data-testid="page">content</div></MemberGate>);
-    expect(container.firstChild).toBeNull();
+    render(<MemberGate><div data-testid="page">content</div></MemberGate>);
+    expect(screen.getByRole("status", { name: "로그인 상태 확인 중" })).toBeInTheDocument();
+    expect(screen.queryByTestId("page")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("login-wall")).not.toBeInTheDocument();
   });
 
   // Codex #142 — 비프로덕션 데모 예외: 로컬 데모 토큰이 있으면 guest여도 벽을 세우지 않는다
