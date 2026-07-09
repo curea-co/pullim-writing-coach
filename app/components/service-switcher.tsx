@@ -39,11 +39,9 @@ export default function ServiceSwitcher() {
         title="서비스 전환"
         className="flex h-[38px] items-center gap-1.5 rounded-[11px] border border-[var(--line,#e6eaf0)] bg-white pl-1.5 pr-2 text-[#45555c] transition-colors hover:border-[#bcd7f7] hover:bg-[var(--surface-sunken,#eef1f6)]"
       >
+        {/* 현재 서비스명은 바로 왼쪽 브랜드 배지("라이팅 코치")가 이미 표시 — 트리거는 아이콘+셰브론만(중복 방지). */}
         <span className="flex h-[26px] w-[26px] items-center justify-center overflow-hidden rounded-[8px]">
           <ServiceIcon name={current?.icon ?? "pullim"} size={26} />
-        </span>
-        <span className="hidden text-[13px] font-bold tracking-[-0.02em] text-[var(--text-primary,#1a1f27)] sm:inline">
-          {current?.name ?? "서비스"}
         </span>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className={`transition-transform ${open ? "rotate-180" : ""}`}>
           <path d="M6 9l6 6 6-6" />
@@ -53,7 +51,12 @@ export default function ServiceSwitcher() {
       {open && (
         // 실제 동작은 '링크 목록'이라 listbox/option 대신 nav+링크로 둔다(Codex #135): listbox는 화살표 이동·
         //   roving tabindex·active descendant를 기대시키는데 이 UI엔 그 계약이 없어 보조기기 사용성이 깨진다.
-        <nav id={menuId} aria-label="서비스 전환" className="absolute right-0 top-[calc(100%+8px)] z-[120] w-[min(330px,92vw)] overflow-hidden rounded-[14px] border border-[var(--line,#e6eaf0)] bg-[var(--surface,#fff)] p-1.5 shadow-[0_8px_28px_rgba(13,26,31,.14)]">
+        // 헤더 좌측(브랜드 옆) 배치라 sm+는 트리거 기준 좌측 정렬(OS .switcher-menu left:0 정합).
+        //   모바일은 트리거가 이미 브랜드 폭만큼 안쪽이라 left-0 + 92vw 메뉴가 우측으로 잘림(Codex #136)
+        //   → viewport 고정(fixed inset-x-3, 헤더 60px 아래)으로 화면 안에 전폭 표시.
+        //   항목 11개(OS 홈+10 서비스)라 낮은 기기(iPhone SE급)에선 메뉴가 남은 화면 높이를 넘음(Codex #136)
+        //   → max-h(100dvh − top 68px − 하단 여백 12px) + 세로 스크롤로 하단 항목 접근 보장.
+        <nav id={menuId} aria-label="서비스 전환" className="fixed inset-x-3 top-[68px] z-[120] max-h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden rounded-[14px] border border-[var(--line,#e6eaf0)] bg-[var(--surface,#fff)] p-1.5 shadow-[0_8px_28px_rgba(13,26,31,.14)] sm:absolute sm:inset-x-auto sm:left-0 sm:top-[calc(100%+8px)] sm:w-[330px]">
           <div className="px-2.5 pb-1.5 pt-2 font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--text-tertiary,#8a94a3)]">
             서비스 전환
           </div>
