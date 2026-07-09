@@ -4,6 +4,7 @@
 //   data_key 화이트리스트 검증(E1). 데이터는 pullim-api가 sub(토큰)로만 스코프. 자격증명·payload 로깅 금지.
 import * as Sentry from "@sentry/nextjs";
 import { getUserData, setUserData, deleteUserData, isDataKey, PullimDataAuthError } from "@/app/lib/server/db";
+import { withServerQuota } from "@/app/lib/quota-core";
 import { jsonError } from "../helpers";
 
 export const runtime = "nodejs";
@@ -50,7 +51,18 @@ export async function PUT(req: Request, ctx: Ctx): Promise<Response> {
     return jsonError("E-PARSE");
   }
   try {
-    await setUserData(req, key, body.payload ?? null);
+    let payload = body.payload ?? null;
+    if (key === "meta_usage") {
+      // 서버 권위 _quota 머지(Codex #143 3R) — 클라 stale 스냅샷/위조 payload가 무료 1일 카운터를
+      //   되돌리지 못하게, 쓰기 직전 서버 현재값의 _quota를 강제한다. 읽기 실패는 fail-open(클라
+      //   payload 그대로 — 쿼터 인프라 장애가 메타 저장 실패로 번지지 않게, quota.ts와 동일 원칙).
+      try {
+        payload = (withServerQuota(payload, await getUserData(req, key)) ?? null) as typeof payload;
+      } catch {
+        console.warn("[/api/data] meta_usage _quota 권위 머지 실패 — fail-open(클라 payload 통과)");
+      }
+    }
+    await setUserData(req, key, payload);
     return Response.json({ ok: true }, { status: 200 });
   } catch (e) {
     return mapRelayError(e);
@@ -61,6 +73,23 @@ export async function DELETE(req: Request, ctx: Ctx): Promise<Response> {
   const key = await keyOf(ctx);
   if (key instanceof Response) return key;
   try {
+    if (key === "meta_usage") {
+      // 삭제도 서버 권위 _quota 보존(Codex #143 4R) — 통삭제를 허용하면 인증된 사용자가
+      //   DELETE 한 번으로 당일 무료 카운터를 초기화한다. 메타 내용만 비우고 _quota는 유지
+      //   (withServerQuota(null, 현재값)). _quota가 없으면 일반 삭제. 읽기 실패는 fail-open(일반 삭제 —
+      //   쿼터 인프라 장애가 사용자 데이터 삭제 요청을 막지 않게).
+      let current: unknown = null;
+      try {
+        current = await getUserData(req, key);
+      } catch {
+        current = null;
+      }
+      const preserved = withServerQuota(null, current);
+      if (preserved !== null) {
+        await setUserData(req, key, preserved);
+        return Response.json({ ok: true }, { status: 200 });
+      }
+    }
     await deleteUserData(req, key); // 단일 키 삭제(전체 삭제는 /api/data DELETE)
     return Response.json({ ok: true }, { status: 200 });
   } catch (e) {
