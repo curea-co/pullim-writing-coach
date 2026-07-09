@@ -86,14 +86,16 @@ export default function StepResult({
               </a>
             </div>
           ) : (
-            // 저장 실패 — 무언 대신 경고(Codex #140). draft는 폐기하지 않아(useScoreForm) 원문은 복구 가능.
+            // 저장 실패 — 무언 대신 경고(Codex #140). draft는 폐기하지 않지만(useScoreForm) 자동저장은
+            //   idle 한정 디바운스라 "임시저장돼 있다"고 단정 못 함(제출 직전 입력·storage 차단 케이스).
+            //   과장 없이 사용자가 지금 할 수 있는 행동(복사)을 안내한다.
             <div
               data-testid="save-failed-notice"
               className="border-band-warn-surface bg-band-warn-surface mb-3 rounded-xl border px-4 py-3"
             >
               <p className="text-foreground text-sm">
-                결과 저장에 실패했어요 — 이 화면을 벗어나면 결과가 사라질 수 있어요. 작성한 글은 임시저장돼
-                있으니, 잠시 후 다시 채점해 보세요.
+                결과 저장에 실패했어요 — 이 화면을 벗어나면 결과가 사라질 수 있어요. 필요한 내용은 지금
+                복사해 두고, 잠시 후 다시 채점해 보세요.
               </p>
             </div>
           )}
