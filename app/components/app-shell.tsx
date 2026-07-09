@@ -11,6 +11,7 @@ import { railItems, tabItems } from "./nav-adapter";
 import { AuthProvider, useAuth } from "@/app/lib/use-auth";
 import { loginUrl, signupUrl, osHubUrl } from "@/app/lib/pullim-login";
 import ServiceSwitcher from "@/app/components/service-switcher";
+import { MemberGate } from "@/app/components/login-wall";
 
 // os.pullim.ai 헤더 우측 정합(실측 스펙): 아이콘 38·radius11·#45555c · pill h42·radius12·#f4faff/#0362da · 앱런처 36 · 간격 6.
 const ICON_BTN =
@@ -110,7 +111,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         as="div"
         linkComponent={Link}
       >
-        {children}
+        {/* 로그인 벽(QA WRITING-ACCESS-001) — 게스트는 전 페이지 콘텐츠 대신 회원가입 유도. */}
+        <MemberGate>{children}</MemberGate>
       </DashboardShell>
     </AuthProvider>
   );
