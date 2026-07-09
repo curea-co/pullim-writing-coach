@@ -1,16 +1,21 @@
 "use client";
 
 // 로그인 벽 — QA WRITING-ACCESS-001: 게스트 진입 차단(회원가입 유도). 라이팅 코치는 회원 전용
-//   (미리보기 무료/첨삭 유료 — 체험도 회원 writing:1 기준). 비로그인이면 페이지 콘텐츠 대신 이 벽을
-//   렌더한다. 로그아웃 후 홈 복귀 시에도 status=guest → 벽 재노출(QA 요구).
+//   (미리보기 무료/첨삭 유료 — 체험도 회원 writing:1 기준). 자체 벽 UI를 렌더하지 않고 **게스트를
+//   중앙 로그인 페이지(`${WEB}/login?next=<현재 주소>`)로 즉시 리다이렉트**한다(2026-07-09 소유자
+//   결정) — UI 통일이 완벽하고(중앙 페이지 자체 사용: 로그인 폼 + "계정이 없으신가요? 회원가입" 유도)
+//   벽 화면을 별도 유지할 비용이 없다. 로그인 후 next 복귀는 pullim-web이 처리. 로그아웃 후 홈 복귀
+//   시에도 status=guest → 재리다이렉트(QA 요구).
 //
-// 게이트 기준(MemberGate):
-//   guest → 벽. authed → 콘텐츠. loading → null(플래시 방지).
-//   error(인증 서버 연결 실패·env 미설정) → 콘텐츠 — 회원 여부를 판별할 수 없는 상태에서 벽을 세우면
-//   장애가 "가입하세요"로 위장된다(헤더가 이미 '연결 오류'를 노출). CI E2E(API env 미설정)도 이 경로.
+// 게이트 분기(MemberGate — DashboardShell 바깥, 게스트에겐 헤더·레일·탭바 미노출):
+//   guest → 중앙 로그인으로 리다이렉트(이동 중 스피너). authed → 콘텐츠. loading → 스피너.
+//   error(인증 서버 연결 실패·env 미설정) → 콘텐츠 — 회원 여부를 판별할 수 없는 상태에서 로그인으로
+//   보내면 장애가 "로그인하세요"로 위장된다(헤더가 이미 '연결 오류'를 노출). CI E2E(API env 미설정 =
+//   error 경로)도 이 경로.
 
+import { useEffect } from "react";
 import { useAuth } from "@/app/lib/use-auth";
-import { loginUrl, signupUrl, osHubUrl } from "@/app/lib/pullim-login";
+import { loginUrl } from "@/app/lib/pullim-login";
 import { DEMO_TOKEN_KEY } from "@/app/components/TokenGate";
 
 // 비프로덕션 데모 예외(Codex #142) — TokenGate가 보존하는 로컬 데모 경로(sessionStorage 토큰 또는
@@ -27,61 +32,38 @@ function demoBypass(): boolean {
   }
 }
 
-// 중앙 로그인 페이지(pullim.local:3001/login) UI 정합 — 스크린샷 레퍼런스(2026-07-09):
-//   연회색 캔버스 위 큰 라운드(24px)의 여백 넉넉한 흰 카드(아이콘 없음), 28px/800 좌정렬 제목 +
-//   muted 부제, 플랫한 큰 파란 버튼(라운드 14px), 하단 텍스트 링크("계정이 …? 회원가입" 패턴),
-//   가운데 "← OS 홈으로 돌아가기".
-export function LoginWall() {
-  // returnTo: 로그인/가입 후 지금 보던 경로로 복귀(중앙 SSO next 파라미터).
-  const returnTo = typeof window !== "undefined" ? window.location.href : undefined;
+// 전체 화면 스피너 — 판별 중/리다이렉트 중 공통(중앙 /login 캔버스 --pullim-paper 정합).
+function FullScreenSpinner({ label }: { label: string }) {
   return (
-    // 독립 전체 화면(헤더·레일·탭바 없음 — 게이트가 DashboardShell 바깥에서 분기).
-    //   중앙 /login 토큰 정합: 캔버스 --pullim-paper(#f0f6fb) · 잉크 #0d1a1f/#45555c ·
-    //   카드 radius --r-lg(18px)·pad 28·max-w 400 · 버튼 --pullim-blue(#0362da).
-    <div data-testid="login-wall" className="grid min-h-[100dvh] place-items-center bg-[#f0f6fb] p-6">
-      <div className="w-full max-w-[400px] rounded-[18px] bg-white p-7 shadow-[0_8px_40px_rgba(13,26,31,.06)]">
-        <h1 className="mb-2 text-[24px] font-extrabold tracking-[-0.02em] text-[#0d1a1f]">
-          풀림 라이팅 코치
-        </h1>
-        <p className="mb-6 text-[16px] leading-relaxed text-[#45555c]">풀림 회원 전용 서비스예요.</p>
-        {/* 회원가입 우선(QA: 회원가입 유도) — 레퍼런스의 플랫한 큰 파란 버튼 */}
-        <a
-          href={signupUrl(returnTo)}
-          className="flex h-11 items-center justify-center rounded-[14px] bg-[#0362da] text-[15px] font-bold text-white no-underline transition hover:brightness-105"
-        >
-          회원가입하고 시작하기
-        </a>
-        {/* 중앙 로그인 푸터 링크 패턴("계정이 없으신가요? 회원가입") 동형 — 여기선 로그인이 보조 */}
-        <p className="mt-4 text-[13px] text-[#45555c]">
-          이미 계정이 있으신가요?{" "}
-          <a href={loginUrl(returnTo)} className="font-bold text-[#0d1a1f]">
-            로그인
-          </a>
-        </p>
-        <p className="mt-3 text-center text-[13px]">
-          <a href={osHubUrl()} className="text-[#45555c] no-underline">
-            ← OS 홈으로 돌아가기
-          </a>
-        </p>
-      </div>
+    <div role="status" aria-label={label} className="grid min-h-[100dvh] place-items-center bg-[#f0f6fb]">
+      <span aria-hidden className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-[#0362da] border-t-transparent" />
     </div>
   );
 }
 
-// 페이지 콘텐츠 게이트 — AppShell(AuthProvider 내부)에서 children을 감싼다.
+// 게스트 → 중앙 로그인 리다이렉트. replace(히스토리 대체) — 뒤로가기로 빈 벽에 갇히지 않게.
+export function LoginWall() {
+  useEffect(() => {
+    try {
+      window.location.replace(loginUrl(window.location.href));
+    } catch {
+      /* jsdom 등 내비게이션 미지원 환경 — 스피너 유지 */
+    }
+  }, []);
+  return (
+    <div data-testid="login-wall">
+      <FullScreenSpinner label="로그인 페이지로 이동 중" />
+    </div>
+  );
+}
+
+// 페이지 콘텐츠 게이트 — AppShell(AuthProvider 내부)에서 DashboardShell 전체를 감싼다.
 export function MemberGate({ children }: { children: React.ReactNode }) {
   const { status } = useAuth();
-  // 판별 전엔 콘텐츠/벽 어느 쪽도 플래시하지 않는다(회원 전용 표면 — 게스트에게 콘텐츠 선노출 금지).
-  //   빈 화면 대신 스피너로 "확인 중" 상태를 고지(Codex #142 — /me 지연 시 긴 공백 오인 방지).
-  //   게이트가 셸 바깥에 있어(헤더/레일 미노출 요구) 스피너도 전체 화면 기준.
-  if (status === "loading")
-    return (
-      <div role="status" aria-label="로그인 상태 확인 중" className="grid min-h-[100dvh] place-items-center bg-[#f0f6fb]">
-        <span aria-hidden className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-[var(--color-action-primary,#0362da)] border-t-transparent" />
-      </div>
-    );
+  // 판별 전엔 콘텐츠를 플래시하지 않는다(회원 전용 표면 — 게스트에게 콘텐츠 선노출 금지).
+  if (status === "loading") return <FullScreenSpinner label="로그인 상태 확인 중" />;
   if (status === "guest" && !demoBypass()) return <LoginWall />;
-  // authed · error(위 주석: 장애를 벽으로 위장하지 않는다 — 헤더 '연결 오류'가 상태 고지)
+  // authed · error(상단 주석: 장애를 로그인 유도로 위장하지 않는다 — 헤더 '연결 오류'가 상태 고지)
   //   · guest+데모(비프로덕션 한정 — 하위 TokenGate·서버 x-demo-token 폴백이 이어받는 로컬 런북)
   return <>{children}</>;
 }
