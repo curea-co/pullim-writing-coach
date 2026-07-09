@@ -19,8 +19,12 @@ export function demoQuotaSkip(req: Request): boolean {
   return !!req.headers.get("x-demo-token");
 }
 
-/** 회원 writing 레벨 — GET /me/entitlements(쿠키 relay)의 flags.writing. 실패/부재 = 1(무료) 취급. */
-async function getWritingLevel(req: Request): Promise<number> {
+/** 회원 writing 레벨 — GET /me/entitlements(쿠키 relay)의 flags.writing.
+ *  **null = 조회 실패**(비2xx·네트워크·shape 불일치) — 무료(1)와 구분한다(Codex #143):
+ *  실패를 1로 뭉개면 일시 장애·shape 변경에 유료 회원이 무료 한도로 떨어져 잘못 429를 받는다.
+ *  실패의 처리는 quotaGate가 fail-open(허용·미소비)으로 담당. 쿠키 부재만 확정 무료(게이트 [G1]
+ *  통과가 데모 경로였다는 뜻 — 데모는 그 전에 스킵되므로 실질 도달 없음). */
+async function getWritingLevel(req: Request): Promise<number | null> {
   const cookieHeader = req.headers.get("cookie");
   if (!cookieHeader) return 1;
   try {
@@ -29,12 +33,12 @@ async function getWritingLevel(req: Request): Promise<number> {
       cache: "no-store",
       redirect: "manual", // 302 추종 인가 우회 방지(pullim-session 동형)
     });
-    if (!res.ok) return 1;
+    if (!res.ok) return null;
     const body = (await res.json()) as { flags?: Record<string, unknown> } | null;
     const w = body?.flags?.writing;
-    return typeof w === "number" && Number.isFinite(w) ? w : 1;
+    return typeof w === "number" && Number.isFinite(w) ? w : null; // shape 불일치도 실패로
   } catch {
-    return 1;
+    return null;
   }
 }
 
@@ -47,6 +51,11 @@ export type QuotaGate =
 export async function quotaGate(req: Request, feature: QuotaFeature): Promise<QuotaGate> {
   if (demoQuotaSkip(req)) return { allowed: true, consume: false };
   const level = await getWritingLevel(req);
+  if (level === null) {
+    // 티어 조회 실패 — fail-open(허용·미소비). 유료를 무료로 오분류해 429를 주는 쪽이 더 나쁘다(Codex #143).
+    console.warn(`[quota] ${feature} 티어 조회 실패 — fail-open`);
+    return { allowed: true, consume: false };
+  }
   if (level >= 2) return { allowed: true, consume: false }; // 유료 — 횟수 무제한
   let raw: unknown;
   try {
@@ -60,9 +69,19 @@ export async function quotaGate(req: Request, feature: QuotaFeature): Promise<Qu
   return { allowed: true, consume: true, raw };
 }
 
-/** 성공 응답 직전 1회 소비 — 실패는 fail-open(로그만). gate에서 받은 raw를 머지 기반으로 사용. */
-export async function consumeQuota(req: Request, feature: QuotaFeature, raw: unknown): Promise<void> {
+/** 성공 응답 직전 1회 소비 — 실패는 fail-open(로그만).
+ *  머지 기반은 **consume 시점 재조회**(Codex #143): gate 시점 raw를 그대로 쓰면 동시 요청 2건이 같은
+ *  카운트에서 +1을 계산해 마지막 쓰기만 남는다(lost update). 재조회로 창을 LLM 호출 시간만큼 좁힌다 —
+ *  완전한 원자 increment는 이 저장소(본인 세션으로 클라 PUT 가능한 소프트 강제 KV)의 본질적 한계로,
+ *  크레딧 정책(#297)의 pullim-api 전용 카운터에서 해결. 재조회 실패 시 gate 시점 raw로 폴백. */
+export async function consumeQuota(req: Request, feature: QuotaFeature, gateRaw: unknown): Promise<void> {
   try {
+    let raw: unknown;
+    try {
+      raw = await getUserData(req, "meta_usage");
+    } catch {
+      raw = gateRaw;
+    }
     await setUserData(req, "meta_usage", applyQuotaConsume(raw, feature, kstDateOf(new Date())));
   } catch (e) {
     console.warn(`[quota] ${feature} 소비 기록 실패 — fail-open: ${e instanceof Error ? e.name : "?"}`);
