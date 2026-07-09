@@ -13,10 +13,11 @@
 
 export type QuotaFeature = "score" | "coach";
 // 무료 1일 한도(호출 단위). 정책 "1명 1일 1회"의 단위는 **세션**이라, 한 세션이 다회 호출인 과정 코치는
-//   호출 예산으로 환산한다: 초기 점검 1 + 재점검 3(#134 '남은 점검 3회' UX) = 4호출 ≈ 1세션.
-//   (세션 중단 컷오프 방지 — 1일 1호출이면 [고쳤어] 재점검에서 코칭이 중간에 끊긴다.)
+//   호출 예산으로 환산한다: 1세션 = 첫 [봐줘] + 수정 재점검 2회 = 3호출(CoachClient MAX_CHECKS=3 —
+//   첫 점검 포함, Codex #143 정합). 소프트 카운터(표시)와 서버 예산이 같은 값이라 "남은 점검 0회"와
+//   429가 동시에 온다(세션 중단 컷오프 없음 — 1일 1호출이면 [고쳤어] 재점검에서 코칭이 끊긴다).
 //   직접 채점은 1호출 = 1회 그대로.
-export const FREE_DAILY_LIMITS: Record<QuotaFeature, number> = { score: 1, coach: 4 };
+export const FREE_DAILY_LIMITS: Record<QuotaFeature, number> = { score: 1, coach: 3 };
 /** meta_usage payload 안의 쿼터 예약 필드 — storage.ts 미지 필드 보존과 한 쌍(위 주석). */
 export const QUOTA_FIELD = "_quota";
 

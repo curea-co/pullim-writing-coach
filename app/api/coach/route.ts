@@ -123,8 +123,8 @@ export async function POST(req: Request): Promise<Response> {
   if (!(await verifyWritingAccess(req))) return jsonError("E-AUTH");
 
   // [G1.5] 무료 1일 1세션 한도(QA WRITING-ACCESS-002) — 유료(writing≥2)·데모(비prod)·인프라 실패는 통과.
-  //   "1일 1회"의 단위는 세션 — 한 세션이 초기 점검 1 + 재점검 최대 3(#134 UX)의 다회 호출이라
-  //   호출 예산 4회로 환산(quota-core FREE_DAILY_LIMITS.coach). 진행 중 세션이 재점검에서 끊기지 않게.
+  //   "1일 1회"의 단위는 세션 — 1세션 = 첫 [봐줘] + 수정 재점검 2회 = 3호출(MAX_CHECKS=3, 첫 점검 포함)
+  //   이라 호출 예산 3회로 환산(quota-core FREE_DAILY_LIMITS.coach). 진행 중 세션이 재점검에서 끊기지 않게.
   //   소비는 성공 응답 직전(에러 재시도가 예산을 태우지 않게).
   const quota = await quotaGate(req, "coach");
   if (!quota.allowed) {
