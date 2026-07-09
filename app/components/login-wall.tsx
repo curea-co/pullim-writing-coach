@@ -10,7 +10,7 @@
 //   장애가 "가입하세요"로 위장된다(헤더가 이미 '연결 오류'를 노출). CI E2E(API env 미설정)도 이 경로.
 
 import { useAuth } from "@/app/lib/use-auth";
-import { loginUrl, signupUrl } from "@/app/lib/pullim-login";
+import { loginUrl, signupUrl, osHubUrl } from "@/app/lib/pullim-login";
 import { ServiceIcon } from "@/components/ui/service-icon";
 import { DEMO_TOKEN_KEY } from "@/app/components/TokenGate";
 
@@ -28,38 +28,42 @@ function demoBypass(): boolean {
   }
 }
 
+// 중앙 로그인 페이지(pullim-web /login: .card.pad-lg + .btn-primary + muted 푸터 링크) UI 정합 —
+//   카드(白·line 보더·radius·그림자·pad 28)·좌정렬·24px/800 제목·굵은 인라인 링크·"← OS 홈으로" 동형.
 export function LoginWall() {
-  // returnTo: 로그인 후 지금 보던 경로로 복귀(중앙 SSO next 파라미터).
+  // returnTo: 로그인/가입 후 지금 보던 경로로 복귀(중앙 SSO next 파라미터).
   const returnTo = typeof window !== "undefined" ? window.location.href : undefined;
   return (
-    <div data-testid="login-wall" className="flex min-h-[60vh] items-center justify-center px-5 py-16">
-      <div className="w-full max-w-[420px] text-center">
-        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center">
-          <ServiceIcon name="writing" size={64} />
+    <div data-testid="login-wall" className="grid min-h-[70vh] place-items-center p-6">
+      <div className="w-full max-w-[400px] rounded-[16px] border border-[var(--line,#e6eaf0)] bg-white p-7 shadow-[0_1px_2px_rgba(13,26,31,.04),0_1px_3px_rgba(13,26,31,.06)]">
+        <div className="mb-4 flex h-11 w-11 items-center justify-center">
+          <ServiceIcon name="writing" size={44} />
         </div>
-        <h1 className="text-[22px] font-extrabold tracking-[-0.02em] text-[var(--text-primary,#1a1f27)]">
+        <h1 className="mb-2 text-[24px] font-extrabold tracking-[-0.02em] text-[var(--text-primary,#1a1f27)]">
           풀림 라이팅 코치
         </h1>
-        <p className="mt-3 text-[15px] leading-relaxed text-[var(--text-secondary,#45555c)]">
-          라이팅 코치는 풀림 회원 전용 서비스예요.
-          <br />
-          가입하고 AI 글쓰기 코칭을 시작해 보세요.
+        <p className="mb-6 text-[14px] leading-relaxed text-[var(--text-tertiary,#8a94a3)]">
+          풀림 회원 전용 서비스예요. 가입하고 AI 글쓰기 코칭을 시작해 보세요.
         </p>
-        <div className="mt-7 flex flex-col gap-2.5">
-          {/* 회원가입 우선(QA: 회원가입 유도) — 로그인은 보조 */}
-          <a
-            href={signupUrl(returnTo)}
-            className="flex h-12 items-center justify-center rounded-[12px] bg-[var(--color-action-primary,#0362da)] text-[15px] font-bold text-white no-underline transition hover:opacity-90"
-          >
-            회원가입하고 시작하기
+        {/* 회원가입 우선(QA: 회원가입 유도) — 중앙 .btn-primary 정합(파랑 bg + 블루 그림자) */}
+        <a
+          href={signupUrl(returnTo)}
+          className="flex h-11 items-center justify-center rounded-[12px] bg-[var(--color-action-primary,#0362da)] text-[15px] font-bold text-white no-underline shadow-[0_4px_14px_rgba(3,98,218,.24)] transition hover:brightness-105"
+        >
+          회원가입하고 시작하기
+        </a>
+        {/* 중앙 로그인 푸터 링크 패턴("계정이 없으신가요? 회원가입") 동형 — 여기선 로그인이 보조 */}
+        <p className="mt-4 text-[13px] text-[var(--text-tertiary,#8a94a3)]">
+          이미 계정이 있으신가요?{" "}
+          <a href={loginUrl(returnTo)} className="font-bold text-[var(--text-primary,#1a1f27)]">
+            로그인
           </a>
-          <a
-            href={loginUrl(returnTo)}
-            className="flex h-12 items-center justify-center rounded-[12px] border border-[var(--line,#e6eaf0)] bg-white text-[15px] font-semibold text-[var(--text-primary,#1a1f27)] no-underline transition hover:bg-[var(--surface-sunken,#eef1f6)]"
-          >
-            이미 회원이에요 — 로그인
+        </p>
+        <p className="mt-2 text-center text-[13px]">
+          <a href={osHubUrl()} className="text-[var(--text-tertiary,#8a94a3)] no-underline">
+            ← OS 홈으로 돌아가기
           </a>
-        </div>
+        </p>
       </div>
     </div>
   );
