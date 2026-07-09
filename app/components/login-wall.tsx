@@ -35,7 +35,8 @@ export function LoginWall() {
   // returnTo: 로그인/가입 후 지금 보던 경로로 복귀(중앙 SSO next 파라미터).
   const returnTo = typeof window !== "undefined" ? window.location.href : undefined;
   return (
-    <div data-testid="login-wall" className="grid min-h-[75vh] place-items-center p-6">
+    // 독립 전체 화면(헤더·레일·탭바 없음 — 게이트가 DashboardShell 바깥에서 분기) + 연회색 캔버스.
+    <div data-testid="login-wall" className="grid min-h-[100dvh] place-items-center bg-[var(--surface-canvas,#f2f6fa)] p-6">
       <div className="w-full max-w-[480px] rounded-[24px] bg-white px-10 py-12 shadow-[0_8px_40px_rgba(13,26,31,.06)]">
         <h1 className="mb-3 text-[28px] font-extrabold tracking-[-0.02em] text-[var(--text-primary,#1a1f27)]">
           풀림 라이팅 코치
@@ -72,9 +73,10 @@ export function MemberGate({ children }: { children: React.ReactNode }) {
   const { status } = useAuth();
   // 판별 전엔 콘텐츠/벽 어느 쪽도 플래시하지 않는다(회원 전용 표면 — 게스트에게 콘텐츠 선노출 금지).
   //   빈 화면 대신 스피너로 "확인 중" 상태를 고지(Codex #142 — /me 지연 시 긴 공백 오인 방지).
+  //   게이트가 셸 바깥에 있어(헤더/레일 미노출 요구) 스피너도 전체 화면 기준.
   if (status === "loading")
     return (
-      <div role="status" aria-label="로그인 상태 확인 중" className="flex min-h-[40vh] items-center justify-center">
+      <div role="status" aria-label="로그인 상태 확인 중" className="grid min-h-[100dvh] place-items-center bg-[var(--surface-canvas,#f2f6fa)]">
         <span aria-hidden className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-[var(--color-action-primary,#0362da)] border-t-transparent" />
       </div>
     );
