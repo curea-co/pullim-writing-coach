@@ -110,8 +110,10 @@ describe("StepResult", () => {
     expect(link).toHaveAttribute("href", "/results");
   });
 
-  it("result saved=false: hides notice (저장 실패에 거짓 안내 금지)", () => {
+  it("result saved=false: hides saved notice, shows save-failed warning (거짓 안내 금지 — Codex #140)", () => {
     render(<StepResult {...baseProps} submitState={{ phase: "result", output: MOCK_OUTPUT, assignment: MOCK_ASSIGNMENT, saved: false }} />);
     expect(screen.queryByTestId("saved-notice")).not.toBeInTheDocument();
+    expect(screen.getByTestId("save-failed-notice")).toBeInTheDocument();
+    expect(screen.getByText(/결과 저장에 실패했어요/)).toBeInTheDocument();
   });
 });

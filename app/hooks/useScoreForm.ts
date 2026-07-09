@@ -253,13 +253,15 @@ export function useScoreForm(opts: {
     return () => clearTimeout(t);
   }, [body, bodyHtml, schoolLevel, subject, genre, targetRaw, promptText, submitState.phase, restoredDraft]);
 
-  // #9 제출 성공 시 draft 폐기.
+  // #9 제출 성공 시 draft 폐기 — 단, 결과 저장(addResult) 실패 시엔 draft 보존(Codex #140):
+  //   결과 화면은 메모리 상태라 새로고침하면 사라지는데 draft까지 지우면 원문·결과를 둘 다 잃는다.
+  //   보존된 draft는 다음 방문 때 "이어 쓰기" 배너로 복구 가능.
   useEffect(() => {
-    if (submitState.phase === "result") {
+    if (submitState.phase === "result" && submitState.saved) {
       void clearDraft();
       setLastSavedAt(null);
     }
-  }, [submitState.phase]);
+  }, [submitState]);
 
   function applyRestore() {
     if (!restoredDraft) return;
