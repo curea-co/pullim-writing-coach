@@ -30,6 +30,7 @@ import { prioritizeNudges } from "@/app/lib/nudge-priority";
 import { COACH_SYSTEM_PROMPT, buildCoachPrompt } from "@/app/lib/coach-prompt";
 import { runCoachMock } from "@/app/lib/coach-mock";
 import { verifyWritingAccess } from "@/app/lib/server/pullim-session";
+import { quotaGate, consumeQuota } from "@/app/lib/server/quota";
 import { validateCoachRequest } from "./request";
 
 // ── 비기능 요구 (score route 정합) ──────────────────────────────────
@@ -121,6 +122,16 @@ export async function POST(req: Request): Promise<Response> {
   // [G1] 인가 게이트 — SSO 세션(/me) 우선, 비prod 데모토큰 fallback (fail-closed).
   if (!(await verifyWritingAccess(req))) return jsonError("E-AUTH");
 
+  // [G1.5] 무료 1일 1세션 한도(QA WRITING-ACCESS-002) — 유료(writing≥2)·데모(비prod)·인프라 실패는 통과.
+  //   "1일 1회"의 단위는 세션 — 한 세션이 초기 점검 1 + 재점검 최대 3(#134 UX)의 다회 호출이라
+  //   호출 예산 4회로 환산(quota-core FREE_DAILY_LIMITS.coach). 진행 중 세션이 재점검에서 끊기지 않게.
+  //   소비는 성공 응답 직전(에러 재시도가 예산을 태우지 않게).
+  const quota = await quotaGate(req, "coach");
+  if (!quota.allowed) {
+    logMetric("quota_capped", { feature: "coach" });
+    return jsonError("E-CAP");
+  }
+
   // [G2] 본문 파싱
   let raw: unknown;
   try {
@@ -162,6 +173,7 @@ export async function POST(req: Request): Promise<Response> {
       return jsonError("E6");
     }
     logMetric("mock_served", { nudges: mock.nudges.length });
+    if (quota.consume) await consumeQuota(req, "coach", quota.raw);
     return respondCoach(mock);
   }
 
@@ -230,7 +242,8 @@ export async function POST(req: Request): Promise<Response> {
       continue; // 1회 재호출 — 통과 못 하면 아래 502
     }
 
-    // [O1] 통과 → prioritizeNudges 정렬 후 200
+    // [O1] 통과 → prioritizeNudges 정렬 후 200. 성공 확정 후에만 쿼터 소비(fail-open).
+    if (quota.consume) await consumeQuota(req, "coach", quota.raw);
     return respondCoach(parsed as CoachOutput);
   }
 

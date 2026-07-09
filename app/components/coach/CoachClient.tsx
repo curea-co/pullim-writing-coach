@@ -508,6 +508,16 @@ async function callCoach(
 
   if (res.status === 401) return { ok: false, auth: true };
 
+  // 429 E-CAP — 무료 1일 한도(코치 세션 예산) 소진. 내일(KST) 리셋이라 재시도 비유도(QA WRITING-ACCESS-002).
+  if (res.status === 429) {
+    return {
+      ok: false,
+      auth: false,
+      message: "오늘의 무료 코치 이용을 모두 사용했어요. 내일 다시 만나요!",
+      retryable: false,
+    };
+  }
+
   if (!res.ok) {
     return {
       ok: false,
