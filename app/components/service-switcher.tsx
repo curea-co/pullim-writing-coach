@@ -54,7 +54,9 @@ export default function ServiceSwitcher() {
         // 헤더 좌측(브랜드 옆) 배치라 sm+는 트리거 기준 좌측 정렬(OS .switcher-menu left:0 정합).
         //   모바일은 트리거가 이미 브랜드 폭만큼 안쪽이라 left-0 + 92vw 메뉴가 우측으로 잘림(Codex #136)
         //   → viewport 고정(fixed inset-x-3, 헤더 60px 아래)으로 화면 안에 전폭 표시.
-        <nav id={menuId} aria-label="서비스 전환" className="fixed inset-x-3 top-[68px] z-[120] overflow-hidden rounded-[14px] border border-[var(--line,#e6eaf0)] bg-[var(--surface,#fff)] p-1.5 shadow-[0_8px_28px_rgba(13,26,31,.14)] sm:absolute sm:inset-x-auto sm:left-0 sm:top-[calc(100%+8px)] sm:w-[330px]">
+        //   항목 11개(OS 홈+10 서비스)라 낮은 기기(iPhone SE급)에선 메뉴가 남은 화면 높이를 넘음(Codex #136)
+        //   → max-h(100dvh − top 68px − 하단 여백 12px) + 세로 스크롤로 하단 항목 접근 보장.
+        <nav id={menuId} aria-label="서비스 전환" className="fixed inset-x-3 top-[68px] z-[120] max-h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden rounded-[14px] border border-[var(--line,#e6eaf0)] bg-[var(--surface,#fff)] p-1.5 shadow-[0_8px_28px_rgba(13,26,31,.14)] sm:absolute sm:inset-x-auto sm:left-0 sm:top-[calc(100%+8px)] sm:w-[330px]">
           <div className="px-2.5 pb-1.5 pt-2 font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--text-tertiary,#8a94a3)]">
             서비스 전환
           </div>
