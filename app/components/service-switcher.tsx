@@ -29,6 +29,8 @@ export default function ServiceSwitcher() {
   }, [open]);
 
   return (
+    // 트리거 = OS .switcher-trigger 정합: 아이콘+서비스명+셰브론 pill. 브랜드([풀림 | 라이팅 코치])와
+    //   나란히 — 헤더 확정 구조(2026-07-09): [풀림] | [라이팅 코치] [아이콘 라이팅 코치 ▾].
     <div ref={ref} className="relative ml-0.5">
       <button
         type="button"
@@ -42,8 +44,7 @@ export default function ServiceSwitcher() {
         <span className="flex h-[26px] w-[26px] items-center justify-center overflow-hidden rounded-[8px]">
           <ServiceIcon name={current?.icon ?? "pullim"} size={26} />
         </span>
-        {/* 현재 서비스명 — OS 스위처 트리거(.sn) 정합: 아이콘+이름+셰브론. 브랜드 sub 배지는 제거(중복).
-            초협폭(<380px)은 숨김 — 옛 배지의 min-[380px] 규칙 승계(우측 버튼과 수평 overflow 방지, #125). */}
+        {/* 현재 서비스명 — 초협폭(<380px)은 숨김: 브랜드 sub와 같은 min-[380px] 규칙(우측 버튼과 수평 overflow 방지, #125). */}
         <span className="hidden whitespace-nowrap text-[13px] font-bold tracking-[-0.02em] text-[var(--text-primary,#1a1f27)] min-[380px]:inline">
           {current?.name ?? "서비스"}
         </span>
