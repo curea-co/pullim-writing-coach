@@ -22,6 +22,7 @@ import {
 import { SYSTEM_PROMPT, buildUserPrompt } from "@/app/lib/prompt";
 import { callModel, isModelError } from "@/app/lib/server/anthropic";
 import { verifyWritingAccess } from "@/app/lib/server/pullim-session";
+import { quotaGate, consumeQuota } from "@/app/lib/server/quota";
 
 // ── 비기능 요구 (12 §9 / critical gap C1) ────────────────────────
 export const runtime = "nodejs";
@@ -50,6 +51,14 @@ function logMetric(event: string, extra: Record<string, unknown> = {}): void {
 export async function POST(req: Request): Promise<Response> {
   // [G1] 인가 게이트 — SSO 세션(/me) 우선, 비prod 데모토큰 fallback (fail-closed).
   if (!(await verifyWritingAccess(req))) return jsonError("E-AUTH");
+
+  // [G1.5] 무료 1일 1회 한도(QA WRITING-ACCESS-002) — 유료(writing≥2)·데모(비prod)·인프라 실패는 통과.
+  //   소비(+1)는 성공 응답 직전([O1]) — 에러 재시도가 하루치를 태우지 않게.
+  const quota = await quotaGate(req, "score");
+  if (!quota.allowed) {
+    logMetric("quota_capped", { feature: "score" });
+    return jsonError("E-CAP");
+  }
 
   // [G2] 본문 파싱
   let raw: unknown;
@@ -131,8 +140,9 @@ export async function POST(req: Request): Promise<Response> {
       continue; // 1회 재호출
     }
 
-    // [O1] 후처리 가드 + meta 주입 → 200
+    // [O1] 후처리 가드 + meta 주입 → 200. 성공 확정 후에만 쿼터 소비(fail-open — 실패해도 응답은 200).
     const output = finalizeOutput(parsed as F3Output);
+    if (quota.consume) await consumeQuota(req, "score", quota.raw);
     return Response.json(output, { status: 200 });
   }
 

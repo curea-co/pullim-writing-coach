@@ -68,6 +68,37 @@ export default function StepResult({
 
       {submit.phase === "result" && (
         <div ref={outcomeRef}>
+          {/* 저장 안내 — 새로고침 시 /try가 홈으로 돌아가는 걸 데이터 유실로 오인하는 혼란 방지
+              (2026-07-09 prod QA). addResult 성공 시에만 — 실패에 "저장됐어요"를 거짓 표시하지 않는다. */}
+          {submit.saved ? (
+            <div
+              data-testid="saved-notice"
+              className="border-border bg-surface mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-4 py-3"
+            >
+              <p className="text-foreground text-sm">
+                <span aria-hidden>✓</span> 이 결과는 <strong>내 결과</strong>에 저장됐어요. 새로고침해도 사라지지 않아요.
+              </p>
+              <a
+                href="/results"
+                className="text-primary text-sm font-semibold underline-offset-2 hover:underline"
+              >
+                보러 가기 →
+              </a>
+            </div>
+          ) : (
+            // 저장 실패 — 무언 대신 경고(Codex #140). draft는 폐기하지 않지만(useScoreForm) 자동저장은
+            //   idle 한정 디바운스라 "임시저장돼 있다"고 단정 못 함(제출 직전 입력·storage 차단 케이스).
+            //   과장 없이 사용자가 지금 할 수 있는 행동(복사)을 안내한다.
+            <div
+              data-testid="save-failed-notice"
+              className="border-band-warn-surface bg-band-warn-surface mb-3 rounded-xl border px-4 py-3"
+            >
+              <p className="text-foreground text-sm">
+                결과 저장에 실패했어요 — 이 화면을 벗어나면 결과가 사라질 수 있어요. 필요한 내용은 지금
+                복사해 두고, 잠시 후 다시 채점해 보세요.
+              </p>
+            </div>
+          )}
           <ResultView
             assignment={submit.assignment}
             output={submit.output}

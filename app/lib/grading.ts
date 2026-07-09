@@ -102,7 +102,9 @@ export const ERROR_MESSAGE: Record<ErrorCode, string> = {
   // E8 = 업스트림 Anthropic 429/5xx(서버 측 장애) → 503. 사용자 인터넷 탓이 아니므로 그렇게 말하지 않는다.
   // 진짜 클라이언트 오프라인은 서버 응답이 아니라 FE의 fetch reject 경로에서 따로 안내(EPO 2026-05-26 ①).
   E8: "일시적 오류예요. 잠시 후 다시 시도해 주세요.",
-  "E-CAP": "오늘 사용량이 많아요. 잠시 후 다시 시도해 주세요.",
+  // E-CAP = 무료 1일 한도 소진(429, QA WRITING-ACCESS-002 — 직접 채점 1일 1회). "잠시 후"가 아니라
+  //   내일 리셋(KST 자정)이므로 재시도를 유도하지 않는다(useScoreForm RETRYABLE에서도 제외).
+  "E-CAP": "오늘의 무료 채점(하루 1회)을 모두 사용했어요. 내일 다시 만나요!",
 };
 
 export type ErrorEnvelope = { error: { code: ErrorCode; message: string } };

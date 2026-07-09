@@ -557,16 +557,7 @@ export async function loadMetaUsage(): Promise<MetaUsage> {
   } catch {
     return emptyMetaUsage();
   }
-  if (typeof parsed !== "object" || parsed === null) return emptyMetaUsage();
-  const o = parsed as Record<string, unknown>;
-  const result = emptyMetaUsage();
-  const fields: MetaField[] = ["school_level", "subject", "genre", "target_raw"];
-  for (const f of fields) {
-    const arr = o[f];
-    if (!Array.isArray(arr)) continue;
-    result[f] = dedupAndCapLRU(arr.filter(isMetaUsageEntry));
-  }
-  return result;
+  return extractMetaUsage(parsed);
 }
 
 // 순수 — usage 객체의 한 필드를 in-place 갱신(count++/LRU). RMW의 modify 단계만 분리.
@@ -588,13 +579,42 @@ function applyMetaUsage(usage: MetaUsage, field: MetaField, value: string, now: 
   }
 }
 
+// meta_usage 기록의 쓰기 베이스 — **미지 필드 보존**(2026-07-09 쿼터): 서버가 같은 키에 무료 1일
+//   한도 카운터(`_quota`, quota-core.ts)를 동거시키므로, 4필드만 추출해 통째로 덮어쓰면 쿼터가 조용히
+//   리셋된다. raw가 객체면 펼쳐서 보존하고 그 위에 usage 4필드를 얹는다.
+function mergeMetaWrite(raw: unknown, usage: MetaUsage): Record<string, unknown> {
+  const base: Record<string, unknown> =
+    typeof raw === "object" && raw !== null && !Array.isArray(raw) ? { ...(raw as Record<string, unknown>) } : {};
+  return { ...base, ...usage };
+}
+
+// raw payload에서 MetaUsage 4필드만 추출(손상 복구 포함) — loadMetaUsage와 동일 규칙.
+function extractMetaUsage(parsed: unknown): MetaUsage {
+  if (typeof parsed !== "object" || parsed === null) return emptyMetaUsage();
+  const o = parsed as Record<string, unknown>;
+  const result = emptyMetaUsage();
+  const fields: MetaField[] = ["school_level", "subject", "genre", "target_raw"];
+  for (const f of fields) {
+    const arr = o[f];
+    if (!Array.isArray(arr)) continue;
+    result[f] = dedupAndCapLRU(arr.filter(isMetaUsageEntry));
+  }
+  return result;
+}
+
 // 단일 필드 사용 기록. 같은 value 있으면 count + 1 + last_used_at 갱신, 없으면 신규 추가.
 // 필드별 LRU 5건 — 6번째 신규 추가 시 last_used_at 가장 오래된 항목 drop.
 export async function recordMetaUsage(field: MetaField, value: string): Promise<void> {
   if (!value.trim()) return; // 빈 값은 기록 안 함
-  const usage = await loadMetaUsage();
+  let raw: unknown;
+  try {
+    raw = await readKey("meta_usage");
+  } catch {
+    raw = null; // 읽기 실패 — 빈 이력에서 시작(비중요 데이터, loadMetaUsage와 동일 관용)
+  }
+  const usage = extractMetaUsage(raw);
   applyMetaUsage(usage, field, value, consentNow());
-  await writeKey("meta_usage", usage);
+  await writeKey("meta_usage", mergeMetaWrite(raw, usage));
 }
 
 // ★ 4필드 일괄 기록 — 1 load → 다필드 갱신 → 1 write. account mode에서 8왕복→2왕복, lost update 제거.
@@ -604,10 +624,16 @@ export async function recordMetaUsageBatch(
 ): Promise<void> {
   const valid = entries.filter(([, v]) => v.trim().length > 0);
   if (valid.length === 0) return;
-  const usage = await loadMetaUsage();
+  let raw: unknown;
+  try {
+    raw = await readKey("meta_usage");
+  } catch {
+    raw = null;
+  }
+  const usage = extractMetaUsage(raw);
   const now = consentNow();
   for (const [field, value] of valid) applyMetaUsage(usage, field, value, now);
-  await writeKey("meta_usage", usage);
+  await writeKey("meta_usage", mergeMetaWrite(raw, usage));
 }
 
 // 필드별 허용값 검증 — 손상된 LS가 enum 외 값을 반환해 ScoreForm requiredOk를
