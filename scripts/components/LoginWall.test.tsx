@@ -46,4 +46,18 @@ describe("MemberGate", () => {
     const { container } = render(<MemberGate><div data-testid="page">content</div></MemberGate>);
     expect(container.firstChild).toBeNull();
   });
+
+  // Codex #142 — 비프로덕션 데모 예외: 로컬 데모 토큰이 있으면 guest여도 벽을 세우지 않는다
+  //   (하위 TokenGate·서버 x-demo-token 폴백 런북 보존). NODE_ENV=test ≠ production 경로.
+  it("guest + 데모 토큰(비프로덕션): 벽 대신 콘텐츠 — 로컬 데모 런북 보존", () => {
+    auth.status = "guest";
+    window.sessionStorage.setItem("pwc-demo-token", "local-demo");
+    try {
+      render(<MemberGate><div data-testid="page">content</div></MemberGate>);
+      expect(screen.getByTestId("page")).toBeInTheDocument();
+      expect(screen.queryByTestId("login-wall")).not.toBeInTheDocument();
+    } finally {
+      window.sessionStorage.removeItem("pwc-demo-token");
+    }
+  });
 });

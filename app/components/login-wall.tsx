@@ -12,6 +12,21 @@
 import { useAuth } from "@/app/lib/use-auth";
 import { loginUrl, signupUrl } from "@/app/lib/pullim-login";
 import { ServiceIcon } from "@/components/ui/service-icon";
+import { DEMO_TOKEN_KEY } from "@/app/components/TokenGate";
+
+// 비프로덕션 데모 예외(Codex #142) — TokenGate가 보존하는 로컬 데모 경로(sessionStorage 토큰 또는
+//   NEXT_PUBLIC_DEMO_TOKEN)를 벽이 죽이지 않게 한다. 경계는 서버(pullim-session demoTokenAuthorized)와
+//   동일하게 NODE_ENV !== "production" — prod 번들에선 상수 false로 죽은 코드(데모 구멍 0).
+function demoBypass(): boolean {
+  if (process.env.NODE_ENV === "production") return false;
+  if (process.env.NEXT_PUBLIC_DEMO_TOKEN) return true;
+  if (typeof window === "undefined") return false;
+  try {
+    return !!window.sessionStorage.getItem(DEMO_TOKEN_KEY);
+  } catch {
+    return false;
+  }
+}
 
 export function LoginWall() {
   // returnTo: 로그인 후 지금 보던 경로로 복귀(중앙 SSO next 파라미터).
@@ -54,7 +69,8 @@ export function LoginWall() {
 export function MemberGate({ children }: { children: React.ReactNode }) {
   const { status } = useAuth();
   if (status === "loading") return null; // 판별 전 콘텐츠/벽 플래시 방지
-  if (status === "guest") return <LoginWall />;
+  if (status === "guest" && !demoBypass()) return <LoginWall />;
   // authed · error(위 주석: 장애를 벽으로 위장하지 않는다 — 헤더 '연결 오류'가 상태 고지)
+  //   · guest+데모(비프로덕션 한정 — 하위 TokenGate·서버 x-demo-token 폴백이 이어받는 로컬 런북)
   return <>{children}</>;
 }
