@@ -129,7 +129,11 @@ export async function POST(req: Request): Promise<Response> {
   const quota = await quotaGate(req, "coach");
   if (!quota.allowed) {
     logMetric("quota_capped", { feature: "coach" });
-    return jsonError("E-CAP");
+    // 공통 E-CAP 카피는 "무료 채점"(score용) — 코치 전용 메시지로 덮어쓴다(봉투 계약 정합, Codex #143).
+    return Response.json(
+      errorEnvelope("E-CAP", "오늘의 무료 코치 이용을 모두 사용했어요. 내일 다시 만나요!"),
+      { status: ERROR_HTTP["E-CAP"] },
+    );
   }
 
   // [G2] 본문 파싱

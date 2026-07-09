@@ -73,6 +73,23 @@ export async function DELETE(req: Request, ctx: Ctx): Promise<Response> {
   const key = await keyOf(ctx);
   if (key instanceof Response) return key;
   try {
+    if (key === "meta_usage") {
+      // 삭제도 서버 권위 _quota 보존(Codex #143 4R) — 통삭제를 허용하면 인증된 사용자가
+      //   DELETE 한 번으로 당일 무료 카운터를 초기화한다. 메타 내용만 비우고 _quota는 유지
+      //   (withServerQuota(null, 현재값)). _quota가 없으면 일반 삭제. 읽기 실패는 fail-open(일반 삭제 —
+      //   쿼터 인프라 장애가 사용자 데이터 삭제 요청을 막지 않게).
+      let current: unknown = null;
+      try {
+        current = await getUserData(req, key);
+      } catch {
+        current = null;
+      }
+      const preserved = withServerQuota(null, current);
+      if (preserved !== null) {
+        await setUserData(req, key, preserved);
+        return Response.json({ ok: true }, { status: 200 });
+      }
+    }
     await deleteUserData(req, key); // 단일 키 삭제(전체 삭제는 /api/data DELETE)
     return Response.json({ ok: true }, { status: 200 });
   } catch (e) {
