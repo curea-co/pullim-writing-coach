@@ -10,6 +10,7 @@ import {
   usedToday,
   isQuotaExceeded,
   applyQuotaConsume,
+  withServerQuota,
 } from "../app/lib/quota-core.ts";
 
 test("kstDateOf: UTC 자정 직전은 KST 다음날 — 롤오버 경계는 한국 자정", () => {
@@ -71,4 +72,23 @@ test("applyQuotaConsume: 어제 엔트리는 오늘 1로 리셋", () => {
 test("applyQuotaConsume: raw 미존재(null)여도 유효 payload 생성", () => {
   const next = applyQuotaConsume(null, "coach", "2026-07-09");
   assert.deepEqual(next[QUOTA_FIELD].coach, { d: "2026-07-09", n: 1 });
+});
+
+test("withServerQuota: 서버 _quota가 클라 stale/위조 _quota를 항상 이긴다", () => {
+  const server = { [QUOTA_FIELD]: { score: { d: "2026-07-09", n: 2 } } };
+  const client = { school_level: [], [QUOTA_FIELD]: { score: { d: "2026-07-09", n: 0 } } };
+  const merged = withServerQuota(client, server);
+  assert.deepEqual(merged[QUOTA_FIELD], { score: { d: "2026-07-09", n: 2 } });
+  assert.deepEqual(merged.school_level, []);
+});
+
+test("withServerQuota: payload null(키 비우기)이어도 서버 _quota는 보존 — 메타 초기화 리셋 루프홀 차단", () => {
+  const server = { [QUOTA_FIELD]: { coach: { d: "2026-07-09", n: 3 } } };
+  const merged = withServerQuota(null, server);
+  assert.deepEqual(merged, { [QUOTA_FIELD]: { coach: { d: "2026-07-09", n: 3 } } });
+});
+
+test("withServerQuota: 서버 _quota 없으면 클라 payload 통과(클라 _quota만 폐기), null은 null", () => {
+  assert.deepEqual(withServerQuota({ a: 1, [QUOTA_FIELD]: { score: { d: "x", n: 9 } } }, { b: 2 }), { a: 1 });
+  assert.equal(withServerQuota(null, null), null);
 });

@@ -53,6 +53,24 @@ export function isQuotaExceeded(raw: unknown, feature: QuotaFeature, today: stri
 }
 
 /**
+ * 클라이언트 meta_usage PUT에 **서버 권위 `_quota`를 강제**하는 머지(Codex #143 3R) —
+ * BFF(/api/data/meta_usage PUT)가 쓰기 직전 서버 현재값의 `_quota`로 덮어써, 클라이언트의 stale
+ * 스냅샷(동시 탭)이나 위조 payload가 카운터를 되돌리는 것을 막는다. 클라가 보낸 `_quota`는 항상 폐기.
+ * - 서버에 `_quota` 없음: 클라 payload에서 `_quota`만 제거해 통과(null은 null 그대로 — 키 비우기 유지).
+ * - 서버에 `_quota` 있음: 클라 payload(null이면 빈 객체)에 서버 `_quota`를 얹음 — 메타 초기화(/me)로도
+ *   당일 카운터는 보존(쿼터 리셋 루프홀 차단).
+ */
+export function withServerQuota(clientPayload: unknown, serverRaw: unknown): unknown {
+  const serverQ =
+    typeof serverRaw === "object" && serverRaw !== null ? (serverRaw as Record<string, unknown>)[QUOTA_FIELD] : undefined;
+  const isObj = typeof clientPayload === "object" && clientPayload !== null && !Array.isArray(clientPayload);
+  const base: Record<string, unknown> = isObj ? { ...(clientPayload as Record<string, unknown>) } : {};
+  delete base[QUOTA_FIELD]; // 클라 제공 _quota는 신뢰하지 않는다(서버 권위)
+  if (serverQ === undefined) return isObj ? base : (clientPayload ?? null);
+  return { ...base, [QUOTA_FIELD]: serverQ };
+}
+
+/**
  * 사용 1회 반영한 payload 반환 — **기존 필드(학습 LRU 등)와 타 기능 쿼터를 보존**하는 머지.
  * raw가 객체가 아니면(미존재·손상) 쿼터만 담은 새 객체.
  */
