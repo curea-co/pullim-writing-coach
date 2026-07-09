@@ -11,6 +11,7 @@ import { railItems, tabItems } from "./nav-adapter";
 import { AuthProvider, useAuth } from "@/app/lib/use-auth";
 import { loginUrl, signupUrl, osHubUrl } from "@/app/lib/pullim-login";
 import ServiceSwitcher from "@/app/components/service-switcher";
+import { MemberGate } from "@/app/components/login-wall";
 
 // os.pullim.ai 헤더 우측 정합(실측 스펙): 아이콘 38·radius11·#45555c · pill h42·radius12·#f4faff/#0362da · 앱런처 36 · 간격 6.
 const ICON_BTN =
@@ -99,6 +100,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   return (
     <AuthProvider>
+      {/* 로그인 벽(QA WRITING-ACCESS-001) — 게이트를 셸 바깥에 둬 게스트에겐 헤더·레일·탭바 없이
+          벽만 전체 화면으로 노출(중앙 /login 페이지 동형). 회원/데모/장애는 기존 셸+콘텐츠. */}
+      <MemberGate>
       <DashboardShell
         // 헤더 확정 구조(2026-07-09): [풀림] | [라이팅 코치](브랜드 sub, OS .mast .sub 구분자 스타일)
         //   + [아이콘 라이팅 코치 ▾](스위처 트리거) — OS 마스트+스위처 병렬 구조 정합.
@@ -112,6 +116,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       >
         {children}
       </DashboardShell>
+      </MemberGate>
     </AuthProvider>
   );
 }
