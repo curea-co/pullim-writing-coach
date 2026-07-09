@@ -11,7 +11,6 @@
 
 import { useAuth } from "@/app/lib/use-auth";
 import { loginUrl, signupUrl, osHubUrl } from "@/app/lib/pullim-login";
-import { ServiceIcon } from "@/components/ui/service-icon";
 import { DEMO_TOKEN_KEY } from "@/app/components/TokenGate";
 
 // 비프로덕션 데모 예외(Codex #142) — TokenGate가 보존하는 로컬 데모 경로(sessionStorage 토큰 또는
@@ -28,39 +27,38 @@ function demoBypass(): boolean {
   }
 }
 
-// 중앙 로그인 페이지(pullim-web /login: .card.pad-lg + .btn-primary + muted 푸터 링크) UI 정합 —
-//   카드(白·line 보더·radius·그림자·pad 28)·좌정렬·24px/800 제목·굵은 인라인 링크·"← OS 홈으로" 동형.
+// 중앙 로그인 페이지(pullim.local:3001/login) UI 정합 — 스크린샷 레퍼런스(2026-07-09):
+//   연회색 캔버스 위 큰 라운드(24px)의 여백 넉넉한 흰 카드(아이콘 없음), 28px/800 좌정렬 제목 +
+//   muted 부제, 플랫한 큰 파란 버튼(라운드 14px), 하단 텍스트 링크("계정이 …? 회원가입" 패턴),
+//   가운데 "← OS 홈으로 돌아가기".
 export function LoginWall() {
   // returnTo: 로그인/가입 후 지금 보던 경로로 복귀(중앙 SSO next 파라미터).
   const returnTo = typeof window !== "undefined" ? window.location.href : undefined;
   return (
-    <div data-testid="login-wall" className="grid min-h-[70vh] place-items-center p-6">
-      <div className="w-full max-w-[400px] rounded-[16px] border border-[var(--line,#e6eaf0)] bg-white p-7 shadow-[0_1px_2px_rgba(13,26,31,.04),0_1px_3px_rgba(13,26,31,.06)]">
-        <div className="mb-4 flex h-11 w-11 items-center justify-center">
-          <ServiceIcon name="writing" size={44} />
-        </div>
-        <h1 className="mb-2 text-[24px] font-extrabold tracking-[-0.02em] text-[var(--text-primary,#1a1f27)]">
+    <div data-testid="login-wall" className="grid min-h-[75vh] place-items-center p-6">
+      <div className="w-full max-w-[480px] rounded-[24px] bg-white px-10 py-12 shadow-[0_8px_40px_rgba(13,26,31,.06)]">
+        <h1 className="mb-3 text-[28px] font-extrabold tracking-[-0.02em] text-[var(--text-primary,#1a1f27)]">
           풀림 라이팅 코치
         </h1>
-        <p className="mb-6 text-[14px] leading-relaxed text-[var(--text-tertiary,#8a94a3)]">
-          풀림 회원 전용 서비스예요. 가입하고 AI 글쓰기 코칭을 시작해 보세요.
+        <p className="mb-9 text-[16px] leading-relaxed text-[var(--text-secondary,#45555c)]">
+          풀림 회원 전용 서비스예요.
         </p>
-        {/* 회원가입 우선(QA: 회원가입 유도) — 중앙 .btn-primary 정합(파랑 bg + 블루 그림자) */}
+        {/* 회원가입 우선(QA: 회원가입 유도) — 레퍼런스의 플랫한 큰 파란 버튼 */}
         <a
           href={signupUrl(returnTo)}
-          className="flex h-11 items-center justify-center rounded-[12px] bg-[var(--color-action-primary,#0362da)] text-[15px] font-bold text-white no-underline shadow-[0_4px_14px_rgba(3,98,218,.24)] transition hover:brightness-105"
+          className="flex h-[54px] items-center justify-center rounded-[14px] bg-[var(--color-action-primary,#0362da)] text-[16px] font-bold text-white no-underline transition hover:brightness-105"
         >
           회원가입하고 시작하기
         </a>
         {/* 중앙 로그인 푸터 링크 패턴("계정이 없으신가요? 회원가입") 동형 — 여기선 로그인이 보조 */}
-        <p className="mt-4 text-[13px] text-[var(--text-tertiary,#8a94a3)]">
+        <p className="mt-6 text-[15px] text-[var(--text-secondary,#45555c)]">
           이미 계정이 있으신가요?{" "}
           <a href={loginUrl(returnTo)} className="font-bold text-[var(--text-primary,#1a1f27)]">
             로그인
           </a>
         </p>
-        <p className="mt-2 text-center text-[13px]">
-          <a href={osHubUrl()} className="text-[var(--text-tertiary,#8a94a3)] no-underline">
+        <p className="mt-5 text-center text-[15px]">
+          <a href={osHubUrl()} className="text-[var(--text-secondary,#45555c)] no-underline">
             ← OS 홈으로 돌아가기
           </a>
         </p>
