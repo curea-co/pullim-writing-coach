@@ -100,8 +100,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <AuthProvider>
       <DashboardShell
-        brand={{ logo: <ServiceIcon name="writing" size={32} />, title: "풀림", sub: "라이팅 코치", href: "/" }}
-        // 서비스 전환 드롭다운 — OS 앱 스위처 위치 정합: 브랜드(풀림 + 라이팅 코치 배지) 바로 오른쪽(#135 후속).
+        // sub 배지 제거 — 서비스명은 스위처 트리거가 표시(OS 헤더 정합: [풀림] + [아이콘 서비스명 ▾], 중복 방지).
+        brand={{ logo: <ServiceIcon name="writing" size={32} />, title: "풀림", href: "/" }}
+        // 서비스 전환 드롭다운 — OS 앱 스위처 위치 정합: 브랜드 바로 오른쪽(#135 후속).
         switcher={<ServiceSwitcher />}
         rail={<OsRail head="둘러보기" items={railItems(pathname)} linkComponent={Link} />}
         tabbar={<OsTabbar items={tabItems(pathname)} linkComponent={Link} />}

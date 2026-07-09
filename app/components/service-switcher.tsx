@@ -39,9 +39,13 @@ export default function ServiceSwitcher() {
         title="서비스 전환"
         className="flex h-[38px] items-center gap-1.5 rounded-[11px] border border-[var(--line,#e6eaf0)] bg-white pl-1.5 pr-2 text-[#45555c] transition-colors hover:border-[#bcd7f7] hover:bg-[var(--surface-sunken,#eef1f6)]"
       >
-        {/* 현재 서비스명은 바로 왼쪽 브랜드 배지("라이팅 코치")가 이미 표시 — 트리거는 아이콘+셰브론만(중복 방지). */}
         <span className="flex h-[26px] w-[26px] items-center justify-center overflow-hidden rounded-[8px]">
           <ServiceIcon name={current?.icon ?? "pullim"} size={26} />
+        </span>
+        {/* 현재 서비스명 — OS 스위처 트리거(.sn) 정합: 아이콘+이름+셰브론. 브랜드 sub 배지는 제거(중복).
+            초협폭(<380px)은 숨김 — 옛 배지의 min-[380px] 규칙 승계(우측 버튼과 수평 overflow 방지, #125). */}
+        <span className="hidden whitespace-nowrap text-[13px] font-bold tracking-[-0.02em] text-[var(--text-primary,#1a1f27)] min-[380px]:inline">
+          {current?.name ?? "서비스"}
         </span>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className={`transition-transform ${open ? "rotate-180" : ""}`}>
           <path d="M6 9l6 6 6-6" />
