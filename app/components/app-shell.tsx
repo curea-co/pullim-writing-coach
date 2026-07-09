@@ -91,8 +91,6 @@ function HeaderActions() {
           <button type="button" onClick={() => { window.location.href = signupUrl(); }} className={PILL}>회원가입</button>
         </>
       )}
-      {/* 서비스 전환 드롭다운 — 풀림 OS의 앱 스위처 정합(기존 4-square OS 런처를 대체). */}
-      <ServiceSwitcher />
     </div>
   );
 }
@@ -103,6 +101,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     <AuthProvider>
       <DashboardShell
         brand={{ logo: <ServiceIcon name="writing" size={32} />, title: "풀림", sub: "라이팅 코치", href: "/" }}
+        // 서비스 전환 드롭다운 — OS 앱 스위처 위치 정합: 브랜드(풀림 + 라이팅 코치 배지) 바로 오른쪽(#135 후속).
+        switcher={<ServiceSwitcher />}
         rail={<OsRail head="둘러보기" items={railItems(pathname)} linkComponent={Link} />}
         tabbar={<OsTabbar items={tabItems(pathname)} linkComponent={Link} />}
         actions={<HeaderActions />}
