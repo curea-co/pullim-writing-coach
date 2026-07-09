@@ -62,7 +62,9 @@ const RETRYABLE: ReadonlySet<string> = new Set([
 export type SubmitState =
   | { phase: "idle" }
   | { phase: "loading" }
-  | { phase: "result"; output: F3Output; assignment: ScoreRequest["assignment"] }
+  // saved: addResult 성공 여부 — 결과 화면의 "내 결과에 저장됐어요 → 보러 가기" 안내 노출 기준.
+  //   새로고침 시 /try가 홈으로 돌아가는 걸 데이터 유실로 오인하는 혼란 방지(2026-07-09 prod QA).
+  | { phase: "result"; output: F3Output; assignment: ScoreRequest["assignment"]; saved: boolean }
   | { phase: "error"; code: string; message: string; retryable: boolean };
 
 export type UseScoreFormReturn = {
@@ -493,7 +495,9 @@ export function useScoreForm(opts: {
     if (res.ok) {
       try {
         const output = (await res.json()) as F3Output;
-        await addResult({
+        // 저장 성공 여부를 결과 화면 안내에 전달 — 실패(denied)는 기존대로 채점 결과 표시를 막지 않되
+        //   "저장됐어요"를 거짓으로 띄우지 않는다.
+        const saveRes = await addResult({
           assignment: payload.assignment,
           submission: {
             body: payload.submission.body,
@@ -530,7 +534,7 @@ export function useScoreForm(opts: {
             setRevisionPair(null);
           }
         }
-        setSubmitState({ phase: "result", output, assignment: payload.assignment });
+        setSubmitState({ phase: "result", output, assignment: payload.assignment, saved: saveRes.ok });
       } catch {
         setSubmitState({
           phase: "error",

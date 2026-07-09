@@ -66,28 +66,28 @@ describe("StepResult", () => {
   });
 
   it("result: shows #result-score with total_score", () => {
-    render(<StepResult {...baseProps} submitState={{ phase: "result", output: MOCK_OUTPUT, assignment: MOCK_ASSIGNMENT }} />);
+    render(<StepResult {...baseProps} submitState={{ phase: "result", output: MOCK_OUTPUT, assignment: MOCK_ASSIGNMENT, saved: true }} />);
     expect(document.getElementById("result-score")).toBeInTheDocument();
     expect(document.getElementById("result-guide")).toBeInTheDocument();
     expect(screen.getByText("75")).toBeInTheDocument();
   });
 
   it("result: shows resubmit button '고쳐쓰기 시작' (no revisionPair)", () => {
-    render(<StepResult {...baseProps} submitState={{ phase: "result", output: MOCK_OUTPUT, assignment: MOCK_ASSIGNMENT }} />);
+    render(<StepResult {...baseProps} submitState={{ phase: "result", output: MOCK_OUTPUT, assignment: MOCK_ASSIGNMENT, saved: true }} />);
     expect(screen.getByRole("button", { name: "고쳐쓰기 시작" })).toBeInTheDocument();
   });
 
   it("result: resubmit button fires onResubmit", async () => {
     const onResubmit = vi.fn();
     const user = userEvent.setup();
-    render(<StepResult {...baseProps} submitState={{ phase: "result", output: MOCK_OUTPUT, assignment: MOCK_ASSIGNMENT }} onResubmit={onResubmit} />);
+    render(<StepResult {...baseProps} submitState={{ phase: "result", output: MOCK_OUTPUT, assignment: MOCK_ASSIGNMENT, saved: true }} onResubmit={onResubmit} />);
     await user.click(screen.getByRole("button", { name: "고쳐쓰기 시작" }));
     expect(onResubmit).toHaveBeenCalledOnce();
   });
 
   it("result with revisionPair: resubmit says '한 번 더 고쳐쓰기'", () => {
     const mockEntry = { id: "x", version: 1, created_at: "2026-06-02T10:00:00+09:00", assignment: MOCK_ASSIGNMENT, submission: { body: "a", char_count: 1 }, output: MOCK_OUTPUT };
-    render(<StepResult {...baseProps} revisionPair={{ v1: mockEntry, v2: mockEntry }} submitState={{ phase: "result", output: MOCK_OUTPUT, assignment: MOCK_ASSIGNMENT }} />);
+    render(<StepResult {...baseProps} revisionPair={{ v1: mockEntry, v2: mockEntry }} submitState={{ phase: "result", output: MOCK_OUTPUT, assignment: MOCK_ASSIGNMENT, saved: true }} />);
     expect(screen.getByRole("button", { name: "한 번 더 고쳐쓰기" })).toBeInTheDocument();
   });
 
@@ -97,8 +97,21 @@ describe("StepResult", () => {
   });
 
   it("result: disclaimer rendered (AI 자동 채점)", () => {
-    render(<StepResult {...baseProps} submitState={{ phase: "result", output: MOCK_OUTPUT, assignment: MOCK_ASSIGNMENT }} />);
+    render(<StepResult {...baseProps} submitState={{ phase: "result", output: MOCK_OUTPUT, assignment: MOCK_ASSIGNMENT, saved: true }} />);
     // disclaimer is in ExportableResultFrame inside ResultView
     expect(screen.getByText(/AI 채점입니다/)).toBeInTheDocument();
+  });
+
+  // 저장 안내 — 새로고침 시 홈 복귀를 데이터 유실로 오인하는 혼란 방지(2026-07-09 prod QA).
+  it("result saved=true: shows '내 결과에 저장' notice with /results link", () => {
+    render(<StepResult {...baseProps} submitState={{ phase: "result", output: MOCK_OUTPUT, assignment: MOCK_ASSIGNMENT, saved: true }} />);
+    expect(screen.getByTestId("saved-notice")).toBeInTheDocument();
+    const link = screen.getByRole("link", { name: /보러 가기/ });
+    expect(link).toHaveAttribute("href", "/results");
+  });
+
+  it("result saved=false: hides notice (저장 실패에 거짓 안내 금지)", () => {
+    render(<StepResult {...baseProps} submitState={{ phase: "result", output: MOCK_OUTPUT, assignment: MOCK_ASSIGNMENT, saved: false }} />);
+    expect(screen.queryByTestId("saved-notice")).not.toBeInTheDocument();
   });
 });

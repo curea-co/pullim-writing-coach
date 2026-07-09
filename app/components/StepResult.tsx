@@ -68,6 +68,24 @@ export default function StepResult({
 
       {submit.phase === "result" && (
         <div ref={outcomeRef}>
+          {/* 저장 안내 — 새로고침 시 /try가 홈으로 돌아가는 걸 데이터 유실로 오인하는 혼란 방지
+              (2026-07-09 prod QA). addResult 성공 시에만 — 실패에 "저장됐어요"를 거짓 표시하지 않는다. */}
+          {submit.saved && (
+            <div
+              data-testid="saved-notice"
+              className="border-border bg-surface mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-4 py-3"
+            >
+              <p className="text-foreground text-sm">
+                <span aria-hidden>✓</span> 이 결과는 <strong>내 결과</strong>에 저장됐어요. 새로고침해도 사라지지 않아요.
+              </p>
+              <a
+                href="/results"
+                className="text-primary text-sm font-semibold underline-offset-2 hover:underline"
+              >
+                보러 가기 →
+              </a>
+            </div>
+          )}
           <ResultView
             assignment={submit.assignment}
             output={submit.output}
