@@ -14,12 +14,18 @@ import {
 import AssignmentStep from "@/app/components/coach/AssignmentStep";
 import ModeSelectStep from "@/app/components/coach/ModeSelectStep";
 import CoachClient from "@/app/components/coach/CoachClient";
+import OutlinePanel from "@/app/components/coach/OutlinePanel";
+import GuidePanel from "@/app/components/coach/GuidePanel";
 
 const SETUP_KEY = "pwc-coach-setup-v1";
 // 과제 임시 저장 — 모드 선택 전(아직 setup 미확정) 새로고침해도 입력 보존(curea-review-ai 지적).
 const ASSIGNMENT_DRAFT_KEY = "pwc-coach-assignment-draft-v1";
 
-type Phase = "loading" | "assignment" | "mode" | "ready";
+// plan = 개요/가이드 참고 메모 화면(별도 스텝) — 좁은 캔버스 프레임에 끼워 잘리던 걸 전용 화면으로 분리
+//   (2026-07-08). 여기서 메모 후 '본문 쓰기 →'로 ready(캔버스)로 넘어간다. 새로고침 시엔 setup 복원이
+//   바로 ready 로 보내 plan 을 건너뛴다(이미 지난 준비 단계).
+type Phase = "loading" | "assignment" | "mode" | "plan" | "ready";
+const NEEDS_PLAN = (m: WritingMode): boolean => m === "outline" || m === "guide";
 
 function loadSetup(): CoachSetup | null {
   if (typeof window === "undefined") return null;
@@ -86,7 +92,10 @@ export default function CoachSetupFlow({ onAuthExpired }: { onAuthExpired?: () =
     if (saved) {
       setAssignment(saved.assignment);
       setMode(saved.mode);
-      setPhase("ready");
+      // plan(참고 메모)을 아직 안 끝냈으면 그 화면으로 복원 — 새 전용 단계의 refresh-resume(Codex #134).
+      //   단, 실제 plan이 필요한 모드일 때만 — 손상 데이터({mode:free,phase:plan})나 voice→free 다운그레이드
+      //   후 plan 진입을 막는다(NEEDS_PLAN 가드).
+      setPhase(saved.phase === "plan" && NEEDS_PLAN(saved.mode) ? "plan" : "ready");
     } else {
       // setup 미확정 — 과제 draft가 있으면 복원해 입력 유실 방지(새로고침 후에도 보존).
       const draft = loadAssignmentDraft();
@@ -103,6 +112,16 @@ export default function CoachSetupFlow({ onAuthExpired }: { onAuthExpired?: () =
         assignment={assignment}
         mode={mode}
         onAuthExpired={onAuthExpired}
+        // 개요/가이드만 plan 화면이 있어 '메모 다시 보기' 복귀 가능. 본문은 영속되어 왕복해도 유지.
+        //   복귀 시 setup의 phase도 "plan"으로 갱신 — 그 화면에서 새로고침해도 plan으로 복원되게(Codex #134).
+        onBackToPlan={
+          NEEDS_PLAN(mode)
+            ? () => {
+                saveSetup({ assignment, mode, phase: "plan" });
+                setPhase("plan");
+              }
+            : undefined
+        }
         onNewAssignment={() => {
           if (typeof window !== "undefined") {
             try {
@@ -126,11 +145,63 @@ export default function CoachSetupFlow({ onAuthExpired }: { onAuthExpired?: () =
         onBack={() => setPhase("assignment")}
         onSelect={(m) => {
           setMode(m);
-          saveSetup({ assignment, mode: m });
-          clearAssignmentDraft(); // 확정 setup에 포함됐으므로 draft 정리.
-          setPhase("ready");
+          if (NEEDS_PLAN(m)) {
+            // 개요/가이드는 참고 메모(plan) 단계를 거친 뒤 캔버스로. **phase:"plan"으로 저장**해 이 화면에서
+            //   새로고침해도 plan으로 복원되게 한다(Codex #134). enterCanvas에서 phase:"ready"로 갱신.
+            saveSetup({ assignment, mode: m, phase: "plan" });
+            clearAssignmentDraft();
+            setPhase("plan");
+          } else {
+            // 자유/음성은 plan 없이 바로 캔버스.
+            saveSetup({ assignment, mode: m, phase: "ready" });
+            clearAssignmentDraft();
+            setPhase("ready");
+          }
         }}
       />
+    );
+  }
+
+  // 개요/가이드 참고 메모 — 전용 전체 화면(캔버스와 분리). '본문 쓰기 →'로 캔버스(ready)로 넘어간다.
+  if (phase === "plan" && assignment) {
+    // plan 완료 → 캔버스. **이 시점에 setup 확정 저장**(Codex #134): plan 전에 저장하면 plan 화면
+    //   새로고침 시 loadSetup이 곧바로 ready(캔버스)로 보내 준비 단계를 건너뛴다. 여기서 저장해야 이후
+    //   새로고침이 정상적으로 ready로 복원된다.
+    const enterCanvas = () => {
+      saveSetup({ assignment, mode, phase: "ready" }); // plan 완료 → ready 확정(새로고침 시 canvas로 복원).
+      clearAssignmentDraft();
+      setPhase("ready");
+    };
+    return (
+      <div className="mx-auto w-full max-w-[560px] px-5 py-8 md:py-12">
+        <button
+          type="button"
+          onClick={() => {
+            // 저장된 setup을 지워 새로고침 시 canvas(ready)로 직행하는 회귀 방지(Codex #134). 과제는 draft로
+            //   보존해 유실 없이 재개(loadSetup=null → loadAssignmentDraft로 과제 복원).
+            try { window.localStorage.removeItem(SETUP_KEY); } catch { /* swallow */ }
+            saveAssignmentDraft(assignment);
+            setPhase("mode");
+          }}
+          className="text-subtle-foreground hover:text-foreground mb-4 text-sm"
+        >
+          ← 모드 다시 선택
+        </button>
+        {mode === "outline" ? (
+          <OutlinePanel genre={assignment.genre} onStartBody={enterCanvas} />
+        ) : (
+          <>
+            <GuidePanel genre={assignment.genre} />
+            <button
+              type="button"
+              onClick={enterCanvas}
+              className="border-border bg-surface text-foreground hover:bg-muted mt-3 w-full rounded-lg border px-3 py-2 text-sm font-medium"
+            >
+              이제 본문 쓰기 →
+            </button>
+          </>
+        )}
+      </div>
     );
   }
 

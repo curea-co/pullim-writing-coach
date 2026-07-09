@@ -28,11 +28,13 @@ export default function NudgeCard({
   onFixed,
   why,
   busy = false,
+  checksLeft,
 }: {
   nudge: CoachNudge;
   onFixed: () => void; // "고쳤어 ✓" — 재점검 트리거
   why?: string; // (옵션) "왜 중요해?" 펼침 설명(메타 근거 — 대안 문장 아님)
   busy?: boolean;
+  checksLeft?: number; // 남은 점검(표시용 소프트 카운터 — 실제 제한 아님). >0 일 때만 "남은 점검 N회" 노출.
 }) {
   const [whyOpen, setWhyOpen] = useState(false);
   const whyId = useId();
@@ -91,6 +93,12 @@ export default function NudgeCard({
           고쳤어 ✓
         </button>
       </div>
+      {/* 남은 점검 소프트 카운터(넛지) — >0 일 때만. 0에선 숨겨 '0인데 되네' 모순을 피한다. */}
+      {checksLeft !== undefined && checksLeft > 0 && (
+        <p className={`${styles.monoFont} mt-2 text-center text-[10.5px] text-[var(--ink-5)]`}>
+          남은 점검 {checksLeft}회
+        </p>
+      )}
     </div>
   );
 }

@@ -24,11 +24,11 @@ const DISCLAIMER =
   "이 채점은 AI 자동 채점입니다. 학교 교사의 실제 채점과 다를 수 있습니다.";
 
 export const SAMPLES: Sample[] = [
-  // D — 저점
+  // E — 하 (총점 40, 최저)
   {
     id: "d",
-    label: "D",
-    category: "저점",
+    label: "E",
+    category: "하",
     title: "중1 도덕·윤리 논설문 — 자율과 책임",
     intent: "분량 26.8% · §2 원칙 6-(b) 50% 임계 발동 · 5~9 미흡 구간 채점",
     assignment: {
@@ -116,11 +116,11 @@ export const SAMPLES: Sample[] = [
       },
     },
   },
-  // C — 편차
+  // D — 중하 (총점 61)
   {
     id: "c",
-    label: "C",
-    category: "편차",
+    label: "D",
+    category: "중하",
     title: "고3 국어 설명문 — 기계식 시계 작동 원리",
     intent: "영역 편차 8점 (§3.2 17 vs §3.3 9) · §3.4 (A)·(B) 동시 미달",
     assignment: {
@@ -208,11 +208,11 @@ export const SAMPLES: Sample[] = [
       },
     },
   },
-  // A — 중점
+  // C — 중 (총점 74)
   {
     id: "a",
-    label: "A",
-    category: "중점",
+    label: "C",
+    category: "중",
     title: "중2 국어 설명문 — 화산의 종류",
     intent: "분량 56% (§2 원칙 6-(b) 임계 바로 위) · §3.4 (B) 어휘 단조",
     assignment: {
@@ -296,10 +296,10 @@ export const SAMPLES: Sample[] = [
       },
     },
   },
-  // E — 중상
+  // B — 중상 (총점 85)
   {
     id: "e",
-    label: "E",
+    label: "B",
     category: "중상",
     title: "고1 국어 감상문 — 이육사 시 '광야'",
     // intent 의도적으로 비움 — § 루브릭 인용 학생용 노출 부적절(2026-05-29). type 옵셔널.
@@ -392,11 +392,11 @@ export const SAMPLES: Sample[] = [
       },
     },
   },
-  // B — 고점
+  // A — 상 (총점 86, 최고)
   {
     id: "b",
-    label: "B",
-    category: "고점",
+    label: "A",
+    category: "상",
     title: "고3 사회 설명문 — 영해·배타적 경제수역",
     intent: "한국지리 정리·복습 글 · §2 원칙 4 영역 경계 (객관 설명 + 동기 진술 혼합)",
     assignment: {

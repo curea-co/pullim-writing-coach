@@ -39,10 +39,11 @@ function Brand({ brand, linkComponent }: { brand: BrandProp; linkComponent: Reac
       {logo}
       {/* os.pullim.ai 정합: 풀림 17px extrabold + 서비스명을 중립 pill 배지로 */}
       <span className="text-[17px] font-extrabold tracking-[-.02em]">{title}</span>
-      {/* whitespace-nowrap — 모바일에서 "라이팅 코치"가 2줄로 꺾이던 것 방지(UX 점검 ⑨).
-          초협폭(<380px)에선 배지를 숨겨 헤더 수평 overflow 방지(우측 버튼 3개 케이스, Codex 리뷰 #125). */}
+      {/* os.pullim.ai .mast .sub 정합 — pill 배지 대신 세로 구분자(border-left) + 텍스트("풀림 | 라이팅 코치").
+          whitespace-nowrap — 모바일에서 "라이팅 코치"가 2줄로 꺾이던 것 방지(UX 점검 ⑨).
+          초협폭(<380px)에선 숨겨 헤더 수평 overflow 방지(우측 버튼 3개 케이스, Codex 리뷰 #125). */}
       {sub && (
-        <span className="hidden whitespace-nowrap rounded-md bg-[var(--surface-sunken,#eef1f6)] px-2 py-0.5 text-[12px] font-semibold text-[var(--text-secondary)] min-[380px]:inline-block">
+        <span className="hidden whitespace-nowrap border-l border-[var(--border-default,#e6eaf0)] pl-2.5 text-[12px] font-semibold text-[var(--text-secondary)] min-[380px]:inline-block">
           {sub}
         </span>
       )}
