@@ -51,8 +51,10 @@ export default function ServiceSwitcher() {
       {open && (
         // 실제 동작은 '링크 목록'이라 listbox/option 대신 nav+링크로 둔다(Codex #135): listbox는 화살표 이동·
         //   roving tabindex·active descendant를 기대시키는데 이 UI엔 그 계약이 없어 보조기기 사용성이 깨진다.
-        // 헤더 좌측(브랜드 옆) 배치라 메뉴는 좌측 정렬(OS .switcher-menu left:0 정합) — 우측 정렬이면 화면 밖으로 벗어난다.
-        <nav id={menuId} aria-label="서비스 전환" className="absolute left-0 top-[calc(100%+8px)] z-[120] w-[min(330px,92vw)] overflow-hidden rounded-[14px] border border-[var(--line,#e6eaf0)] bg-[var(--surface,#fff)] p-1.5 shadow-[0_8px_28px_rgba(13,26,31,.14)]">
+        // 헤더 좌측(브랜드 옆) 배치라 sm+는 트리거 기준 좌측 정렬(OS .switcher-menu left:0 정합).
+        //   모바일은 트리거가 이미 브랜드 폭만큼 안쪽이라 left-0 + 92vw 메뉴가 우측으로 잘림(Codex #136)
+        //   → viewport 고정(fixed inset-x-3, 헤더 60px 아래)으로 화면 안에 전폭 표시.
+        <nav id={menuId} aria-label="서비스 전환" className="fixed inset-x-3 top-[68px] z-[120] overflow-hidden rounded-[14px] border border-[var(--line,#e6eaf0)] bg-[var(--surface,#fff)] p-1.5 shadow-[0_8px_28px_rgba(13,26,31,.14)] sm:absolute sm:inset-x-auto sm:left-0 sm:top-[calc(100%+8px)] sm:w-[330px]">
           <div className="px-2.5 pb-1.5 pt-2 font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--text-tertiary,#8a94a3)]">
             서비스 전환
           </div>
