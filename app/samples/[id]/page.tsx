@@ -4,7 +4,6 @@ import { SAMPLES, getSample } from "../../data/samples";
 import ResultView from "../../components/ResultView";
 import AnnotatedBody from "../../components/AnnotatedBody";
 import Breadcrumb from "../../components/Breadcrumb";
-import CtaBand from "../../components/CtaBand";
 
 export function generateStaticParams() {
   return SAMPLES.map((s) => ({ id: s.id }));
@@ -129,11 +128,6 @@ export default async function SampleDetailPage({
           }
         />
       </div>
-
-      <CtaBand
-        title="다른 글도 직접 넣어 보세요"
-        description="이 샘플처럼, 직접 쓴 수행평가 글을 첨삭받을 수 있어요."
-      />
     </main>
   );
 }
