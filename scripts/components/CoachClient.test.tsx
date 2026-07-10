@@ -161,7 +161,7 @@ describe("CoachClient voice 분기", () => {
       removeItem: vi.fn(),
     });
     const onAuthExpired = vi.fn();
-    const onAuthRefresh = vi.fn(async () => true);
+    const onAuthRefresh = vi.fn(async () => "authed" as const);
 
     render(
       <CoachClient

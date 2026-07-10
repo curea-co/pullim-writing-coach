@@ -47,8 +47,9 @@ export default function TokenGate({
   defaults?: { school_level?: string; subject?: string; genre?: string };
   // 코치 등 다른 게이티드 화면을 자식으로 받는다. 제공 시 ScoreWizard 대신 렌더.
   //   onAuthExpired는 서버 401(E-AUTH) 시 호출 — 로컬 데모 토큰 폐기용으로 보존.
-  //   onAuthRefresh는 401 시 토큰 회전(성공=true) — 호출부가 원 요청을 자동 재시도(게이트키퍼 SSO 계약).
-  children?: (onAuthExpired: () => void, onAuthRefresh: () => Promise<boolean>) => React.ReactNode;
+  //   onAuthRefresh는 401 시 토큰 회전 — 결과 Status를 그대로 전파: authed=원 요청 자동 재시도,
+  //   guest=재인증 유도, error=인증 서버 장애(재로그인으로 위장 금지 — 일시 오류 UI). 게이트키퍼 SSO 계약.
+  children?: (onAuthExpired: () => void, onAuthRefresh: () => Promise<"authed" | "guest" | "error">) => React.ReactNode;
 } = {}) {
   const { status, refresh } = useAuth();
 
@@ -67,11 +68,14 @@ export default function TokenGate({
     writeToken(null);
   }
 
-  // 게이트키퍼 SSO 계약(2026-07-10): access 만료(서버 401) → /auth/refresh 회전 → 성공 시 호출부가
-  //   **원 요청을 자동 재시도**. use-auth.refresh는 csrf 부트스트랩→refresh→/me 재검증까지 수행하고
-  //   최종 Status를 반환 — authed일 때만 재시도(guest/error는 false → 재인증 유도로 낙하).
-  async function handleAuthRefresh(): Promise<boolean> {
-    return (await refresh()) === "authed";
+  // 게이트키퍼 SSO 계약(2026-07-10): access 만료(서버 401) → /auth/refresh 회전 → authed면 호출부가
+  //   **원 요청을 자동 재시도**. use-auth.refresh는 csrf 부트스트랩→refresh→/me 재검증까지 수행.
+  //   Status를 boolean으로 뭉개지 않는다(Codex #151): guest(만료 — 재인증 유도)와 error(인증 서버
+  //   5xx/네트워크 — 장애를 재로그인으로 은폐 금지, use-auth의 분리 계약)를 호출부가 구분 처리한다.
+  //   loading은 refresh 최종 상태로 나올 수 없어 error로 수렴(방어).
+  async function handleAuthRefresh(): Promise<"authed" | "guest" | "error"> {
+    const st = await refresh();
+    return st === "loading" ? "error" : st;
   }
 
   // 인가 판정: 중앙 SSO authed 이거나, 로컬 데모 토큰 보유(로컬 한정 폼 진입).

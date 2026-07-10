@@ -135,8 +135,9 @@ export type UseScoreFormReturn = {
 export function useScoreForm(opts: {
   onAuthExpired?: () => void;
   // 게이트키퍼 SSO 계약(2026-07-10): access 만료로 서버 401이면 refresh 후 **원 요청을 자동 재시도**.
-  //   true 반환 = 토큰 회전 성공(재시도 가능). TokenGate가 useAuth().refresh로 주입.
-  onAuthRefresh?: () => Promise<boolean>;
+  //   authed=재시도 · guest=재인증 유도(onAuthExpired) · error=인증 서버 장애(일시 오류 UI —
+  //   재로그인으로 위장 금지, use-auth 분리 계약). TokenGate가 useAuth().refresh로 주입.
+  onAuthRefresh?: () => Promise<"authed" | "guest" | "error">;
   defaults?: { school_level?: string; subject?: string; genre?: string };
   onResubmit?: () => void;
 }): UseScoreFormReturn {
@@ -494,11 +495,17 @@ export function useScoreForm(opts: {
     }
 
     if (res.status === 401) {
-      // 게이트키퍼 SSO 계약: access 만료(401) → refresh → 성공 시 **같은 요청 자동 재시도**(1회 한정).
-      //   회전 실패(guest/error)면 기존 흐름(onAuthExpired — 재인증 유도)으로 낙하.
-      if (!retriedAuth && onAuthRefresh && (await onAuthRefresh())) {
-        return runScore(payload, true);
+      // 게이트키퍼 SSO 계약: access 만료(401) → refresh → authed면 **같은 요청 자동 재시도**(1회 한정).
+      if (!retriedAuth && onAuthRefresh) {
+        const st = await onAuthRefresh();
+        if (st === "authed") return runScore(payload, true);
+        if (st === "error") {
+          // 인증 서버 5xx/네트워크 — 세션 만료로 위장하지 않는다(use-auth error 분리 계약, Codex #151).
+          setSubmitState({ phase: "error", code: "E8", message: ERROR_MESSAGE.E8, retryable: true });
+          return;
+        }
       }
+      // guest(회전 결과 만료 확정) 또는 onAuthRefresh 미주입/재401 — 재인증 유도.
       setSubmitState({ phase: "idle" });
       onAuthExpired?.();
       return;

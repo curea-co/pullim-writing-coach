@@ -86,7 +86,7 @@ export default function CoachSetupFlow({
   onAuthRefresh,
 }: {
   onAuthExpired?: () => void;
-  onAuthRefresh?: () => Promise<boolean>; // 401 → 토큰 회전 → 원 요청 자동 재시도(게이트키퍼 SSO 계약)
+  onAuthRefresh?: () => Promise<"authed" | "guest" | "error">; // 401 → 토큰 회전(게이트키퍼 SSO 계약)
 }) {
   const [phase, setPhase] = useState<Phase>("loading");
   const [assignment, setAssignment] = useState<CoachAssignment | null>(null);
