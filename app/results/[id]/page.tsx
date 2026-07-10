@@ -10,7 +10,6 @@ import { getResult, type ResultEntry } from "../../lib/storage";
 import { useAuth } from "../../lib/use-auth";
 import Breadcrumb from "../../components/Breadcrumb";
 import ResultView from "../../components/ResultView";
-import CtaBand from "../../components/CtaBand";
 
 // PR #115 결함 2: "id 미발견"(missing)과 "읽기 실패"(error)를 분리.
 type LoadState = "loading" | "missing" | "loaded" | "error";
@@ -194,11 +193,6 @@ export default function ResultDetailPage({
           }
         />
       </div>
-
-      <CtaBand
-        title="또 한 편 써 보세요"
-        description="새 글을 실시간으로 채점받을 수 있어요."
-      />
     </main>
   );
 }
