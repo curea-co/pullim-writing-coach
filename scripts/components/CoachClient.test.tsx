@@ -6,7 +6,7 @@
  * 가짜로 교체한다. 실제 useReducer 루프(EDIT dispatch → state.body)는 그대로 실행한다.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, act } from "@testing-library/react";
+import { render, screen, act, waitFor } from "@testing-library/react";
 
 // ── Canvas stub — TipTap/ProseMirror 없이 마운트 가능하게 ──────────────────
 let capturedInsertBlock: ((text: string) => void) | null = null;
@@ -172,14 +172,15 @@ describe("CoachClient voice 분기", () => {
       />,
     );
     act(() => { screen.getByTestId("canvas-trigger-insert").click(); });
-    await act(async () => { screen.getByTestId("coach-ask").click(); });
+    act(() => { screen.getByTestId("coach-ask").click(); });
 
+    // 이벤트 핸들러의 비동기 체인(401→refresh→재시도→dispatch)은 React가 추적하지 않으므로
+    //   최종 UI 상태(넛지 카드)를 명시적으로 기다린다(Codex #151 — 간헐 실패 방지).
+    await waitFor(() => expect(screen.getByTestId("nudge-card-stub")).toBeInTheDocument());
     // 401 → refresh 1회 → 같은 요청 재시도(총 2회 호출), 재인증 유도(onAuthExpired)로 낙하하지 않음.
     expect(onAuthRefresh).toHaveBeenCalledOnce();
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(onAuthExpired).not.toHaveBeenCalled();
-    // 재시도 성공 → nudge 단계 진입(넛지 카드 stub 렌더).
-    expect(screen.getByTestId("nudge-card-stub")).toBeInTheDocument();
 
     vi.unstubAllGlobals();
   });
