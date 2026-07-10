@@ -15,8 +15,8 @@ describe("nav-adapter", () => {
     expect(items.find((i) => i.href === "/samples")?.active).toBe(true);
     expect(items.find((i) => i.href === "/")?.active).toBe(false);
   });
-  it("tabItems returns the 5 primary routes incl. /samples", () => {
-    expect(tabItems("/try").map((i) => i.href)).toEqual(["/", "/try", "/coach", "/results", "/samples"]);
+  it("tabItems: 5개 주요 라우트 — 홈이 중앙(3번째) (2026-07-10 소유자 확정 순서)", () => {
+    expect(tabItems("/try").map((i) => i.href)).toEqual(["/try", "/coach", "/", "/results", "/samples"]);
     expect(tabItems("/try").find((i) => i.href === "/try")?.active).toBe(true);
   });
 });
