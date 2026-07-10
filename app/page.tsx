@@ -49,14 +49,14 @@ const STATS = [
 // 바로 시작 타일
 const TILES = [
   {
-    title: "직접 채점받기",
+    title: "글 바로 채점",
     description: "글 붙여넣고 1분 안에 5영역 채점·첨삭",
     href: "/try",
     cta: "실시간",
     icon: <IconPen />,
   },
   {
-    title: "과정 코치",
+    title: "쓰기 과정 코칭",
     description: "개요→본문 단계별 코칭",
     href: "/coach",
     cta: "베타",
@@ -90,7 +90,7 @@ export default function Home() {
             href="/try"
             className="inline-flex items-center justify-center rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90"
           >
-            직접 채점받기 →
+            글 바로 채점 →
           </Link>
         }
       />
@@ -164,7 +164,7 @@ export default function Home() {
               href="/try"
               className="inline-flex items-center justify-center rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90"
             >
-              직접 채점받기 →
+              글 바로 채점 →
             </Link>
             <Link
               href="/about"
