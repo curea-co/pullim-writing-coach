@@ -12,7 +12,6 @@ import { useAuth } from "../lib/use-auth";
 import { getTotalScoreBand } from "../data/scoring";
 import { cn } from "../lib/utils";
 import Breadcrumb from "../components/Breadcrumb";
-import CtaBand from "../components/CtaBand";
 
 // PR #115 결함 2: "결과 없음"(empty)과 "읽기 실패"(error)를 분리 — 빈 상태 카피가 장애를 은폐하지 않게.
 type LoadState = "loading" | "empty" | "loaded" | "error";
@@ -331,10 +330,6 @@ export default function ResultsListPage() {
         </section>
       )}
 
-      <CtaBand
-        title="다시 한 편 채점받아 볼래요?"
-        description="실시간 채점으로 또 다른 글을 평가받을 수 있어요."
-      />
     </main>
   );
 }
