@@ -163,7 +163,7 @@ export default function ResultsListPage() {
             href="/try"
             className="bg-primary text-primary-foreground mt-5 inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold transition hover:opacity-90"
           >
-            직접 채점받기
+            글 바로 채점
             <span aria-hidden>→</span>
           </Link>
         </section>

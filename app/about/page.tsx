@@ -11,7 +11,7 @@ import Breadcrumb from "../components/Breadcrumb";
 export const metadata: Metadata = {
   title: "서비스 소개 — Pullim Writing Coach",
   description:
-    "Pullim Writing Coach는 학생 글을 AI가 5가지 기준(과제 이해·내용 충실도·구조·논리·표현·문장·성장 가능성)으로 채점·코치해 주는 글쓰기 도구예요. 직접 채점·과정 코치·샘플 결과를 실제 화면으로 소개해요.",
+    "Pullim Writing Coach는 학생 글을 AI가 5가지 기준(과제 이해·내용 충실도·구조·논리·표현·문장·성장 가능성)으로 채점·코치해 주는 글쓰기 도구예요. 직접 채점·쓰기 과정 코칭·샘플 결과를 실제 화면으로 소개해요.",
 };
 
 type Feature = {
@@ -26,7 +26,7 @@ type Feature = {
 const FEATURES: Feature[] = [
   {
     tag: "실시간",
-    title: "직접 채점받기",
+    title: "글 바로 채점",
     href: "/try",
     lead: "글을 붙여넣으면 1분 안에 5영역으로 채점하고, 영역별 잘한 점·고칠 점과 수정 가이드를 보여줘요.",
     points: [
@@ -34,11 +34,11 @@ const FEATURES: Feature[] = [
       "5영역 점수와 영역별 진단·우선순위, 수정 전/후 비교를 한 화면에서 확인.",
       "결과는 PDF·스크린샷으로 저장해 선생님과 공유.",
     ],
-    shot: { src: "/screens/try.png", w: 672, h: 1009, alt: "직접 채점받기 — 글 입력 위저드 화면" },
+    shot: { src: "/screens/try.png", w: 672, h: 1009, alt: "글 바로 채점 — 글 입력 위저드 화면" },
   },
   {
     tag: "베타",
-    title: "과정 코치",
+    title: "쓰기 과정 코칭",
     href: "/coach",
     lead: "결과가 아니라 '과정'을 코치해요. 학생이 직접 쓰고, 코치는 답을 주지 않고 질문으로 끌어내요(대필 0).",
     points: [
@@ -46,7 +46,7 @@ const FEATURES: Feature[] = [
       "리치 에디터 캔버스에서 쓰고 [봐줘]로 점검 → 우선순위 넛지 한 호흡씩.",
       "고칠수록 영역 막대가 차고, 고쳐쓰기 과정이 성취 서사(돌파 배지·과정 타임라인·공유 카드)로 남아요.",
     ],
-    shot: { src: "/screens/coach.png", w: 432, h: 626, alt: "과정 코치 — 작성 캔버스 화면" },
+    shot: { src: "/screens/coach.png", w: 432, h: 626, alt: "쓰기 과정 코칭 — 작성 캔버스 화면" },
   },
   {
     tag: "미리보기",
@@ -64,8 +64,8 @@ const FEATURES: Feature[] = [
 
 const PAGES: { path: string; name: string; what: string }[] = [
   { path: "/", name: "홈", what: "서비스 한눈에 보기 + 바로 시작 타일." },
-  { path: "/try", name: "직접 채점받기", what: "글 붙여넣고 1분 채점·첨삭(위저드)." },
-  { path: "/coach", name: "과정 코치", what: "직접 쓰며 단계별 코칭받기(대필 0)." },
+  { path: "/try", name: "글 바로 채점", what: "글 붙여넣고 1분 채점·첨삭(위저드)." },
+  { path: "/coach", name: "쓰기 과정 코칭", what: "직접 쓰며 단계별 코칭받기(대필 0)." },
   { path: "/samples", name: "샘플 채점 결과", what: "점수대 5케이스 채점 결과 미리보기." },
   { path: "/results", name: "채점 결과 조회", what: "저장된 내 채점 결과 다시 보기." },
   { path: "/me", name: "내 정보", what: "프로필·사용 현황, 저장 데이터 일괄 삭제." },
@@ -184,10 +184,10 @@ export default function AboutPage() {
           href="/try"
           className="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90"
         >
-          직접 채점받기 →
+          글 바로 채점 →
         </Link>
         <Link href="/coach" className="text-muted-foreground hover:text-foreground text-sm font-medium">
-          과정 코치 체험 →
+          쓰기 과정 코칭 체험 →
         </Link>
         <Link href="/" className="text-muted-foreground hover:text-foreground text-sm">
           ← 홈으로

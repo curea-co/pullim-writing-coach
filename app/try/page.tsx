@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import TryClient from "../components/TryClient";
 
 export const metadata: Metadata = {
-  title: "직접 채점받기 — Pullim Writing Coach",
+  title: "글 바로 채점 — Pullim Writing Coach",
   description:
     "학생 글을 입력하면 AI가 5가지 기준으로 첨삭해 드려요 (WBS P3.1·P3.2).",
 };
@@ -26,7 +26,7 @@ export default function TryPage() {
         <div className="flex items-baseline gap-3">
           {/* 영문 브랜드 h1 잔재 정리 — 내비/탭과 동일한 화면명으로(UX 점검 ⑧). */}
           <h1 className="text-foreground text-2xl font-bold tracking-tight md:text-3xl">
-            직접 채점받기
+            글 바로 채점
           </h1>
           <span className="bg-accent-mid-surface text-accent-mid rounded-full px-2 py-0.5 text-xs font-semibold">
             실시간 채점

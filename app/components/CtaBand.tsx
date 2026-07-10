@@ -11,7 +11,7 @@ export default function CtaBand({
   title = "직접 쓴 글로 채점받아 보세요",
   description = "과제 정보와 글을 넣으면 AI Coach가 5영역으로 첨삭해 드려요.",
   href = "/try",
-  cta = "직접 채점받기",
+  cta = "글 바로 채점",
 }: {
   title?: string;
   description?: string;

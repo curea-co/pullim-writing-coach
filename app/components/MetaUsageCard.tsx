@@ -59,7 +59,7 @@ export default function MetaUsageCard() {
             href="/try"
             className="bg-primary text-primary-foreground mt-3 inline-flex h-9 items-center rounded-lg px-3 text-xs font-semibold transition hover:opacity-90"
           >
-            직접 채점받기 →
+            글 바로 채점 →
           </Link>
         </div>
       ) : (
