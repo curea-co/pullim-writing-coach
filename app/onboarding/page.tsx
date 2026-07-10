@@ -436,7 +436,7 @@ function Step3({ profile }: { profile: Profile | null }) {
           disabled={!ready}
           className="border-border bg-surface text-foreground hover:bg-muted inline-flex h-12 w-full items-center justify-center rounded-xl border text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
         >
-          과정 코치로 직접 고쳐 써볼래요
+          쓰기 과정 코칭으로 직접 고쳐 써볼래요
         </button>
       </div>
 

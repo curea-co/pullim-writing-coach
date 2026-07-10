@@ -14,8 +14,8 @@ export interface RailItem {
 
 export const NAV = [
   { label: "홈", href: "/" },
-  { label: "직접 채점받기", href: "/try" },
-  { label: "과정 코치", href: "/coach" },
+  { label: "글 바로 채점", href: "/try" },
+  { label: "쓰기 과정 코칭", href: "/coach" },
   { label: "채점 결과 조회", href: "/results" },
   { label: "샘플 채점 결과", href: "/samples" },
   { label: "내 정보", href: "/me" },

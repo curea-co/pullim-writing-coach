@@ -566,12 +566,14 @@ export default function CoachClient({
   onAuthExpired,
   onNewAssignment,
   onBackToPlan,
+  onBackToMode,
 }: {
   assignment?: CoachAssignment;
   mode?: WritingMode;
   onAuthExpired?: () => void;
   onNewAssignment?: () => void;
   onBackToPlan?: () => void; // 개요/가이드 메모 화면(plan)으로 복귀 — 있으면 캔버스에 '메모 다시 보기' chevron 노출.
+  onBackToMode?: () => void; // 자유/음성(plan 없는 모드) 모드 선택으로 복귀 — 있으면 캔버스에 '모드 다시 선택' chevron 노출.
 }) {
   const [state, dispatch] = useReducer(reducer, undefined, initState);
   const [currentNudge, setCurrentNudge] = useState<CoachNudge | null>(null);
@@ -905,18 +907,26 @@ export default function CoachClient({
             editorRef={editorRef}
           />
 
-          {/* 개요·가이드 메모 다시 보기 — 캔버스 하단과 '봐줘' CTA(시트 peek) 사이. plan 화면으로 복귀해
-              무엇을 메모했는지 확인. 본문(bodyHtml)은 localStorage 영속이라 왕복해도 유지됨. write 단계·해당 모드에서만. */}
-          {onBackToPlan && state.phase === "write" && (
-            <button
-              type="button"
-              onClick={onBackToPlan}
-              aria-label="개요·가이드 메모 다시 보기"
-              className="absolute inset-x-0 bottom-[86px] z-20 mx-auto flex w-fit items-center gap-1 rounded-[var(--r-pill)] border border-[var(--line)] bg-white/95 px-3 py-1.5 text-[12px] font-medium text-[var(--ink-3)] shadow-[var(--sh-1)] backdrop-blur transition hover:text-[var(--pullim-ink)]"
-            >
-              <span aria-hidden className="text-[15px] leading-none">‹</span> 메모 다시 보기
-            </button>
-          )}
+          {/* 캔버스 back chevron — 캔버스 하단과 '봐줘' CTA(시트 peek) 사이. 개요/가이드는 plan(메모) 화면으로,
+              자유/음성은 모드 선택으로 복귀(사용자 요청 2026-07-10). 본문(bodyHtml)은 localStorage 영속이라
+              왕복해도 유지됨. write 단계에서만. 두 back은 모드에 따라 상호배타(둘 다 오지 않음). */}
+          {(() => {
+            const back = onBackToPlan
+              ? { fn: onBackToPlan, label: "메모 다시 보기", aria: "개요·가이드 메모 다시 보기" }
+              : onBackToMode
+                ? { fn: onBackToMode, label: "모드 다시 선택", aria: "작성 모드 다시 선택" }
+                : null;
+            return back && state.phase === "write" ? (
+              <button
+                type="button"
+                onClick={back.fn}
+                aria-label={back.aria}
+                className="absolute inset-x-0 bottom-[86px] z-20 mx-auto flex w-fit items-center gap-1 rounded-[var(--r-pill)] border border-[var(--line)] bg-white/95 px-3 py-1.5 text-[12px] font-medium text-[var(--ink-3)] shadow-[var(--sh-1)] backdrop-blur transition hover:text-[var(--pullim-ink)]"
+              >
+                <span aria-hidden className="text-[15px] leading-none">‹</span> {back.label}
+              </button>
+            ) : null;
+          })()}
 
           {/* 바텀시트 */}
           <BottomSheet

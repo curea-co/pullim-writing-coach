@@ -122,6 +122,19 @@ export default function CoachSetupFlow({ onAuthExpired }: { onAuthExpired?: () =
               }
             : undefined
         }
+        // 자유/음성(plan 없는 모드)은 캔버스에서 바로 '모드 다시 선택'으로 복귀 — 개요/가이드의 '메모 다시
+        //   보기'에 대응하는 back(사용자 요청 2026-07-10). plan 스텝의 '← 모드 다시 선택'과 동일 동작:
+        //   SETUP_KEY 제거(새로고침 시 canvas 직행 회귀 방지) + 과제는 draft로 보존(유실 없이 재개). 본문은
+        //   assignmentSig별 bodyHtml localStorage 영속이라 모드 재선택·재진입해도 유지.
+        onBackToMode={
+          !NEEDS_PLAN(mode)
+            ? () => {
+                try { window.localStorage.removeItem(SETUP_KEY); } catch { /* swallow */ }
+                saveAssignmentDraft(assignment);
+                setPhase("mode");
+              }
+            : undefined
+        }
         onNewAssignment={() => {
           if (typeof window !== "undefined") {
             try {
