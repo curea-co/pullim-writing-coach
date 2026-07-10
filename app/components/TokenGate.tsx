@@ -47,9 +47,10 @@ export default function TokenGate({
   defaults?: { school_level?: string; subject?: string; genre?: string };
   // 코치 등 다른 게이티드 화면을 자식으로 받는다. 제공 시 ScoreWizard 대신 렌더.
   //   onAuthExpired는 서버 401(E-AUTH) 시 호출 — 로컬 데모 토큰 폐기용으로 보존.
-  children?: (onAuthExpired: () => void) => React.ReactNode;
+  //   onAuthRefresh는 401 시 토큰 회전(성공=true) — 호출부가 원 요청을 자동 재시도(게이트키퍼 SSO 계약).
+  children?: (onAuthExpired: () => void, onAuthRefresh: () => Promise<boolean>) => React.ReactNode;
 } = {}) {
-  const { status } = useAuth();
+  const { status, refresh } = useAuth();
 
   // 서버/하이드레이션 스냅샷은 null → 이후 실제 토큰으로 전환. 로컬 데모 토큰 존재 여부.
   const demoToken = useSyncExternalStore(subscribeToken, readToken, () => null);
@@ -64,6 +65,13 @@ export default function TokenGate({
   // 서버 401(E-AUTH) 시 로컬 데모 토큰 폐기 — children/ScoreWizard가 호출. (로컬 한정 잔존)
   function handleAuthExpired() {
     writeToken(null);
+  }
+
+  // 게이트키퍼 SSO 계약(2026-07-10): access 만료(서버 401) → /auth/refresh 회전 → 성공 시 호출부가
+  //   **원 요청을 자동 재시도**. use-auth.refresh는 csrf 부트스트랩→refresh→/me 재검증까지 수행하고
+  //   최종 Status를 반환 — authed일 때만 재시도(guest/error는 false → 재인증 유도로 낙하).
+  async function handleAuthRefresh(): Promise<boolean> {
+    return (await refresh()) === "authed";
   }
 
   // 인가 판정: 중앙 SSO authed 이거나, 로컬 데모 토큰 보유(로컬 한정 폼 진입).
@@ -96,9 +104,9 @@ export default function TokenGate({
           </div>
         )}
         {children ? (
-          children(handleAuthExpired)
+          children(handleAuthExpired, handleAuthRefresh)
         ) : (
-          <ScoreWizard defaults={defaults} onAuthExpired={handleAuthExpired} />
+          <ScoreWizard defaults={defaults} onAuthExpired={handleAuthExpired} onAuthRefresh={handleAuthRefresh} />
         )}
       </div>
     );

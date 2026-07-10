@@ -81,7 +81,13 @@ function clearAssignmentDraft(): void {
   }
 }
 
-export default function CoachSetupFlow({ onAuthExpired }: { onAuthExpired?: () => void }) {
+export default function CoachSetupFlow({
+  onAuthExpired,
+  onAuthRefresh,
+}: {
+  onAuthExpired?: () => void;
+  onAuthRefresh?: () => Promise<boolean>; // 401 → 토큰 회전 → 원 요청 자동 재시도(게이트키퍼 SSO 계약)
+}) {
   const [phase, setPhase] = useState<Phase>("loading");
   const [assignment, setAssignment] = useState<CoachAssignment | null>(null);
   const [mode, setMode] = useState<WritingMode>("free");
@@ -112,6 +118,7 @@ export default function CoachSetupFlow({ onAuthExpired }: { onAuthExpired?: () =
         assignment={assignment}
         mode={mode}
         onAuthExpired={onAuthExpired}
+        onAuthRefresh={onAuthRefresh}
         // 개요/가이드만 plan 화면이 있어 '메모 다시 보기' 복귀 가능. 본문은 영속되어 왕복해도 유지.
         //   복귀 시 setup의 phase도 "plan"으로 갱신 — 그 화면에서 새로고침해도 plan으로 복원되게(Codex #134).
         onBackToPlan={

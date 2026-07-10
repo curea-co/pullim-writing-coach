@@ -134,10 +134,13 @@ export type UseScoreFormReturn = {
 
 export function useScoreForm(opts: {
   onAuthExpired?: () => void;
+  // 게이트키퍼 SSO 계약(2026-07-10): access 만료로 서버 401이면 refresh 후 **원 요청을 자동 재시도**.
+  //   true 반환 = 토큰 회전 성공(재시도 가능). TokenGate가 useAuth().refresh로 주입.
+  onAuthRefresh?: () => Promise<boolean>;
   defaults?: { school_level?: string; subject?: string; genre?: string };
   onResubmit?: () => void;
 }): UseScoreFormReturn {
-  const { onAuthExpired, defaults, onResubmit } = opts;
+  const { onAuthExpired, onAuthRefresh, defaults, onResubmit } = opts;
 
   // 초기값 우선순위: profile defaults > LRU 최빈값 > 빈 문자열.
   //   getMostUsedMeta가 async가 되어 lazy initializer 불가 → defaults로 초기화 후 effect로 LRU 채움.
@@ -457,7 +460,8 @@ export function useScoreForm(opts: {
   if (targetInvalid) missingFields.push("목표 글자 수");
 
   // ── 실시간 채점 호출 ────────────────────────────────────────────────
-  async function runScore(payload: ScoreRequest) {
+  //   retriedAuth: 401→refresh→재시도를 딱 1회로 제한(refresh가 성공했는데도 401이 반복되면 무한루프 방지).
+  async function runScore(payload: ScoreRequest, retriedAuth = false) {
     // SSO 정합: 인가는 서버 verifyWritingAccess(쿠키/me)가 권위. 데모토큰은 로컬 fallback 전용이므로
     //   토큰 부재가 곧 차단이 되어선 안 된다(prod authed 사용자는 데모토큰이 없다). 토큰이 있을 때만
     //   x-demo-token을 부착하고, 동일 출처 요청이라 access 쿠키(Domain=.pullim.ai)는 자동 전송된다.
@@ -490,6 +494,11 @@ export function useScoreForm(opts: {
     }
 
     if (res.status === 401) {
+      // 게이트키퍼 SSO 계약: access 만료(401) → refresh → 성공 시 **같은 요청 자동 재시도**(1회 한정).
+      //   회전 실패(guest/error)면 기존 흐름(onAuthExpired — 재인증 유도)으로 낙하.
+      if (!retriedAuth && onAuthRefresh && (await onAuthRefresh())) {
+        return runScore(payload, true);
+      }
       setSubmitState({ phase: "idle" });
       onAuthExpired?.();
       return;

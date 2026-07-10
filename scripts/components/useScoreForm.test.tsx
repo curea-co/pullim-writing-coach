@@ -119,6 +119,52 @@ describe("useScoreForm", () => {
     expect(onAuthExpired).not.toHaveBeenCalled();
   });
 
+  // 게이트키퍼 SSO 계약(2026-07-10): access 만료(401) → refresh(onAuthRefresh) → 성공 시 **같은 요청 자동 재시도**.
+  it("401 → onAuthRefresh true → 같은 요청 자동 재시도 → 200 result (onAuthExpired 미호출)", async () => {
+    // 1번째 /api/score = 401(만료), 2번째 = 200 — 게이트키퍼 테스트 시나리오 그대로.
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 401, json: () => Promise.reject() } as unknown as Response)
+      .mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve(MOCK_OUTPUT) } as Response);
+    vi.stubGlobal("fetch", fetchMock);
+    const onAuthExpired = vi.fn();
+    const onAuthRefresh = vi.fn(async () => true); // 토큰 회전 성공
+    const { result } = renderHook(() => useScoreForm({ onAuthExpired, onAuthRefresh }));
+    act(() => {
+      result.current.onEditorChange({ html: "<p>오늘 학교에서 친구들과 점심을 먹으며 교복 자율화에 대해 토론했다. 나는 교복이 학생의 개성을 제한한다고 생각한다.</p>", text: "오늘 학교에서 친구들과 점심을 먹으며 교복 자율화에 대해 토론했다. 나는 교복이 학생의 개성을 제한한다고 생각한다." });
+      result.current.setSchoolLevel("중2");
+      result.current.setSubject("국어");
+      result.current.setGenre("논설문·주장하는 글");
+      result.current.setPromptText("교복 자율화에 대한 자신의 주장을 근거 2개 이상으로 쓰시오.");
+    });
+    act(() => { result.current.handleSubmit({ preventDefault: () => {} } as React.FormEvent); });
+    await waitFor(() => expect(result.current.submitState.phase).toBe("result"));
+    expect(onAuthRefresh).toHaveBeenCalledOnce();
+    // /api/score 2회(원 호출 + 재시도) — 재인증 유도(onAuthExpired)로 낙하하지 않음.
+    const scoreCalls = fetchMock.mock.calls.filter(([u]) => u === "/api/score");
+    expect(scoreCalls.length).toBe(2);
+    expect(onAuthExpired).not.toHaveBeenCalled();
+  });
+
+  it("401 반복(refresh 성공에도 재401) → 1회만 재시도 후 onAuthExpired 낙하(무한루프 방지)", async () => {
+    vi.stubGlobal("fetch", vi.fn(() =>
+      Promise.resolve({ ok: false, status: 401, json: () => Promise.reject() } as unknown as Response)
+    ));
+    const onAuthExpired = vi.fn();
+    const onAuthRefresh = vi.fn(async () => true);
+    const { result } = renderHook(() => useScoreForm({ onAuthExpired, onAuthRefresh }));
+    act(() => {
+      result.current.onEditorChange({ html: "<p>오늘 학교에서 친구들과 점심을 먹으며 교복 자율화에 대해 토론했다. 나는 교복이 학생의 개성을 제한한다고 생각한다.</p>", text: "오늘 학교에서 친구들과 점심을 먹으며 교복 자율화에 대해 토론했다. 나는 교복이 학생의 개성을 제한한다고 생각한다." });
+      result.current.setSchoolLevel("중2");
+      result.current.setSubject("국어");
+      result.current.setGenre("논설문·주장하는 글");
+      result.current.setPromptText("교복 자율화에 대한 자신의 주장을 근거 2개 이상으로 쓰시오.");
+    });
+    act(() => { result.current.handleSubmit({ preventDefault: () => {} } as React.FormEvent); });
+    await waitFor(() => expect(onAuthExpired).toHaveBeenCalledOnce());
+    expect(onAuthRefresh).toHaveBeenCalledOnce(); // 재시도 1회 한정
+    expect(result.current.submitState.phase).toBe("idle");
+  });
+
   it("401 response → onAuthExpired called, phase back to idle", async () => {
     vi.stubGlobal("fetch", vi.fn(() =>
       Promise.resolve({ ok: false, status: 401, json: () => Promise.reject() } as unknown as Response)

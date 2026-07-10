@@ -567,10 +567,12 @@ export default function CoachClient({
   onNewAssignment,
   onBackToPlan,
   onBackToMode,
+  onAuthRefresh,
 }: {
   assignment?: CoachAssignment;
   mode?: WritingMode;
   onAuthExpired?: () => void;
+  onAuthRefresh?: () => Promise<boolean>; // 401 → 토큰 회전 → callCoach 자동 재시도(게이트키퍼 SSO 계약)
   onNewAssignment?: () => void;
   onBackToPlan?: () => void; // 개요/가이드 메모 화면(plan)으로 복귀 — 있으면 캔버스에 '메모 다시 보기' chevron 노출.
   onBackToMode?: () => void; // 자유/음성(plan 없는 모드) 모드 선택으로 복귀 — 있으면 캔버스에 '모드 다시 선택' chevron 노출.
@@ -675,10 +677,14 @@ export default function CoachClient({
   const runCheck = async () => {
     if (!state.body.trim()) return;
     dispatch({ type: "CHECK_START" });
-    const r = await callCoach(state.body, assignment, rubricRef.current, mode);
+    let r = await callCoach(state.body, assignment, rubricRef.current, mode);
+    // 게이트키퍼 SSO 계약: access 만료(401) → refresh → 성공 시 같은 요청 1회 자동 재시도.
+    if (!r.ok && r.auth && onAuthRefresh && (await onAuthRefresh())) {
+      r = await callCoach(state.body, assignment, rubricRef.current, mode);
+    }
     if (!r.ok) {
       if (r.auth) {
-        dispatch({ type: "AUTH_EXPIRED" }); // 글 보존하고 write 복귀
+        dispatch({ type: "AUTH_EXPIRED" }); // 글 보존하고 write 복귀(회전 실패 — 재인증 유도)
         onAuthExpired?.();
         return;
       }
@@ -730,7 +736,11 @@ export default function CoachClient({
     const lastBody = sessionRef.current?.draftHistory[sessionRef.current.draftHistory.length - 1]?.body ?? "";
     const wasRevised = sessionRef.current ? state.body !== lastBody : true;
     dispatch({ type: "RECHECK_START" });
-    const r = await callCoach(state.body, assignment, rubricRef.current, mode);
+    let r = await callCoach(state.body, assignment, rubricRef.current, mode);
+    // 게이트키퍼 SSO 계약: access 만료(401) → refresh → 성공 시 같은 요청 1회 자동 재시도.
+    if (!r.ok && r.auth && onAuthRefresh && (await onAuthRefresh())) {
+      r = await callCoach(state.body, assignment, rubricRef.current, mode);
+    }
     if (!r.ok) {
       if (r.auth) {
         dispatch({ type: "AUTH_EXPIRED" });
