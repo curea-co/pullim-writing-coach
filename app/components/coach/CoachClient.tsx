@@ -567,10 +567,14 @@ export default function CoachClient({
   onNewAssignment,
   onBackToPlan,
   onBackToMode,
+  onAuthRefresh,
 }: {
   assignment?: CoachAssignment;
   mode?: WritingMode;
   onAuthExpired?: () => void;
+  // 401 → 토큰 회전(게이트키퍼 SSO 계약): authed=callCoach 자동 재시도 · guest=재인증 유도 ·
+  //   error=인증 서버 장애(일시 오류 UI — 재로그인으로 위장 금지).
+  onAuthRefresh?: () => Promise<"authed" | "guest" | "error">;
   onNewAssignment?: () => void;
   onBackToPlan?: () => void; // 개요/가이드 메모 화면(plan)으로 복귀 — 있으면 캔버스에 '메모 다시 보기' chevron 노출.
   onBackToMode?: () => void; // 자유/음성(plan 없는 모드) 모드 선택으로 복귀 — 있으면 캔버스에 '모드 다시 선택' chevron 노출.
@@ -675,10 +679,20 @@ export default function CoachClient({
   const runCheck = async () => {
     if (!state.body.trim()) return;
     dispatch({ type: "CHECK_START" });
-    const r = await callCoach(state.body, assignment, rubricRef.current, mode);
+    let r = await callCoach(state.body, assignment, rubricRef.current, mode);
+    // 게이트키퍼 SSO 계약: access 만료(401) → refresh → authed면 같은 요청 1회 자동 재시도.
+    //   error(인증 서버 장애)는 세션 만료로 위장하지 않고 일시 오류로(use-auth 분리 계약, Codex #151).
+    if (!r.ok && r.auth && onAuthRefresh) {
+      const st = await onAuthRefresh();
+      if (st === "authed") r = await callCoach(state.body, assignment, rubricRef.current, mode);
+      else if (st === "error") {
+        dispatch({ type: "ERROR", message: "코치를 잠시 불러올 수 없어요. 잠시 후 다시 시도해 주세요.", retryable: true });
+        return;
+      }
+    }
     if (!r.ok) {
       if (r.auth) {
-        dispatch({ type: "AUTH_EXPIRED" }); // 글 보존하고 write 복귀
+        dispatch({ type: "AUTH_EXPIRED" }); // 글 보존하고 write 복귀(만료 확정 — 재인증 유도)
         onAuthExpired?.();
         return;
       }
@@ -730,7 +744,16 @@ export default function CoachClient({
     const lastBody = sessionRef.current?.draftHistory[sessionRef.current.draftHistory.length - 1]?.body ?? "";
     const wasRevised = sessionRef.current ? state.body !== lastBody : true;
     dispatch({ type: "RECHECK_START" });
-    const r = await callCoach(state.body, assignment, rubricRef.current, mode);
+    let r = await callCoach(state.body, assignment, rubricRef.current, mode);
+    // 게이트키퍼 SSO 계약: 401 → refresh → authed면 재시도 · error는 일시 오류(위 runCheck와 동일).
+    if (!r.ok && r.auth && onAuthRefresh) {
+      const st = await onAuthRefresh();
+      if (st === "authed") r = await callCoach(state.body, assignment, rubricRef.current, mode);
+      else if (st === "error") {
+        dispatch({ type: "ERROR", message: "코치를 잠시 불러올 수 없어요. 잠시 후 다시 시도해 주세요.", retryable: true });
+        return;
+      }
+    }
     if (!r.ok) {
       if (r.auth) {
         dispatch({ type: "AUTH_EXPIRED" });

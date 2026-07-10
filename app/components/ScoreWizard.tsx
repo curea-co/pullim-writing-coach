@@ -16,16 +16,18 @@ import StepResult from "@/app/components/StepResult";
 
 export type ScoreWizardProps = {
   onAuthExpired?: () => void;
+  onAuthRefresh?: () => Promise<"authed" | "guest" | "error">; // 401 → 토큰 회전(게이트키퍼 SSO 계약)
   defaults?: { school_level?: string; subject?: string; genre?: string };
 };
 
-export default function ScoreWizard({ onAuthExpired, defaults }: ScoreWizardProps): React.ReactNode {
+export default function ScoreWizard({ onAuthExpired, onAuthRefresh, defaults }: ScoreWizardProps): React.ReactNode {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [spellcheckOn, setSpellcheckOn] = useState(false); // RichEditor 맞춤법 표시 UI 상태(소유).
   const formTopRef = useRef<HTMLDivElement>(null);
 
   const form = useScoreForm({
     onAuthExpired,
+    onAuthRefresh,
     defaults,
     onResubmit: () => {
       setStep(1);

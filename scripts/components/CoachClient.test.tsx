@@ -6,7 +6,7 @@
  * 가짜로 교체한다. 실제 useReducer 루프(EDIT dispatch → state.body)는 그대로 실행한다.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, act } from "@testing-library/react";
+import { render, screen, act, waitFor } from "@testing-library/react";
 
 // ── Canvas stub — TipTap/ProseMirror 없이 마운트 가능하게 ──────────────────
 let capturedInsertBlock: ((text: string) => void) | null = null;
@@ -128,6 +128,61 @@ describe("CoachClient voice 분기", () => {
     expect(capturedInsertBlock).toHaveBeenCalledTimes(2);
     expect(capturedInsertBlock).toHaveBeenNthCalledWith(1, "첫 번째 줄");
     expect(capturedInsertBlock).toHaveBeenNthCalledWith(2, "두 번째 줄");
+  });
+
+  // 게이트키퍼 SSO 계약(2026-07-10): /api/coach 401 → onAuthRefresh(토큰 회전) → 같은 요청 1회 자동 재시도.
+  it("[봐줘] 401 → onAuthRefresh true → /api/coach 자동 재시도 (onAuthExpired 미호출)", async () => {
+    const VALID_COACH_OUTPUT = {
+      area_scores: [
+        { area: "과제 이해", score: 14 },
+        { area: "내용 충실도", score: 10 },
+        { area: "구조·논리", score: 12 },
+        { area: "표현·문장", score: 13 },
+        { area: "성장 가능성", score: 11 },
+      ],
+      nudges: [
+        {
+          paragraph_index: 1,
+          rubric_area: "내용 충실도",
+          diagnosis: "주장만 있고 근거가 없어요.",
+          guiding_question: "네 경험에서 왜 그런지 하나 떠올려볼까?",
+          quick_win_rank: 1,
+        },
+      ],
+    };
+    // 1번째 /api/coach = 401(만료), 2번째 = 200 — 게이트키퍼 테스트 시나리오 그대로.
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 401, json: () => Promise.reject() })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve(VALID_COACH_OUTPUT) });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("sessionStorage", {
+      getItem: () => null,
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    });
+    const onAuthExpired = vi.fn();
+    const onAuthRefresh = vi.fn(async () => "authed" as const);
+
+    render(
+      <CoachClient
+        assignment={DEMO_ASSIGNMENT}
+        mode="free"
+        onAuthExpired={onAuthExpired}
+        onAuthRefresh={onAuthRefresh}
+      />,
+    );
+    act(() => { screen.getByTestId("canvas-trigger-insert").click(); });
+    act(() => { screen.getByTestId("coach-ask").click(); });
+
+    // 이벤트 핸들러의 비동기 체인(401→refresh→재시도→dispatch)은 React가 추적하지 않으므로
+    //   최종 UI 상태(넛지 카드)를 명시적으로 기다린다(Codex #151 — 간헐 실패 방지).
+    await waitFor(() => expect(screen.getByTestId("nudge-card-stub")).toBeInTheDocument());
+    // 401 → refresh 1회 → 같은 요청 재시도(총 2회 호출), 재인증 유도(onAuthExpired)로 낙하하지 않음.
+    expect(onAuthRefresh).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(onAuthExpired).not.toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
   });
 
   it("checking 단계(busy)에서도 VoicePanel이 마운트 유지된다 (전사 데이터 손실 없음)", async () => {
