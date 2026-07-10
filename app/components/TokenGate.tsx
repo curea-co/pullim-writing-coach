@@ -63,9 +63,15 @@ export default function TokenGate({
     writeToken(AUTO_TOKEN);
   }, []);
 
-  // 서버 401(E-AUTH) 시 로컬 데모 토큰 폐기 — children/ScoreWizard가 호출. (로컬 한정 잔존)
+  // 서버 401(E-AUTH) 시 호출 — children/ScoreWizard가 호출.
+  //   ① 로컬 데모 토큰 폐기(로컬 한정 잔존). ② **중앙 상태 재동기화**(Codex #151 4R): refresh 성공 직후
+  //   재401(만료 확정/권한 회수) 케이스에서 데모 토큰만 지우면 useAuth status가 stale authed로 남아
+  //   재인증 배너(needsReauth)가 뜨지 않는다. refresh()를 다시 돌려 실제 만료면 guest로 전이 →
+  //   배너·로그인 CTA 보장, 세션이 살아 있으면 authed 유지(과잉 로그아웃 없음). fire-and-forget이라
+  //   요청 재시도 루프와 무관(무한루프 없음).
   function handleAuthExpired() {
     writeToken(null);
+    void refresh();
   }
 
   // 게이트키퍼 SSO 계약(2026-07-10): access 만료(서버 401) → /auth/refresh 회전 → authed면 호출부가
