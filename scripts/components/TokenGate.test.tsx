@@ -6,8 +6,10 @@ import { render, screen, waitFor } from "@testing-library/react";
 
 // useAuth를 mock으로 주입 — AuthProvider 없이 status를 직접 제어.
 let mockStatus: "loading" | "authed" | "guest" | "error" = "guest";
+// refresh mock이 mockStatus를 바꾼 뒤 반환 — handleAuthExpired의 재동기화(#151 4R)를 재현하기 위함.
+const mockRefresh = vi.fn(async () => mockStatus);
 vi.mock("@/app/lib/use-auth", () => ({
-  useAuth: () => ({ user: null, status: mockStatus, refresh: async () => {} }),
+  useAuth: () => ({ user: null, status: mockStatus, refresh: mockRefresh }),
 }));
 
 // ScoreWizard는 무거운 의존(에디터 등) — 가벼운 stub.
@@ -84,6 +86,39 @@ it("status=error → 로그인 CTA·폼 모두 미렌더 (인증서버 장애를
   render(<TokenGate />);
   expect(screen.queryByRole("button", { name: /로그인/ })).not.toBeInTheDocument();
   expect(screen.queryByTestId("score-wizard")).not.toBeInTheDocument();
+});
+
+// Codex #152: 진입(entered) 후 서버 401 → onAuthExpired가 refresh() 재동기화 → 인증 서버 장애로
+//   status="error"가 되는 케이스. needsReauth를 status==="guest"로 좁히지 않으면 error도 "세션 만료"
+//   배너로 오인 노출된다(자식이 이미 일시 오류 UI를 띄운 위에 잘못된 재로그인 CTA가 겹쳐짐).
+it("진입 후 401→refresh가 'error'로 귀결 → '세션 만료' 배너 미노출(장애를 재로그인으로 위장 안 함)", async () => {
+  mockStatus = "authed";
+  let capturedOnAuthExpired: (() => void) | null = null;
+  const { rerender } = render(
+    <TokenGate>
+      {(onAuthExpired) => {
+        capturedOnAuthExpired = onAuthExpired;
+        return <div data-testid="coach-child">COACH</div>;
+      }}
+    </TokenGate>,
+  );
+  await waitFor(() => expect(screen.getByTestId("coach-child")).toBeInTheDocument());
+
+  // 서버 401 발생 → 인증 서버 장애로 refresh가 "error" 귀결(재동기화).
+  mockStatus = "error";
+  await (async () => { capturedOnAuthExpired!(); await Promise.resolve(); })();
+  rerender(
+    <TokenGate>
+      {(onAuthExpired) => {
+        capturedOnAuthExpired = onAuthExpired;
+        return <div data-testid="coach-child">COACH</div>;
+      }}
+    </TokenGate>,
+  );
+
+  // entered=true라 자식은 계속 렌더(글 보존)되지만, "세션이 만료됐어요" 배너는 뜨지 않아야 한다.
+  expect(screen.getByTestId("coach-child")).toBeInTheDocument();
+  expect(screen.queryByText(/세션이 만료됐어요/)).not.toBeInTheDocument();
 });
 
 it("로컬 데모: 저장된 토큰 있으면 guest여도 폼 렌더(로그인 CTA 아님)", async () => {

@@ -96,7 +96,11 @@ export default function TokenGate({
 
   // 진입한 적 있으면 위저드를 계속 렌더(상태=작성 글 보존). allowed가 풀렸으면(401 등) 재인증 배너만 올린다.
   if (allowed || entered) {
-    const needsReauth = !allowed; // 진입 후 토큰 폐기(서버 401) — 폼은 유지, 재로그인 유도.
+    // 진입 후 토큰 폐기(서버 401 확정 만료) — 폼은 유지, 재로그인 유도. **status==="guest"로 좁힌다**
+    //   (Codex #152): handleAuthExpired가 refresh()로 상태를 재동기화하면 인증 서버 장애 시 status가
+    //   "error"가 될 수 있다. !allowed로만 판정하면 error도 "세션 만료"로 뭉개져, 자식이 이미 띄운
+    //   일시 오류 UI 위에 상위가 잘못된 재로그인 배너를 겹쳐 그린다(use-auth guest/error 분리 계약 위반).
+    const needsReauth = !allowed && status === "guest";
     return (
       <div className="space-y-4">
         {needsReauth && (
