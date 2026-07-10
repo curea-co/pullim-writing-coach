@@ -134,10 +134,14 @@ export type UseScoreFormReturn = {
 
 export function useScoreForm(opts: {
   onAuthExpired?: () => void;
+  // 게이트키퍼 SSO 계약(2026-07-10): access 만료로 서버 401이면 refresh 후 **원 요청을 자동 재시도**.
+  //   authed=재시도 · guest=재인증 유도(onAuthExpired) · error=인증 서버 장애(일시 오류 UI —
+  //   재로그인으로 위장 금지, use-auth 분리 계약). TokenGate가 useAuth().refresh로 주입.
+  onAuthRefresh?: () => Promise<"authed" | "guest" | "error">;
   defaults?: { school_level?: string; subject?: string; genre?: string };
   onResubmit?: () => void;
 }): UseScoreFormReturn {
-  const { onAuthExpired, defaults, onResubmit } = opts;
+  const { onAuthExpired, onAuthRefresh, defaults, onResubmit } = opts;
 
   // 초기값 우선순위: profile defaults > LRU 최빈값 > 빈 문자열.
   //   getMostUsedMeta가 async가 되어 lazy initializer 불가 → defaults로 초기화 후 effect로 LRU 채움.
@@ -457,7 +461,8 @@ export function useScoreForm(opts: {
   if (targetInvalid) missingFields.push("목표 글자 수");
 
   // ── 실시간 채점 호출 ────────────────────────────────────────────────
-  async function runScore(payload: ScoreRequest) {
+  //   retriedAuth: 401→refresh→재시도를 딱 1회로 제한(refresh가 성공했는데도 401이 반복되면 무한루프 방지).
+  async function runScore(payload: ScoreRequest, retriedAuth = false) {
     // SSO 정합: 인가는 서버 verifyWritingAccess(쿠키/me)가 권위. 데모토큰은 로컬 fallback 전용이므로
     //   토큰 부재가 곧 차단이 되어선 안 된다(prod authed 사용자는 데모토큰이 없다). 토큰이 있을 때만
     //   x-demo-token을 부착하고, 동일 출처 요청이라 access 쿠키(Domain=.pullim.ai)는 자동 전송된다.
@@ -490,6 +495,17 @@ export function useScoreForm(opts: {
     }
 
     if (res.status === 401) {
+      // 게이트키퍼 SSO 계약: access 만료(401) → refresh → authed면 **같은 요청 자동 재시도**(1회 한정).
+      if (!retriedAuth && onAuthRefresh) {
+        const st = await onAuthRefresh();
+        if (st === "authed") return runScore(payload, true);
+        if (st === "error") {
+          // 인증 서버 5xx/네트워크 — 세션 만료로 위장하지 않는다(use-auth error 분리 계약, Codex #151).
+          setSubmitState({ phase: "error", code: "E8", message: ERROR_MESSAGE.E8, retryable: true });
+          return;
+        }
+      }
+      // guest(회전 결과 만료 확정) 또는 onAuthRefresh 미주입/재401 — 재인증 유도.
       setSubmitState({ phase: "idle" });
       onAuthExpired?.();
       return;

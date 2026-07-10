@@ -47,9 +47,11 @@ export default function TokenGate({
   defaults?: { school_level?: string; subject?: string; genre?: string };
   // 코치 등 다른 게이티드 화면을 자식으로 받는다. 제공 시 ScoreWizard 대신 렌더.
   //   onAuthExpired는 서버 401(E-AUTH) 시 호출 — 로컬 데모 토큰 폐기용으로 보존.
-  children?: (onAuthExpired: () => void) => React.ReactNode;
+  //   onAuthRefresh는 401 시 토큰 회전 — 결과 Status를 그대로 전파: authed=원 요청 자동 재시도,
+  //   guest=재인증 유도, error=인증 서버 장애(재로그인으로 위장 금지 — 일시 오류 UI). 게이트키퍼 SSO 계약.
+  children?: (onAuthExpired: () => void, onAuthRefresh: () => Promise<"authed" | "guest" | "error">) => React.ReactNode;
 } = {}) {
-  const { status } = useAuth();
+  const { status, refresh } = useAuth();
 
   // 서버/하이드레이션 스냅샷은 null → 이후 실제 토큰으로 전환. 로컬 데모 토큰 존재 여부.
   const demoToken = useSyncExternalStore(subscribeToken, readToken, () => null);
@@ -61,9 +63,25 @@ export default function TokenGate({
     writeToken(AUTO_TOKEN);
   }, []);
 
-  // 서버 401(E-AUTH) 시 로컬 데모 토큰 폐기 — children/ScoreWizard가 호출. (로컬 한정 잔존)
+  // 서버 401(E-AUTH) 시 호출 — children/ScoreWizard가 호출.
+  //   ① 로컬 데모 토큰 폐기(로컬 한정 잔존). ② **중앙 상태 재동기화**(Codex #151 4R): refresh 성공 직후
+  //   재401(만료 확정/권한 회수) 케이스에서 데모 토큰만 지우면 useAuth status가 stale authed로 남아
+  //   재인증 배너(needsReauth)가 뜨지 않는다. refresh()를 다시 돌려 실제 만료면 guest로 전이 →
+  //   배너·로그인 CTA 보장, 세션이 살아 있으면 authed 유지(과잉 로그아웃 없음). fire-and-forget이라
+  //   요청 재시도 루프와 무관(무한루프 없음).
   function handleAuthExpired() {
     writeToken(null);
+    void refresh();
+  }
+
+  // 게이트키퍼 SSO 계약(2026-07-10): access 만료(서버 401) → /auth/refresh 회전 → authed면 호출부가
+  //   **원 요청을 자동 재시도**. use-auth.refresh는 csrf 부트스트랩→refresh→/me 재검증까지 수행.
+  //   Status를 boolean으로 뭉개지 않는다(Codex #151): guest(만료 — 재인증 유도)와 error(인증 서버
+  //   5xx/네트워크 — 장애를 재로그인으로 은폐 금지, use-auth의 분리 계약)를 호출부가 구분 처리한다.
+  //   loading은 refresh 최종 상태로 나올 수 없어 error로 수렴(방어).
+  async function handleAuthRefresh(): Promise<"authed" | "guest" | "error"> {
+    const st = await refresh();
+    return st === "loading" ? "error" : st;
   }
 
   // 인가 판정: 중앙 SSO authed 이거나, 로컬 데모 토큰 보유(로컬 한정 폼 진입).
@@ -96,9 +114,9 @@ export default function TokenGate({
           </div>
         )}
         {children ? (
-          children(handleAuthExpired)
+          children(handleAuthExpired, handleAuthRefresh)
         ) : (
-          <ScoreWizard defaults={defaults} onAuthExpired={handleAuthExpired} />
+          <ScoreWizard defaults={defaults} onAuthExpired={handleAuthExpired} onAuthRefresh={handleAuthRefresh} />
         )}
       </div>
     );
