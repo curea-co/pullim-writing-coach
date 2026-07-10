@@ -837,6 +837,22 @@ export default function CoachClient({
     <div className={`${styles.root} ${styles.stageBg} flex w-full flex-col items-center`}>
       {/* (OS 토픽바 제거 — 앱셸 헤더(풀림·라이팅 코치)와 중복 + "체험" 데모 배지 잔재였음. UX 점검 ④) */}
 
+      {/* 자유/음성 모드 back — plan 스텝(개요/가이드)의 '← 모드 다시 선택' 상단 텍스트 버튼과 동형·동위치
+          (사용자 요청 2026-07-10: 하단 pill → 상단 이동). write 단계에서만(점검/완료 중 이탈 방지).
+          본문은 assignmentSig별 bodyHtml 영속이라 왕복해도 유지. */}
+      {onBackToMode && state.phase === "write" && (
+        <div className="w-full max-w-[1280px] px-[22px] pt-[14px]">
+          <button
+            type="button"
+            onClick={onBackToMode}
+            aria-label="작성 모드 다시 선택"
+            className="text-sm text-[var(--ink-4)] transition hover:text-[var(--pullim-ink)]"
+          >
+            ← 모드 다시 선택
+          </button>
+        </div>
+      )}
+
       {/* 무대 리드 카피 */}
       <div className="flex w-full max-w-[1280px] items-center justify-between gap-4 px-[22px] pt-[18px]">
         <p className="max-w-[60ch] text-[13.5px] text-[var(--ink-3)]">
@@ -907,26 +923,19 @@ export default function CoachClient({
             editorRef={editorRef}
           />
 
-          {/* 캔버스 back chevron — 캔버스 하단과 '봐줘' CTA(시트 peek) 사이. 개요/가이드는 plan(메모) 화면으로,
-              자유/음성은 모드 선택으로 복귀(사용자 요청 2026-07-10). 본문(bodyHtml)은 localStorage 영속이라
-              왕복해도 유지됨. write 단계에서만. 두 back은 모드에 따라 상호배타(둘 다 오지 않음). */}
-          {(() => {
-            const back = onBackToPlan
-              ? { fn: onBackToPlan, label: "메모 다시 보기", aria: "개요·가이드 메모 다시 보기" }
-              : onBackToMode
-                ? { fn: onBackToMode, label: "모드 다시 선택", aria: "작성 모드 다시 선택" }
-                : null;
-            return back && state.phase === "write" ? (
-              <button
-                type="button"
-                onClick={back.fn}
-                aria-label={back.aria}
-                className="absolute inset-x-0 bottom-[86px] z-20 mx-auto flex w-fit items-center gap-1 rounded-[var(--r-pill)] border border-[var(--line)] bg-white/95 px-3 py-1.5 text-[12px] font-medium text-[var(--ink-3)] shadow-[var(--sh-1)] backdrop-blur transition hover:text-[var(--pullim-ink)]"
-              >
-                <span aria-hidden className="text-[15px] leading-none">‹</span> {back.label}
-              </button>
-            ) : null;
-          })()}
+          {/* 개요·가이드 메모 다시 보기 — 캔버스 하단과 '봐줘' CTA(시트 peek) 사이. plan 화면으로 복귀해
+              무엇을 메모했는지 확인. 본문(bodyHtml)은 localStorage 영속이라 왕복해도 유지됨. write 단계·해당
+              모드에서만. (자유/음성의 '모드 다시 선택'은 무대 상단 텍스트 버튼 — plan 스텝과 동형.) */}
+          {onBackToPlan && state.phase === "write" && (
+            <button
+              type="button"
+              onClick={onBackToPlan}
+              aria-label="개요·가이드 메모 다시 보기"
+              className="absolute inset-x-0 bottom-[86px] z-20 mx-auto flex w-fit items-center gap-1 rounded-[var(--r-pill)] border border-[var(--line)] bg-white/95 px-3 py-1.5 text-[12px] font-medium text-[var(--ink-3)] shadow-[var(--sh-1)] backdrop-blur transition hover:text-[var(--pullim-ink)]"
+            >
+              <span aria-hidden className="text-[15px] leading-none">‹</span> 메모 다시 보기
+            </button>
+          )}
 
           {/* 바텀시트 */}
           <BottomSheet
