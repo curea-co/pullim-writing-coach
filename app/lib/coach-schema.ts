@@ -189,19 +189,27 @@ function collapseWhitespace(s: string): string {
 const SENTENCE_BOUNDARY = /[.!?。…]/;
 
 // quoted(공백 제거·정규화됨)가 draftKey(공백 제거된 학생 원고) 안에서 **정확히 한 문장**으로 등장하는지.
-//   시작 = 문두 또는 마침표 직후. 끝 = quoted 내부(마지막 글자 제외)에 문장 경계 문자가 없어야 한다
-//   (Codex #155 2R — 시작 경계만 보면 여러 문장을 통째로 이어 붙인 인용도 통과해 가드가 다시 느슨해짐).
-//   quoted 자체의 마지막 글자가 마침표류일 수 있으므로(SENTENCE_END 통과 조건) 그 글자는 검사에서 제외.
-//   원고에 같은 조각이 여러 번 나올 수 있어 모든 등장 위치를 확인 — 하나라도 두 경계를 만족하면 echo로 인정.
+//   시작 = 문두 또는 마침표 직후. 끝 = quoted 자체가 문장부호로 끝나거나(스스로 종결) — 아니면(예:
+//   "다"류 어미만으로 SENTENCE_END를 통과한 경우) **원고에서 quoted 바로 다음 글자가 문서 끝이거나
+//   문장부호**여야 한다(Codex #155 3R — 안 그러면 "…위험하다고 생각한다"의 "다"까지만 잘라 "위험하다"를
+//   인용해도 문장 시작+어미 조건만으로 echo로 오인된다. "다고"의 "다"는 종결어미가 아니라 인용격 조사
+//   앞부분이라 실제 문장 끝이 아님 — 다음 글자가 "고"처럼 이어지면 차단). 내부(마지막 글자 제외)에
+//   문장 경계 문자가 있으면 여러 문장을 이어 붙인 것으로 보고 면제 안 함(Codex #155 2R).
+//   원고에 같은 조각이 여러 번 나올 수 있어 모든 등장 위치를 확인 — 하나라도 조건을 만족하면 echo로 인정.
 function isWholeSentenceEcho(quoted: string, draftKey: string): boolean {
   const interior = quoted.slice(0, -1); // 마지막 글자(종결 문장부호일 수 있음) 제외한 나머지
   if (SENTENCE_BOUNDARY.test(interior)) return false; // 내부에 문장 경계 있음 = 여러 문장 이어붙임
+  const selfTerminated = SENTENCE_BOUNDARY.test(quoted[quoted.length - 1]); // quoted 자체가 문장부호로 끝남
   let from = 0;
   for (;;) {
     const idx = draftKey.indexOf(quoted, from);
     if (idx === -1) return false;
-    const prev = idx === 0 ? null : draftKey[idx - 1];
-    if (prev === null || SENTENCE_BOUNDARY.test(prev)) return true;
+    const prevOk = idx === 0 || SENTENCE_BOUNDARY.test(draftKey[idx - 1]);
+    if (prevOk) {
+      if (selfTerminated) return true;
+      const next = draftKey[idx + quoted.length];
+      if (next === undefined || SENTENCE_BOUNDARY.test(next)) return true;
+    }
     from = idx + 1;
   }
 }
