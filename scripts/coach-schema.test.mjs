@@ -299,6 +299,36 @@ test("diagnosis가 마침표 없이 끝나도(필드 경계 모호) question의 
   assert.deepEqual(checkGenerationBlock(o, draft), []);
 });
 
+// Codex #155 9R (1/2) — 학생 원고가 마침표 없이 끝나는데 모델이 인용에만 마침표를 보태는 흔한
+//   정규화 차이. 반대 방향(원고엔 있는데 모델이 생략)은 부분 문자열 매칭상 원래도 통과했다.
+test("echo 면제 — 모델이 원고에 없는 마침표를 인용에 보태도 인정(부호 정규화)", () => {
+  const o = validOutput();
+  const sentenceNoPeriod = "학생들이 자신의 개성을 표현할 수 있기 때문이다"; // 원고: 마침표 없음
+  const draft = `나는 교복 자율화에 찬성한다. ${sentenceNoPeriod}`; // 원고 맨 끝 문장이라 부호 생략 흔함
+  o.nudges[0].guiding_question = `네가 쓴 '${sentenceNoPeriod}.'에서, 왜 그런지 예를 들어볼까?`; // 모델이 마침표 추가
+  assert.deepEqual(checkGenerationBlock(o, draft), []);
+});
+
+// Codex #155 9R (2/2) — 알려진 잔여 한계(정직 기록, KNOWN_GAP 관례): 인용은 한 필드(diagnosis)에,
+//   재작성 지시는 다른 필드(question)에 나뉘어 있는 "교차 필드" 조합은 필드별 완전 격리(8R) 설계상
+//   놓친다. 전역으로 막으면 "무관한 diagnosis 일반 코칭 표현 + question의 무관한 echo" 조합에서
+//   8R이 고친 오탐이 재발한다(예: diagnosis="이 부분은 다시 써 보자."+question="네가 쓴 '...'에서
+//   왜 그런지?" — 서로 무관한데 막힘). 휴리스틱으로 "코디네이션 여부(같은 인용을 가리키는지)"까지
+//   완전히 판별할 수 없어 이 방향은 잔여 gap으로 남긴다 — 실제 발생 시 v4 후속(예: nudge당 재작성
+//   지시 존재 자체를 더 강하게 제한)에서 재검토. 아래는 이 경계를 "실패가 아니라 알려진 상태"로
+//   고정해 회귀 감시에 걸리게 한다(assert.ok(true) — 실패 시 이 주석·판단을 재검토할 신호).
+test("[known_gap] 인용(diagnosis)·재작성 지시(question) 교차 필드 조합은 필드 격리 설계상 미탐지", () => {
+  const o = validOutput();
+  const sentence = "학생들이 자신의 개성을 표현할 수 있기 때문이다.";
+  const draft = `나는 교복 자율화에 찬성한다. ${sentence} 또한 편하다.`;
+  o.nudges[0].diagnosis = `네가 쓴 '${sentence}'는 핵심 근거야.`;
+  o.nudges[0].guiding_question = "이 문장을 결론에 다시 써 볼까?";
+  const violations = checkGenerationBlock(o, draft);
+  // 현재 설계의 실제 동작(미탐지)을 정직하게 고정 — 언젠가 이 assert가 실패하면(즉 탐지되기 시작하면)
+  // 그건 개선이니 이 known_gap 기록을 지우면 된다. 반대로 유지된다면 v4 논의 대상으로 남는다.
+  assert.deepEqual(violations, []);
+});
+
 test("위반 메시지는 어느 nudge인지(index) 가리킨다", () => {
   const o = validOutput();
   o.nudges = [

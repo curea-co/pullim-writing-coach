@@ -211,6 +211,20 @@ const SENTENCE_BOUNDARY = new RegExp(`[.!?。…${LINE_BOUNDARY_SENTINEL}]`);
 //   문장 경계 문자가 있으면 여러 문장을 이어 붙인 것으로 보고 면제 안 함(Codex #155 2R).
 //   원고에 같은 조각이 여러 번 나올 수 있어 모든 등장 위치를 확인 — 하나라도 조건을 만족하면 echo로 인정.
 function isWholeSentenceEcho(quoted: string, draftKey: string): boolean {
+  if (tryEchoMatch(quoted, draftKey)) return true;
+  // 모델이 원고에 없던 마침표류를 덧붙이는 흔한 정규화 차이도 echo로 인정한다(Codex #155 9R) — 학생
+  //   원고가 마침표 없이 끝나는 흔한 경우, 모델이 인용에 마침표를 보태면 quoted가 draftKey의 부분
+  //   문자열이 아니게 돼 매칭이 실패했다(반대 방향 — 원고에 있는데 모델이 생략 — 은 부분 문자열
+  //   매칭상 원래도 통과했음). quoted 끝의 문장부호를 떼고 한 번 더 시도.
+  const stripped = quoted.replace(/[.!?。…]+$/, "");
+  if (stripped.length > 0 && stripped !== quoted && tryEchoMatch(stripped, draftKey)) return true;
+  return false;
+}
+
+// 문장 시작(문두/마침표 직후)·끝(자기종결 또는 다음 글자가 경계/문서끝) 두 경계 + 내부 무경계를
+//   확인하는 단일 후보 검사(Codex #155 1R·2R·3R). isWholeSentenceEcho가 원본/부호-정규화 두 후보에
+//   각각 이 검사를 적용한다.
+function tryEchoMatch(quoted: string, draftKey: string): boolean {
   const interior = quoted.slice(0, -1); // 마지막 글자(종결 문장부호일 수 있음) 제외한 나머지
   if (SENTENCE_BOUNDARY.test(interior)) return false; // 내부에 문장 경계 있음 = 여러 문장 이어붙임
   const selfTerminated = SENTENCE_BOUNDARY.test(quoted[quoted.length - 1]); // quoted 자체가 문장부호로 끝남
