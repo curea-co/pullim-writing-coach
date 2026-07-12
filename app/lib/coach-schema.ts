@@ -183,12 +183,33 @@ function collapseWhitespace(s: string): string {
   return s.replace(/\s+/g, "");
 }
 
+// 문장 경계 문자(공백 제거 후 기준) — 인용 echo가 "문장 전체"인지 확인할 때 시작 위치가 이 뒤이거나
+//   원고 맨 앞이어야 한다(Codex #155 — 단순 부분 문자열 포함만으로는 두 문장에 걸친 15자+ 조각이나
+//   문장 중간에서 잘라낸 조각도 통과해 가드에 구멍이 생긴다).
+const SENTENCE_BOUNDARY = /[.!?。…]/;
+
+// quoted(공백 제거·정규화됨)가 draftKey(공백 제거된 학생 원고) 안에서 **문장 시작 지점**에 등장하는지.
+//   SENTENCE_END가 이미 quoted의 끝을 문장 종결로 제한하므로, 여기서는 시작 경계만 확인하면 된다
+//   (원고에 같은 조각이 여러 번 나올 수 있어 모든 등장 위치를 확인 — 하나라도 경계에 걸리면 echo로 인정).
+function isWholeSentenceEcho(quoted: string, draftKey: string): boolean {
+  let from = 0;
+  for (;;) {
+    const idx = draftKey.indexOf(quoted, from);
+    if (idx === -1) return false;
+    const prev = idx === 0 ? null : draftKey[idx - 1];
+    if (prev === null || SENTENCE_BOUNDARY.test(prev)) return true;
+    from = idx + 1;
+  }
+}
+
 // 한 nudge(진단+유도질문)에 대필 신호가 있으면 위반. 위반 메시지는 nudge 인덱스를 포함.
 //   studentDraft(선택) — 넘기면 "학생이 이미 쓴 문장을 그대로 되짚어 질문"하는 정당한 코칭을
 //   (2) 긴 인용 가드에서 면제한다(2026-07-12, 실사용 발견 — 코치가 학생 원고를 인용해 되묻는
 //   흔한 정상 패턴이 "완성문장 인용(대필)"로 오탐돼 재호출 후에도 계속 502였음). 면제는 **인용문이
-//   학생 원고에 공백 무시 정확히 존재할 때만** — 모델이 패러프레이즈/신규 작성한 문장은 원문에
-//   없으므로 여전히 차단된다(불변식 유지). 미전달 시 기존 동작과 100% 동일(하위 호환).
+//   학생 원고의 문장 시작 지점(문두 또는 마침표 직후)에 공백 무시 정확히 존재할 때만**(Codex #155 —
+//   단순 부분 문자열 포함이면 두 문장에 걸친 조각·문장 중간에서 잘라낸 조각도 통과해 구멍이 생김).
+//   모델이 패러프레이즈/신규 작성한 문장은 원문에 없으므로 여전히 차단된다(불변식 유지). 미전달 시
+//   기존 동작과 100% 동일(하위 호환).
 export function checkGenerationBlock(o: CoachOutput, studentDraft?: string): string[] {
   const v: string[] = [];
   const draftKey = studentDraft ? collapseWhitespace(studentDraft) : null;
@@ -209,7 +230,7 @@ export function checkGenerationBlock(o: CoachOutput, studentDraft?: string): str
     for (const m of text.matchAll(LONG_QUOTE)) {
       const quoted = m[1].trim();
       if (!SENTENCE_END.test(quoted)) continue;
-      if (draftKey && draftKey.includes(collapseWhitespace(quoted))) continue; // 학생 자기 문장 echo — 통과
+      if (draftKey && isWholeSentenceEcho(collapseWhitespace(quoted), draftKey)) continue; // 학생 자기 문장 전체 echo — 통과
       quoteHit = true;
       break;
     }
