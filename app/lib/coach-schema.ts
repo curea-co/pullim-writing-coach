@@ -189,7 +189,7 @@ function quotedInsertionSuggestion(text: string): boolean {
 //   하나로 바뀌고, 개행 없는 순수 공백(스페이스·탭)은 기존대로 완전히 제거된다 — 문장 내부 띄어쓰기
 //   차이는 여전히 무시하되, 줄바꿈 자리에는 경계 표지가 남는다. quoted(모델 출력, 단일 줄 JSON 문자열)
 //   에는 개행이 없어 이 갈래를 타지 않으므로 인용 비교 자체엔 영향 없다.
-const LINE_BOUNDARY_SENTINEL = " ";
+const LINE_BOUNDARY_SENTINEL = "\n";
 
 // 공백을 정규화한 비교키 — 인용문이 학생 원고를 "그대로" 인용했는지(echo) 판정할 때, 줄바꿈·띄어쓰기
 //   차이로 오탐/누락되지 않게 한다. 문자 순서·내용은 그대로라 실질적 왜곡(패러프레이즈)은 안 걸러진다.
@@ -259,13 +259,30 @@ export function checkGenerationBlock(o: CoachOutput, studentDraft?: string): str
       const quoted = m[1].trim();
       if (!SENTENCE_END.test(quoted)) continue;
       if (draftKey && isWholeSentenceEcho(collapseWhitespace(quoted), draftKey)) {
-        // 재작성 지시(QUOTE_REWRITE_DIRECTIVE)는 **이 인용 종료 직후부터 다음 인용(있으면) 또는 text
-        //   끝까지**를 검사한다(Codex #155 5R: text 전체면 인용과 무관한 다른 문장의 일반 코칭 표현에
-        //   오탐 / 6R: 고정된 짧은 윈도우면 위치·설명 문구를 늘려 지시어를 창 밖으로 밀어내는 우회 가능).
-        //   "이 인용 다음, 다른 인용이 나오기 전까지"로 좁혀 오탐도 우회도 동시에 막는다.
-        const windowEnd = mi + 1 < quoteMatches.length ? quoteMatches[mi + 1].index! : text.length;
-        const after = text.slice(m.index! + m[0].length, windowEnd);
-        if (!QUOTE_REWRITE_DIRECTIVE.test(after)) continue; // 인용~다음 인용 사이에 재작성 지시 없음 — echo로 통과
+        // 재작성 지시(QUOTE_REWRITE_DIRECTIVE)는 이 인용과 **같은 문장/절**(앞뒤 모두)에서만 검사한다.
+        //   범위는 "가장 가까운 문장 경계(.!?。 또는 이전/다음 인용)"까지로 제한 — Codex #155 5R(text
+        //   전체면 무관한 다른 문장의 일반 코칭 표현에 오탐)·6R(인용 뒤 고정 윈도우는 문구를 늘려 우회
+        //   가능)·7R("결론에 다시 써 봐: '…'"처럼 지시어가 인용 **앞**에 오는 어순은 뒤쪽만 보면 놓침)를
+        //   모두 좌우 대칭으로 막는다. 문장 경계 문자 자체는 지역 구간에서 제외(다음 문장으로 안 새게).
+        const prevBound = mi > 0 ? quoteMatches[mi - 1].index! + quoteMatches[mi - 1][0].length : 0;
+        const precedingSlice = text.slice(prevBound, m.index!);
+        const lastLocalBreak = Math.max(
+          precedingSlice.lastIndexOf("."),
+          precedingSlice.lastIndexOf("!"),
+          precedingSlice.lastIndexOf("?"),
+          precedingSlice.lastIndexOf("。"),
+        );
+        const before = precedingSlice.slice(lastLocalBreak + 1);
+        const nextBound = mi + 1 < quoteMatches.length ? quoteMatches[mi + 1].index! : text.length;
+        const followingSlice = text.slice(m.index! + m[0].length, nextBound);
+        const firstLocalBreak = (() => {
+          const idxs = [".", "!", "?", "。"]
+            .map((c) => followingSlice.indexOf(c))
+            .filter((idx) => idx !== -1);
+          return idxs.length > 0 ? Math.min(...idxs) : followingSlice.length;
+        })();
+        const after = followingSlice.slice(0, firstLocalBreak);
+        if (!QUOTE_REWRITE_DIRECTIVE.test(before) && !QUOTE_REWRITE_DIRECTIVE.test(after)) continue; // 재작성 지시 없음 — echo로 통과
       }
       quoteHit = true;
       break;
