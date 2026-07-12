@@ -165,7 +165,7 @@ export async function POST(req: Request): Promise<Response> {
   if (useMock) {
     const mock = runCoachMock(draft);
     const schemaErrs = validateCoachOutput(mock);
-    const guardErrs = runCoachGuards(mock);
+    const guardErrs = runCoachGuards(mock, draft);
     if (schemaErrs.length > 0 || guardErrs.length > 0) {
       // mock은 결정적이라 정상 코드패스에선 발생 불가 — 발생하면 버그. 깨진 출력 누출 금지.
       logMetric("mock_invalid", { schemaErrs, guardErrs });
@@ -238,7 +238,7 @@ export async function POST(req: Request): Promise<Response> {
     }
 
     // [GUARD] 생성 차단 가드 — 권위적. 위반 시 재호출, 절대 누출하지 않는다.
-    const guardErrs = runCoachGuards(parsed as CoachOutput);
+    const guardErrs = runCoachGuards(parsed as CoachOutput, draft);
     if (guardErrs.length > 0) {
       lastErrs = guardErrs;
       console.warn(`[/api/coach] 가드 위반(attempt ${attempt}): ${guardErrs.join("; ")}`);

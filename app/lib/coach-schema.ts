@@ -101,6 +101,13 @@ export function validateCoachOutput(o: unknown): string[] {
 const WRITE_DIRECTIVE =
   /이렇게\s*(써|쓰|적|작성|고쳐)|다음과\s*같이\s*(써|쓰|적|작성|고쳐)|라고\s*(써|쓰|적)|예시\s*문장|예문|추천\s*(문장|표현)|모범\s*(답안|문장|글)|이런\s*식으로\s*(써|적|고쳐)|대신\s*(써|작성)/;
 
+// 학생 자기 문장 echo 면제(아래 (2))의 안전 범위를 좁히는 지시 패턴(Codex #155 4R) — echo 면제는
+//   "학생이 쓴 문장을 되짚어 질문"하는 문맥에만 해당해야 하는데, 인용 뒤에 "다시 써/고쳐 써/바꿔 써/
+//   그대로 옮겨" 류가 붙으면 "이 문장을 그대로(또는 손봐서) 다른 자리에 다시 쓰라"는 **지시**가 되어
+//   기계적 복붙/재작성을 유도한다 — 대필은 아니어도 스스로 고쳐 쓰게 만드는 코칭 취지에 어긋난다.
+const QUOTE_REWRITE_DIRECTIVE =
+  /다시\s*(써|쓰|적)|고쳐\s*(써|쓰|보자|볼까|보아)|바꿔\s*(써|쓰|보자|볼까)|옮겨\s*(써|쓰)|그대로\s*(써|쓰|사용|옮기|옮겨)/;
+
 // 인용부호 종류(ASCII·스마트·낫표·겹낫표)
 const QUOTE_CHARS = "'\"‘’“”「」『』";
 // (2) 붙여넣기용 완성문장 신호: 인용 안 내용이 15자 이상이고 문장부호 또는 한국어 종결어미로 끝남.
@@ -177,9 +184,126 @@ function quotedInsertionSuggestion(text: string): boolean {
   return DECLARATIVE_END.test(quoted) || /\s/.test(quoted) || quoted.length >= 10;
 }
 
+// 줄바꿈 경계 표지 — 마침표 없이 줄바꿈만으로 문장/문단을 구분하는 원고(흔함)에서도 그 줄바꿈을
+//   문장 경계로 인정하기 위한 보이지 않는 sentinel(Codex #155 6R). 개행을 포함한 공백 런만 이 문자
+//   하나로 바뀌고, 개행 없는 순수 공백(스페이스·탭)은 기존대로 완전히 제거된다 — 문장 내부 띄어쓰기
+//   차이는 여전히 무시하되, 줄바꿈 자리에는 경계 표지가 남는다. quoted(모델 출력, 단일 줄 JSON 문자열)
+//   에는 개행이 없어 이 갈래를 타지 않으므로 인용 비교 자체엔 영향 없다.
+const LINE_BOUNDARY_SENTINEL = "\n";
+
+// 공백을 정규화한 비교키 — 인용문이 학생 원고를 "그대로" 인용했는지(echo) 판정할 때, 줄바꿈·띄어쓰기
+//   차이로 오탐/누락되지 않게 한다. 문자 순서·내용은 그대로라 실질적 왜곡(패러프레이즈)은 안 걸러진다.
+function collapseWhitespace(s: string): string {
+  return s.replace(/\s+/g, (m) => (m.includes("\n") ? LINE_BOUNDARY_SENTINEL : ""));
+}
+
+// 문장 경계 문자(공백 정규화 후 기준) — 인용 echo가 "문장 전체"인지 확인할 때 시작 위치가 이 뒤이거나
+//   원고 맨 앞이어야 한다(Codex #155 1R — 단순 부분 문자열 포함만으로는 두 문장에 걸친 15자+ 조각이나
+//   문장 중간에서 잘라낸 조각도 통과해 가드에 구멍이 생긴다). 줄바꿈 sentinel도 경계로 인정(6R).
+const SENTENCE_BOUNDARY = new RegExp(`[.!?。…${LINE_BOUNDARY_SENTINEL}]`);
+
+// quoted(공백 제거·정규화됨)가 draftKey(공백 제거된 학생 원고) 안에서 **정확히 한 문장**으로 등장하는지.
+//   시작 = 문두 또는 마침표 직후. 끝 = quoted 자체가 문장부호로 끝나거나(스스로 종결) — 아니면(예:
+//   "다"류 어미만으로 SENTENCE_END를 통과한 경우) **원고에서 quoted 바로 다음 글자가 문서 끝이거나
+//   문장부호**여야 한다(Codex #155 3R — 안 그러면 "…위험하다고 생각한다"의 "다"까지만 잘라 "위험하다"를
+//   인용해도 문장 시작+어미 조건만으로 echo로 오인된다. "다고"의 "다"는 종결어미가 아니라 인용격 조사
+//   앞부분이라 실제 문장 끝이 아님 — 다음 글자가 "고"처럼 이어지면 차단). 내부(마지막 글자 제외)에
+//   문장 경계 문자가 있으면 여러 문장을 이어 붙인 것으로 보고 면제 안 함(Codex #155 2R).
+//   원고에 같은 조각이 여러 번 나올 수 있어 모든 등장 위치를 확인 — 하나라도 조건을 만족하면 echo로 인정.
+function isWholeSentenceEcho(quoted: string, draftKey: string): boolean {
+  if (tryEchoMatch(quoted, draftKey)) return true;
+  // 모델이 원고에 없던 마침표류를 덧붙이는 흔한 정규화 차이도 echo로 인정한다(Codex #155 9R) — 학생
+  //   원고가 마침표 없이 끝나는 흔한 경우, 모델이 인용에 마침표를 보태면 quoted가 draftKey의 부분
+  //   문자열이 아니게 돼 매칭이 실패했다(반대 방향 — 원고에 있는데 모델이 생략 — 은 부분 문자열
+  //   매칭상 원래도 통과했음). quoted 끝의 문장부호를 떼고 한 번 더 시도.
+  const stripped = quoted.replace(/[.!?。…]+$/, "");
+  if (stripped.length > 0 && stripped !== quoted && tryEchoMatch(stripped, draftKey)) return true;
+  return false;
+}
+
+// 문장 시작(문두/마침표 직후)·끝(자기종결 또는 다음 글자가 경계/문서끝) 두 경계 + 내부 무경계를
+//   확인하는 단일 후보 검사(Codex #155 1R·2R·3R). isWholeSentenceEcho가 원본/부호-정규화 두 후보에
+//   각각 이 검사를 적용한다.
+function tryEchoMatch(quoted: string, draftKey: string): boolean {
+  const interior = quoted.slice(0, -1); // 마지막 글자(종결 문장부호일 수 있음) 제외한 나머지
+  if (SENTENCE_BOUNDARY.test(interior)) return false; // 내부에 문장 경계 있음 = 여러 문장 이어붙임
+  const selfTerminated = SENTENCE_BOUNDARY.test(quoted[quoted.length - 1]); // quoted 자체가 문장부호로 끝남
+  let from = 0;
+  for (;;) {
+    const idx = draftKey.indexOf(quoted, from);
+    if (idx === -1) return false;
+    const prevOk = idx === 0 || SENTENCE_BOUNDARY.test(draftKey[idx - 1]);
+    if (prevOk) {
+      if (selfTerminated) return true;
+      const next = draftKey[idx + quoted.length];
+      if (next === undefined || SENTENCE_BOUNDARY.test(next)) return true;
+    }
+    from = idx + 1;
+  }
+}
+
+// 문자열에서 마지막 SENTENCE_BOUNDARY 위치(없으면 -1) — String.lastIndexOf는 정규식을 못 받으므로
+//   뒤에서부터 훑는다. SENTENCE_BOUNDARY와 동일 기준(마침표류+개행 sentinel)을 지역 윈도우 계산에도
+//   써서 두 곳의 "문장 경계" 정의가 어긋나지 않게 한다(Codex #155 11R — 로컬 윈도우가 `.!?。`만 보고
+//   SENTENCE_BOUNDARY의 `…`·개행 sentinel을 놓치면, 실제로는 다른 문장/줄인 재작성 지시를 같은 절로
+//   오인해 echo 면제가 깨진다).
+function lastBoundaryIndex(s: string): number {
+  for (let i = s.length - 1; i >= 0; i--) if (SENTENCE_BOUNDARY.test(s[i])) return i;
+  return -1;
+}
+function firstBoundaryIndex(s: string): number {
+  for (let i = 0; i < s.length; i++) if (SENTENCE_BOUNDARY.test(s[i])) return i;
+  return s.length;
+}
+
+// (2) 붙여넣기용 완성문장 인용 위반 여부 — **단일 필드**(diagnosis 또는 question) 안에서만 검사한다
+//   (Codex #155 8R — 합친 문자열에서 지역 윈도우를 계산하면, 한 필드가 문장부호 없이 끝나는 흔한
+//   경우 필드 경계가 사라져 앞 필드의 무관한 재작성 지시가 뒤 필드의 정상 echo까지 오염시킨다).
+//
+//   ★ 교차 필드(인용은 diagnosis, 재작성 지시는 question 같은 분산) 방어는 **의도적으로 넣지 않는다**
+//   (Codex #155 10R↔11R 왕복에서 확인된 결론): "반대 필드 어디든 지시가 있으면 거부"로 닫으면(10R)
+//   무관한 반대 필드 표현이 실서비스에서 정상 코칭을 오차단하고(11R이 재지적), 다시 지역으로 좁히면
+//   교차 필드 우회가 열린다(10R이 애초에 지적) — 순수 정규식 휴리스틱으로는 "반대 필드 지시가 이
+//   인용과 같은 내용을 가리키는 코디네이션인지"를 판별할 수 없어 어느 쪽으로도 완전히 만족시킬 수
+//   없다(왕복 자체가 증거). 이 코드베이스의 기존 관례(eval KNOWN_GAP — 정직 기록, LLM-judge 후속
+//   대상)를 따라 지역(같은 필드·같은 절) 검사만 적용하고, 교차 필드는 잔여 gap으로 문서화한다
+//   (scripts/coach-schema.test.mjs "[known_gap]" 테스트).
+function hasLongQuoteViolation(fieldText: string, draftKey: string | null): boolean {
+  const matches = Array.from(fieldText.matchAll(LONG_QUOTE));
+  for (let mi = 0; mi < matches.length; mi++) {
+    const m = matches[mi];
+    const quoted = m[1].trim();
+    if (!SENTENCE_END.test(quoted)) continue;
+    if (draftKey && isWholeSentenceEcho(collapseWhitespace(quoted), draftKey)) {
+      // 재작성 지시(QUOTE_REWRITE_DIRECTIVE)는 이 인용과 **같은 문장/절**(앞뒤 모두, 이 필드 안에서만)
+      //   에서만 검사한다. 범위는 "가장 가까운 문장 경계(SENTENCE_BOUNDARY — .!?。…·개행 sentinel)
+      //   또는 이전/다음 인용"까지로 제한 — Codex #155 5R(전체면 무관한 다른 문장의 일반 코칭 표현에
+      //   오탐)·6R(인용 뒤 고정 윈도우는 문구를 늘려 우회 가능)·7R(지시어가 인용 앞에 오는 어순은
+      //   뒤쪽만 보면 놓침)·11R(경계 문자 불일치로 다른 절이 같은 절로 오인)을 모두 막는다.
+      const prevBound = mi > 0 ? matches[mi - 1].index! + matches[mi - 1][0].length : 0;
+      const precedingSlice = fieldText.slice(prevBound, m.index!);
+      const before = precedingSlice.slice(lastBoundaryIndex(precedingSlice) + 1);
+      const nextBound = mi + 1 < matches.length ? matches[mi + 1].index! : fieldText.length;
+      const followingSlice = fieldText.slice(m.index! + m[0].length, nextBound);
+      const after = followingSlice.slice(0, firstBoundaryIndex(followingSlice));
+      if (!QUOTE_REWRITE_DIRECTIVE.test(before) && !QUOTE_REWRITE_DIRECTIVE.test(after)) continue; // 재작성 지시 없음 — echo로 통과
+    }
+    return true;
+  }
+  return false;
+}
+
 // 한 nudge(진단+유도질문)에 대필 신호가 있으면 위반. 위반 메시지는 nudge 인덱스를 포함.
-export function checkGenerationBlock(o: CoachOutput): string[] {
+//   studentDraft(선택) — 넘기면 "학생이 이미 쓴 문장을 그대로 되짚어 질문"하는 정당한 코칭을
+//   (2) 긴 인용 가드에서 면제한다(2026-07-12, 실사용 발견 — 코치가 학생 원고를 인용해 되묻는
+//   흔한 정상 패턴이 "완성문장 인용(대필)"로 오탐돼 재호출 후에도 계속 502였음). 면제는 **인용문이
+//   학생 원고의 문장 시작 지점(문두 또는 마침표 직후)에 공백 무시 정확히 존재할 때만**(Codex #155 —
+//   단순 부분 문자열 포함이면 두 문장에 걸친 조각·문장 중간에서 잘라낸 조각도 통과해 구멍이 생김).
+//   모델이 패러프레이즈/신규 작성한 문장은 원문에 없으므로 여전히 차단된다(불변식 유지). 미전달 시
+//   기존 동작과 100% 동일(하위 호환).
+export function checkGenerationBlock(o: CoachOutput, studentDraft?: string): string[] {
   const v: string[] = [];
+  const draftKey = studentDraft ? collapseWhitespace(studentDraft) : null;
   const nudges = isObject(o as unknown) ? (o.nudges ?? []) : [];
   (Array.isArray(nudges) ? nudges : []).forEach((n, i) => {
     if (!isObject(n as unknown)) return;
@@ -192,15 +316,11 @@ export function checkGenerationBlock(o: CoachOutput): string[] {
       v.push(`[${i}] 대필 지시 감지`);
       return;
     }
-    // (2) 붙여넣기용 완성문장 인용
-    let quoteHit = false;
-    for (const m of text.matchAll(LONG_QUOTE)) {
-      if (SENTENCE_END.test(m[1].trim())) {
-        quoteHit = true;
-        break;
-      }
-    }
-    if (quoteHit) {
+    // (2) 붙여넣기용 완성문장 인용 — 단, 학생 원고에 그대로 있는 인용(echo)은 정당한 코칭이라 면제.
+    //   diagnosis·question 필드를 **각각 독립적으로** 검사한다(Codex #155 8R) — 둘을 text로 합쳐서
+    //   지역 윈도우를 계산하면, 한 필드가 문장부호 없이 끝나는 흔한 경우 그 경계가 사라져 앞 필드의
+    //   무관한 재작성 지시가 뒤 필드의 정상 echo까지 오염시킬 수 있다.
+    if (hasLongQuoteViolation(diagnosis, draftKey) || hasLongQuoteViolation(question, draftKey)) {
       v.push(`[${i}] 완성문장 인용(대필) 감지`);
       return;
     }
@@ -230,6 +350,7 @@ export function checkGenerationBlock(o: CoachOutput): string[] {
 }
 
 // 코치 출력 후처리 가드 집계. 현재는 생성 차단 단일 — 확장 지점.
-export function runCoachGuards(o: CoachOutput): string[] {
-  return checkGenerationBlock(o);
+//   studentDraft — checkGenerationBlock의 학생 자기 문장 echo 면제로 그대로 전달(선택, 하위 호환).
+export function runCoachGuards(o: CoachOutput, studentDraft?: string): string[] {
+  return checkGenerationBlock(o, studentDraft);
 }

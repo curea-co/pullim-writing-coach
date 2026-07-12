@@ -135,6 +135,202 @@ test("학생 단어 짧은 인용('자율')은 위반 아님", () => {
   assert.deepEqual(checkGenerationBlock(o), []);
 });
 
+// ── 학생 자기 문장 echo 면제(2026-07-12 실사용 발견) ────────────────────
+//   코치가 학생이 이미 쓴 문장을 그대로 인용해 되짚어 묻는 것은 정당한 코칭이다(대필 아님).
+//   studentDraft를 넘기면 그 원고에 실제로 있는 인용만 (2) 긴 인용 가드에서 면제한다.
+
+test("긴 인용이 studentDraft에 그대로 있으면(echo) → 위반 아님", () => {
+  const o = validOutput();
+  const sentence = "학생들이 자신의 개성을 표현할 수 있기 때문이다.";
+  o.nudges[0].guiding_question = `네가 쓴 '${sentence}'에서, 왜 그런지 예를 들어볼까?`;
+  const draft = `나는 교복 자율화에 찬성한다. ${sentence} 또한 편하다.`;
+  assert.deepEqual(checkGenerationBlock(o, draft), []);
+});
+
+test("긴 인용이 studentDraft에 없으면(모델이 지어낸 문장) → 여전히 위반", () => {
+  const o = validOutput();
+  o.nudges[0].guiding_question = "예를 들어 '화산 폭발은 인명과 재산에 큰 피해를 준다.' 어때?";
+  const draft = "화산은 위험한 자연 현상이다. 그래서 조심해야 한다.";
+  assert.ok(checkGenerationBlock(o, draft).length > 0);
+});
+
+test("studentDraft 미전달 시 기존 동작과 동일(하위 호환) — 긴 인용은 여전히 위반", () => {
+  const o = validOutput();
+  o.nudges[0].guiding_question = "예를 들어 '화산 폭발은 인명과 재산에 큰 피해를 준다.' 어때?";
+  assert.ok(checkGenerationBlock(o).length > 0);
+});
+
+test("echo 면제는 공백 차이를 무시한다(줄바꿈·띄어쓰기 달라도 동일 문장이면 면제)", () => {
+  const o = validOutput();
+  const sentence = "학생들이 자신의 개성을 표현할 수 있기 때문이다.";
+  o.nudges[0].guiding_question = `네가 쓴 '${sentence}'에서, 왜 그런지 예를 들어볼까?`;
+  // 문장 경계(\n)는 실제 문장 사이에만 — 문장 내부 줄바꿈은 현실적이지 않은 케이스라 순수 공백
+  //   차이(스페이스 2~3개)만으로 오탐/누락 무시를 검증한다(Codex #155 6R: \n은 이제 문장 경계로도
+  //   쓰이므로, 문장 내부에 \n을 넣으면 그 자체가 경계로 오인돼 echo 매칭이 끊긴다).
+  const draft = "나는 교복 자율화에 찬성한다.\n학생들이  자신의   개성을   표현할 수 있기 때문이다. 또한 편하다.";
+  assert.deepEqual(checkGenerationBlock(o, draft), []);
+});
+
+// Codex #155 — 부분 문자열 포함만으로는 두 문장에 걸친/문장 중간에서 잘라낸 조각도 통과하던 구멍.
+test("echo 면제는 문장 경계에서만 인정 — 두 문장에 걸친 15자+ 조각은 여전히 차단", () => {
+  const o = validOutput();
+  // draft: "...하기 때문이다. 그리고 나는..." — 아래 인용은 앞문장 꼬리+뒷문장 머리를 가로지른다.
+  const draft = "학생들이 자신의 개성을 표현할 수 있기 때문이다. 그리고 나는 편한 것도 좋아한다.";
+  const crossSentenceFragment = "때문이다. 그리고 나는 편한 것도 좋아한다."; // 문장 중간(때문이다 앞)에서 시작 — 경계 아님
+  o.nudges[0].guiding_question = `'${crossSentenceFragment}' 이 부분은 어때?`;
+  assert.ok(checkGenerationBlock(o, draft).length > 0);
+});
+
+test("echo 면제는 문장 경계에서만 인정 — 문장 중간에서 잘라낸 조각(문두 아님)은 차단", () => {
+  const o = validOutput();
+  const draft = "나는 교복 자율화에 찬성한다. 학생들이 자신의 개성을 표현할 수 있기 때문이다.";
+  const midSentenceFragment = "개성을 표현할 수 있기 때문이다."; // 문장 중간부터 시작 — 문두/마침표 직후 아님
+  o.nudges[0].guiding_question = `'${midSentenceFragment}' 부분을 더 설명해볼까?`;
+  assert.ok(checkGenerationBlock(o, draft).length > 0);
+});
+
+// Codex #155 2R — 시작 경계만 보면 문두에서 시작해 여러 문장을 통째로 이어 붙인 인용도 통과하던 구멍.
+test("echo 면제는 정확히 한 문장만 — 문두에서 시작해도 두 문장을 이어 붙인 인용은 차단", () => {
+  const o = validOutput();
+  const draft = "나는 교복 자율화에 찬성한다. 학생들이 자신의 개성을 표현할 수 있기 때문이다. 또한 편하다.";
+  // 문두에서 시작하지만 첫 문장 마침표를 넘어 두 번째 문장까지 통째로 인용 — 단일 문장 echo 아님.
+  const twoSentences = "나는 교복 자율화에 찬성한다. 학생들이 자신의 개성을 표현할 수 있기 때문이다.";
+  o.nudges[0].guiding_question = `'${twoSentences}' 이 부분 좋아. 더 확장해볼까?`;
+  assert.ok(checkGenerationBlock(o, draft).length > 0);
+});
+
+// Codex #155 3R — "다"는 종결어미와 "다고"(인용격 조사) 양쪽에 다 나타난다. 시작 경계만 확인하면
+//   "…위험하다고 생각한다"에서 "다"까지만 잘라 "위험하다"를 인용해도(SENTENCE_END는 "다"로 끝나면
+//   통과) 문두/마침표 직후 조건만으로 echo로 오인된다 — 실제로는 문장 끝이 아니라 "다고"의 앞부분뿐.
+test("echo 면제는 어미 종결도 실제 문장 끝인지 확인 — '다고'처럼 이어지는 접두 인용은 차단", () => {
+  const o = validOutput();
+  const draft = "나는 화산 폭발이 인간에게 정말로 위험하다고 항상 생각해왔다.";
+  // draft에서 "다" 뒤에 "고"가 이어지므로 실제 문장 끝이 아니다(인용격 조사 "다고"의 일부).
+  const prefixOnly = "화산 폭발이 인간에게 정말로 위험하다";
+  o.nudges[0].guiding_question = `'${prefixOnly}'는 좋은 생각이야. 왜 그렇게 느꼈어?`;
+  assert.ok(checkGenerationBlock(o, draft).length > 0);
+});
+
+test("echo 면제(어미 종결) 정상 케이스 — 인용 뒤 원고가 실제로 끝나면 면제", () => {
+  const o = validOutput();
+  const draft = "나는 화산 폭발이 인간에게 정말로 위험하다";
+  o.nudges[0].guiding_question = `'${draft}'는 좋은 생각이야. 왜 그렇게 느꼈어?`;
+  assert.deepEqual(checkGenerationBlock(o, draft), []);
+});
+
+// Codex #155 4R — echo 면제는 "되짚어 묻기"에만 한정돼야 한다. 검증된 verbatim echo라도 재작성
+//   지시("다시 써 보자" 등)가 붙으면 기계적 복붙/재작성 유도라 면제하지 않는다.
+test("echo 검증 통과해도 '다시 써 보자' 재작성 지시가 있으면 여전히 차단", () => {
+  const o = validOutput();
+  const sentence = "학생들이 자신의 개성을 표현할 수 있기 때문이다.";
+  const draft = `나는 교복 자율화에 찬성한다. ${sentence} 또한 편하다.`;
+  o.nudges[0].guiding_question = `네가 쓴 '${sentence}'를 첫 문단에 다시 써 보자.`;
+  assert.ok(checkGenerationBlock(o, draft).length > 0);
+});
+
+test("echo 검증 통과해도 '그대로 옮겨' 재작성 지시가 있으면 여전히 차단", () => {
+  const o = validOutput();
+  const sentence = "학생들이 자신의 개성을 표현할 수 있기 때문이다.";
+  const draft = `나는 교복 자율화에 찬성한다. ${sentence} 또한 편하다.`;
+  o.nudges[0].diagnosis = `이 문장 '${sentence}'을 결론에 그대로 옮겨 적어보자.`;
+  assert.ok(checkGenerationBlock(o, draft).length > 0);
+});
+
+// Codex #155 5R — 재작성 지시 판정을 인용 직후 지역 문맥으로 좁혀야 한다. text 전체에 걸면 인용과
+//   무관한 다른 문장의 일반 코칭 표현("마지막 표현은 고쳐 보자")에도 걸려 정상 echo가 다시 막힌다.
+// Codex #155 5R·11R(최종) — 재작성 지시가 인용과 무관한 다른 문장/필드에 있으면 echo 면제 유지.
+//   10R에서 잠시 "반대 필드 전역 검사"로 안전 우선 차단을 시도했으나, 11R에서 바로 그 변경이
+//   실서비스 정상 코칭 오차단(이 케이스 그대로)을 재유발한다는 재지적을 받았다 — 10R↔11R 왕복 자체가
+//   "휴리스틱만으로는 교차 필드 코디네이션 여부를 판별 불가"의 증거라 판단, 지역(같은 필드·같은 절)
+//   검사로 확정했다. 교차 필드는 known_gap으로 문서화(아래 별도 테스트).
+test("재작성 지시가 인용과 무관한 다른 문장에 있으면 echo 면제 유지(오탐 아님, 5R·11R 확정)", () => {
+  const o = validOutput();
+  const sentence = "학생들이 자신의 개성을 표현할 수 있기 때문이다.";
+  const draft = `나는 교복 자율화에 찬성한다. ${sentence} 또한 편하다.`;
+  o.nudges[0].diagnosis = "마지막 표현은 고쳐 보자.";
+  o.nudges[0].guiding_question = `네가 쓴 '${sentence}'에서, 왜 그런지 예를 들어볼까?`;
+  assert.deepEqual(checkGenerationBlock(o, draft), []);
+});
+
+// Codex #155 6R (1/2) — 마침표 없이 줄바꿈만으로 문장을 구분하는 흔한 초안에서도 echo가 인정돼야 한다.
+test("echo 면제 — 마침표 없이 줄바꿈으로만 구분된 원고에서도 문장 경계 인정", () => {
+  const o = validOutput();
+  const sentence = "학생들이 자신의 개성을 표현할 수 있기 때문이다";
+  const draft = `나는 찬성한다\n${sentence}`;
+  o.nudges[0].guiding_question = `네가 쓴 '${sentence}'에서, 왜 그런지 예를 들어볼까?`;
+  assert.deepEqual(checkGenerationBlock(o, draft), []);
+});
+
+// Codex #155 6R (2/2) — 고정된 짧은 윈도우는 위치/설명 문구를 늘려 지시어를 창 밖으로 밀어내는
+//   우회가 가능했다. 다음 인용(또는 text 끝)까지 전 구간을 봐야 실제로 막힌다.
+test("echo 검증 통과해도 재작성 지시가 인용 뒤 멀리 있어도(같은 인용 구간) 여전히 차단", () => {
+  const o = validOutput();
+  const sentence = "학생들이 자신의 개성을 표현할 수 있기 때문이다.";
+  const draft = `나는 교복 자율화에 찬성한다. ${sentence} 또한 편하다.`;
+  o.nudges[0].guiding_question =
+    `네가 쓴 '${sentence}' 이 문장을 마지막 문단의 핵심 근거 문장으로 한 번 더 자연스럽게 다시 써 보자.`;
+  assert.ok(checkGenerationBlock(o, draft).length > 0);
+});
+
+// Codex #155 7R — 재작성 지시가 인용 뒤가 아니라 **앞**에 자연스러운 어순으로 올 수도 있다
+//   ("결론에 다시 써 봐: '…'"). 뒤쪽만 보면 이런 어순은 놓친다 — 앞쪽도 같은 문장/절 범위로 검사해야 한다.
+test("재작성 지시가 인용 앞(같은 절)에 있어도 여전히 차단", () => {
+  const o = validOutput();
+  const sentence = "학생들이 자신의 개성을 표현할 수 있기 때문이다.";
+  const draft = `나는 교복 자율화에 찬성한다. ${sentence} 또한 편하다.`;
+  o.nudges[0].guiding_question = `결론에 다시 써 봐: '${sentence}'`;
+  assert.ok(checkGenerationBlock(o, draft).length > 0);
+});
+
+// 대칭 확인 — 인용 앞의 재작성 지시가 "다른 문장"(문장 경계 너머)에 있으면 무관하므로 면제 유지.
+test("재작성 지시가 인용 앞의 다른 문장(문장 경계 너머)에 있으면 echo 면제 유지(오탐 아님, 5R·11R 확정)", () => {
+  const o = validOutput();
+  const sentence = "학생들이 자신의 개성을 표현할 수 있기 때문이다.";
+  const draft = `나는 교복 자율화에 찬성한다. ${sentence} 또한 편하다.`;
+  o.nudges[0].diagnosis = "이 부분은 나중에 다시 써 보자.";
+  o.nudges[0].guiding_question = `네가 쓴 '${sentence}'에서, 왜 그런지 예를 들어볼까?`;
+  assert.deepEqual(checkGenerationBlock(o, draft), []);
+});
+
+// Codex #155 8R — diagnosis+question을 합쳐 지역 윈도우를 계산하면, diagnosis가 문장부호 없이
+//   끝나는 흔한 경우(마침표 생략) 필드 경계가 사라져 diagnosis의 무관한 "다시 써 보자"가 question의
+//   정상 echo까지 재작성 지시로 오염시킬 수 있었다. 필드별 완전 격리로 문장부호 유무와 무관하게 안전.
+test("diagnosis가 마침표 없이 끝나도(필드 경계 모호) question의 정상 echo는 면제 유지(8R 오탐 방지)", () => {
+  const o = validOutput();
+  const sentence = "학생들이 자신의 개성을 표현할 수 있기 때문이다.";
+  const draft = `나는 교복 자율화에 찬성한다. ${sentence} 또한 편하다.`;
+  o.nudges[0].diagnosis = "이 부분은 나중에 다시 써 보자"; // 마침표 없음 — 필드 경계 신호 없음
+  o.nudges[0].guiding_question = `네가 쓴 '${sentence}'에서, 왜 그런지 예를 들어볼까?`;
+  assert.deepEqual(checkGenerationBlock(o, draft), []);
+});
+
+// Codex #155 9R (1/2) — 학생 원고가 마침표 없이 끝나는데 모델이 인용에만 마침표를 보태는 흔한
+//   정규화 차이. 반대 방향(원고엔 있는데 모델이 생략)은 부분 문자열 매칭상 원래도 통과했다.
+test("echo 면제 — 모델이 원고에 없는 마침표를 인용에 보태도 인정(부호 정규화)", () => {
+  const o = validOutput();
+  const sentenceNoPeriod = "학생들이 자신의 개성을 표현할 수 있기 때문이다"; // 원고: 마침표 없음
+  const draft = `나는 교복 자율화에 찬성한다. ${sentenceNoPeriod}`; // 원고 맨 끝 문장이라 부호 생략 흔함
+  o.nudges[0].guiding_question = `네가 쓴 '${sentenceNoPeriod}.'에서, 왜 그런지 예를 들어볼까?`; // 모델이 마침표 추가
+  assert.deepEqual(checkGenerationBlock(o, draft), []);
+});
+
+// Codex #155 9R·10R·11R(최종 확정) — 인용(diagnosis)·재작성 지시(question) 같은 교차 필드 분산
+//   조합은 **의도적으로 잔여 gap으로 남긴다**(known_gap). 10R에서 "반대 필드 전역 검사"로 닫아봤으나
+//   11R에서 정확히 그 변경이 "무관한 반대 필드 표현 + 정상 echo" 조합(위 두 테스트)을 다시 오차단
+//   한다는 재지적을 받았다 — 왕복 자체가 순수 정규식 휴리스틱으로는 "반대 필드 지시가 이 인용과
+//   같은 내용을 가리키는 코디네이션인지" 판별이 불가능함의 증거. 이 코드베이스의 기존 관례(eval
+//   KNOWN_GAP — 정직 기록, LLM-judge 후속 대상)를 따라 현재 동작(미탐지)을 명시 고정한다 — 실제
+//   악용 관측 시 v4 후속(예: nudge당 재작성 지시 존재 자체를 더 강하게 제한)에서 재검토.
+test("[known_gap] 인용(diagnosis)·재작성 지시(question) 교차 필드 조합은 필드 격리 설계상 미탐지", () => {
+  const o = validOutput();
+  const sentence = "학생들이 자신의 개성을 표현할 수 있기 때문이다.";
+  const draft = `나는 교복 자율화에 찬성한다. ${sentence} 또한 편하다.`;
+  o.nudges[0].diagnosis = `네가 쓴 '${sentence}'는 핵심 근거야.`;
+  o.nudges[0].guiding_question = "이 문장을 결론에 다시 써 볼까?";
+  // 현재 설계의 실제 동작(미탐지)을 정직하게 고정 — 탐지되기 시작하면(개선) 이 기록을 지우면 된다.
+  assert.deepEqual(checkGenerationBlock(o, draft), []);
+});
+
 test("위반 메시지는 어느 nudge인지(index) 가리킨다", () => {
   const o = validOutput();
   o.nudges = [
