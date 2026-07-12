@@ -135,6 +135,39 @@ test("학생 단어 짧은 인용('자율')은 위반 아님", () => {
   assert.deepEqual(checkGenerationBlock(o), []);
 });
 
+// ── 학생 자기 문장 echo 면제(2026-07-12 실사용 발견) ────────────────────
+//   코치가 학생이 이미 쓴 문장을 그대로 인용해 되짚어 묻는 것은 정당한 코칭이다(대필 아님).
+//   studentDraft를 넘기면 그 원고에 실제로 있는 인용만 (2) 긴 인용 가드에서 면제한다.
+
+test("긴 인용이 studentDraft에 그대로 있으면(echo) → 위반 아님", () => {
+  const o = validOutput();
+  const sentence = "학생들이 자신의 개성을 표현할 수 있기 때문이다.";
+  o.nudges[0].guiding_question = `네가 쓴 '${sentence}'에서, 왜 그런지 예를 들어볼까?`;
+  const draft = `나는 교복 자율화에 찬성한다. ${sentence} 또한 편하다.`;
+  assert.deepEqual(checkGenerationBlock(o, draft), []);
+});
+
+test("긴 인용이 studentDraft에 없으면(모델이 지어낸 문장) → 여전히 위반", () => {
+  const o = validOutput();
+  o.nudges[0].guiding_question = "예를 들어 '화산 폭발은 인명과 재산에 큰 피해를 준다.' 어때?";
+  const draft = "화산은 위험한 자연 현상이다. 그래서 조심해야 한다.";
+  assert.ok(checkGenerationBlock(o, draft).length > 0);
+});
+
+test("studentDraft 미전달 시 기존 동작과 동일(하위 호환) — 긴 인용은 여전히 위반", () => {
+  const o = validOutput();
+  o.nudges[0].guiding_question = "예를 들어 '화산 폭발은 인명과 재산에 큰 피해를 준다.' 어때?";
+  assert.ok(checkGenerationBlock(o).length > 0);
+});
+
+test("echo 면제는 공백 차이를 무시한다(줄바꿈·띄어쓰기 달라도 동일 문장이면 면제)", () => {
+  const o = validOutput();
+  const sentence = "학생들이 자신의 개성을 표현할 수 있기 때문이다.";
+  o.nudges[0].guiding_question = `네가 쓴 '${sentence}'에서, 왜 그런지 예를 들어볼까?`;
+  const draft = "나는 교복 자율화에 찬성한다.\n학생들이  자신의   개성을\n표현할 수 있기 때문이다. 또한 편하다.";
+  assert.deepEqual(checkGenerationBlock(o, draft), []);
+});
+
 test("위반 메시지는 어느 nudge인지(index) 가리킨다", () => {
   const o = validOutput();
   o.nudges = [

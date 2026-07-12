@@ -177,9 +177,21 @@ function quotedInsertionSuggestion(text: string): boolean {
   return DECLARATIVE_END.test(quoted) || /\s/.test(quoted) || quoted.length >= 10;
 }
 
+// 공백만 제거한 비교키 — 인용문이 학생 원고를 "그대로" 인용했는지(echo) 판정할 때, 줄바꿈·띄어쓰기
+//   차이로 오탐/누락되지 않게 한다. 문자 순서·내용은 그대로라 실질적 왜곡(패러프레이즈)은 안 걸러진다.
+function collapseWhitespace(s: string): string {
+  return s.replace(/\s+/g, "");
+}
+
 // 한 nudge(진단+유도질문)에 대필 신호가 있으면 위반. 위반 메시지는 nudge 인덱스를 포함.
-export function checkGenerationBlock(o: CoachOutput): string[] {
+//   studentDraft(선택) — 넘기면 "학생이 이미 쓴 문장을 그대로 되짚어 질문"하는 정당한 코칭을
+//   (2) 긴 인용 가드에서 면제한다(2026-07-12, 실사용 발견 — 코치가 학생 원고를 인용해 되묻는
+//   흔한 정상 패턴이 "완성문장 인용(대필)"로 오탐돼 재호출 후에도 계속 502였음). 면제는 **인용문이
+//   학생 원고에 공백 무시 정확히 존재할 때만** — 모델이 패러프레이즈/신규 작성한 문장은 원문에
+//   없으므로 여전히 차단된다(불변식 유지). 미전달 시 기존 동작과 100% 동일(하위 호환).
+export function checkGenerationBlock(o: CoachOutput, studentDraft?: string): string[] {
   const v: string[] = [];
+  const draftKey = studentDraft ? collapseWhitespace(studentDraft) : null;
   const nudges = isObject(o as unknown) ? (o.nudges ?? []) : [];
   (Array.isArray(nudges) ? nudges : []).forEach((n, i) => {
     if (!isObject(n as unknown)) return;
@@ -192,13 +204,14 @@ export function checkGenerationBlock(o: CoachOutput): string[] {
       v.push(`[${i}] 대필 지시 감지`);
       return;
     }
-    // (2) 붙여넣기용 완성문장 인용
+    // (2) 붙여넣기용 완성문장 인용 — 단, 학생 원고에 그대로 있는 인용(echo)은 정당한 코칭이라 면제.
     let quoteHit = false;
     for (const m of text.matchAll(LONG_QUOTE)) {
-      if (SENTENCE_END.test(m[1].trim())) {
-        quoteHit = true;
-        break;
-      }
+      const quoted = m[1].trim();
+      if (!SENTENCE_END.test(quoted)) continue;
+      if (draftKey && draftKey.includes(collapseWhitespace(quoted))) continue; // 학생 자기 문장 echo — 통과
+      quoteHit = true;
+      break;
     }
     if (quoteHit) {
       v.push(`[${i}] 완성문장 인용(대필) 감지`);
@@ -230,6 +243,7 @@ export function checkGenerationBlock(o: CoachOutput): string[] {
 }
 
 // 코치 출력 후처리 가드 집계. 현재는 생성 차단 단일 — 확장 지점.
-export function runCoachGuards(o: CoachOutput): string[] {
-  return checkGenerationBlock(o);
+//   studentDraft — checkGenerationBlock의 학생 자기 문장 echo 면제로 그대로 전달(선택, 하위 호환).
+export function runCoachGuards(o: CoachOutput, studentDraft?: string): string[] {
+  return checkGenerationBlock(o, studentDraft);
 }
