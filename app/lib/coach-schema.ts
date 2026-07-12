@@ -228,6 +228,47 @@ function isWholeSentenceEcho(quoted: string, draftKey: string): boolean {
   }
 }
 
+// (2) 붙여넣기용 완성문장 인용 위반 여부 — **단일 필드**(diagnosis 또는 question) 안에서만 검사한다
+//   (Codex #155 8R — diagnosis+question을 합친 문자열에서 지역 윈도우를 계산하면, 한 필드가 문장부호
+//   없이 끝나는 흔한 경우 필드 경계가 사라져 앞 필드의 무관한 재작성 지시가 뒤 필드의 정상 echo까지
+//   오염시킨다). fieldText 하나에 국한되므로 인용 앞뒤 지역 윈도우도 자동으로 필드 밖을 넘지 않는다.
+function hasLongQuoteViolation(fieldText: string, draftKey: string | null): boolean {
+  const matches = Array.from(fieldText.matchAll(LONG_QUOTE));
+  for (let mi = 0; mi < matches.length; mi++) {
+    const m = matches[mi];
+    const quoted = m[1].trim();
+    if (!SENTENCE_END.test(quoted)) continue;
+    if (draftKey && isWholeSentenceEcho(collapseWhitespace(quoted), draftKey)) {
+      // 재작성 지시(QUOTE_REWRITE_DIRECTIVE)는 이 인용과 **같은 문장/절**(앞뒤 모두, 이 필드 안에서만)
+      //   에서만 검사한다. 범위는 "가장 가까운 문장 경계(.!?。 또는 이전/다음 인용)"까지로 제한 —
+      //   Codex #155 5R(전체면 무관한 다른 문장의 일반 코칭 표현에 오탐)·6R(인용 뒤 고정 윈도우는
+      //   문구를 늘려 우회 가능)·7R(지시어가 인용 앞에 오는 어순은 뒤쪽만 보면 놓침)를 좌우 대칭으로
+      //   막는다. 문장 경계 문자 자체는 지역 구간에서 제외(다음 문장으로 안 새게).
+      const prevBound = mi > 0 ? matches[mi - 1].index! + matches[mi - 1][0].length : 0;
+      const precedingSlice = fieldText.slice(prevBound, m.index!);
+      const lastLocalBreak = Math.max(
+        precedingSlice.lastIndexOf("."),
+        precedingSlice.lastIndexOf("!"),
+        precedingSlice.lastIndexOf("?"),
+        precedingSlice.lastIndexOf("。"),
+      );
+      const before = precedingSlice.slice(lastLocalBreak + 1);
+      const nextBound = mi + 1 < matches.length ? matches[mi + 1].index! : fieldText.length;
+      const followingSlice = fieldText.slice(m.index! + m[0].length, nextBound);
+      const firstLocalBreak = (() => {
+        const idxs = [".", "!", "?", "。"]
+          .map((c) => followingSlice.indexOf(c))
+          .filter((idx) => idx !== -1);
+        return idxs.length > 0 ? Math.min(...idxs) : followingSlice.length;
+      })();
+      const after = followingSlice.slice(0, firstLocalBreak);
+      if (!QUOTE_REWRITE_DIRECTIVE.test(before) && !QUOTE_REWRITE_DIRECTIVE.test(after)) continue; // 재작성 지시 없음 — echo로 통과
+    }
+    return true;
+  }
+  return false;
+}
+
 // 한 nudge(진단+유도질문)에 대필 신호가 있으면 위반. 위반 메시지는 nudge 인덱스를 포함.
 //   studentDraft(선택) — 넘기면 "학생이 이미 쓴 문장을 그대로 되짚어 질문"하는 정당한 코칭을
 //   (2) 긴 인용 가드에서 면제한다(2026-07-12, 실사용 발견 — 코치가 학생 원고를 인용해 되묻는
@@ -252,42 +293,10 @@ export function checkGenerationBlock(o: CoachOutput, studentDraft?: string): str
       return;
     }
     // (2) 붙여넣기용 완성문장 인용 — 단, 학생 원고에 그대로 있는 인용(echo)은 정당한 코칭이라 면제.
-    let quoteHit = false;
-    const quoteMatches = Array.from(text.matchAll(LONG_QUOTE));
-    for (let mi = 0; mi < quoteMatches.length; mi++) {
-      const m = quoteMatches[mi];
-      const quoted = m[1].trim();
-      if (!SENTENCE_END.test(quoted)) continue;
-      if (draftKey && isWholeSentenceEcho(collapseWhitespace(quoted), draftKey)) {
-        // 재작성 지시(QUOTE_REWRITE_DIRECTIVE)는 이 인용과 **같은 문장/절**(앞뒤 모두)에서만 검사한다.
-        //   범위는 "가장 가까운 문장 경계(.!?。 또는 이전/다음 인용)"까지로 제한 — Codex #155 5R(text
-        //   전체면 무관한 다른 문장의 일반 코칭 표현에 오탐)·6R(인용 뒤 고정 윈도우는 문구를 늘려 우회
-        //   가능)·7R("결론에 다시 써 봐: '…'"처럼 지시어가 인용 **앞**에 오는 어순은 뒤쪽만 보면 놓침)를
-        //   모두 좌우 대칭으로 막는다. 문장 경계 문자 자체는 지역 구간에서 제외(다음 문장으로 안 새게).
-        const prevBound = mi > 0 ? quoteMatches[mi - 1].index! + quoteMatches[mi - 1][0].length : 0;
-        const precedingSlice = text.slice(prevBound, m.index!);
-        const lastLocalBreak = Math.max(
-          precedingSlice.lastIndexOf("."),
-          precedingSlice.lastIndexOf("!"),
-          precedingSlice.lastIndexOf("?"),
-          precedingSlice.lastIndexOf("。"),
-        );
-        const before = precedingSlice.slice(lastLocalBreak + 1);
-        const nextBound = mi + 1 < quoteMatches.length ? quoteMatches[mi + 1].index! : text.length;
-        const followingSlice = text.slice(m.index! + m[0].length, nextBound);
-        const firstLocalBreak = (() => {
-          const idxs = [".", "!", "?", "。"]
-            .map((c) => followingSlice.indexOf(c))
-            .filter((idx) => idx !== -1);
-          return idxs.length > 0 ? Math.min(...idxs) : followingSlice.length;
-        })();
-        const after = followingSlice.slice(0, firstLocalBreak);
-        if (!QUOTE_REWRITE_DIRECTIVE.test(before) && !QUOTE_REWRITE_DIRECTIVE.test(after)) continue; // 재작성 지시 없음 — echo로 통과
-      }
-      quoteHit = true;
-      break;
-    }
-    if (quoteHit) {
+    //   diagnosis·question 필드를 **각각 독립적으로** 검사한다(Codex #155 8R) — 둘을 text로 합쳐서
+    //   지역 윈도우를 계산하면, 한 필드가 문장부호 없이 끝나는 흔한 경우 그 경계가 사라져 앞 필드의
+    //   무관한 재작성 지시가 뒤 필드의 정상 echo까지 오염시킬 수 있다.
+    if (hasLongQuoteViolation(diagnosis, draftKey) || hasLongQuoteViolation(question, draftKey)) {
       v.push(`[${i}] 완성문장 인용(대필) 감지`);
       return;
     }
