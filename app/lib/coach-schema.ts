@@ -184,16 +184,23 @@ function quotedInsertionSuggestion(text: string): boolean {
   return DECLARATIVE_END.test(quoted) || /\s/.test(quoted) || quoted.length >= 10;
 }
 
-// 공백만 제거한 비교키 — 인용문이 학생 원고를 "그대로" 인용했는지(echo) 판정할 때, 줄바꿈·띄어쓰기
+// 줄바꿈 경계 표지 — 마침표 없이 줄바꿈만으로 문장/문단을 구분하는 원고(흔함)에서도 그 줄바꿈을
+//   문장 경계로 인정하기 위한 보이지 않는 sentinel(Codex #155 6R). 개행을 포함한 공백 런만 이 문자
+//   하나로 바뀌고, 개행 없는 순수 공백(스페이스·탭)은 기존대로 완전히 제거된다 — 문장 내부 띄어쓰기
+//   차이는 여전히 무시하되, 줄바꿈 자리에는 경계 표지가 남는다. quoted(모델 출력, 단일 줄 JSON 문자열)
+//   에는 개행이 없어 이 갈래를 타지 않으므로 인용 비교 자체엔 영향 없다.
+const LINE_BOUNDARY_SENTINEL = " ";
+
+// 공백을 정규화한 비교키 — 인용문이 학생 원고를 "그대로" 인용했는지(echo) 판정할 때, 줄바꿈·띄어쓰기
 //   차이로 오탐/누락되지 않게 한다. 문자 순서·내용은 그대로라 실질적 왜곡(패러프레이즈)은 안 걸러진다.
 function collapseWhitespace(s: string): string {
-  return s.replace(/\s+/g, "");
+  return s.replace(/\s+/g, (m) => (m.includes("\n") ? LINE_BOUNDARY_SENTINEL : ""));
 }
 
-// 문장 경계 문자(공백 제거 후 기준) — 인용 echo가 "문장 전체"인지 확인할 때 시작 위치가 이 뒤이거나
+// 문장 경계 문자(공백 정규화 후 기준) — 인용 echo가 "문장 전체"인지 확인할 때 시작 위치가 이 뒤이거나
 //   원고 맨 앞이어야 한다(Codex #155 1R — 단순 부분 문자열 포함만으로는 두 문장에 걸친 15자+ 조각이나
-//   문장 중간에서 잘라낸 조각도 통과해 가드에 구멍이 생긴다).
-const SENTENCE_BOUNDARY = /[.!?。…]/;
+//   문장 중간에서 잘라낸 조각도 통과해 가드에 구멍이 생긴다). 줄바꿈 sentinel도 경계로 인정(6R).
+const SENTENCE_BOUNDARY = new RegExp(`[.!?。…${LINE_BOUNDARY_SENTINEL}]`);
 
 // quoted(공백 제거·정규화됨)가 draftKey(공백 제거된 학생 원고) 안에서 **정확히 한 문장**으로 등장하는지.
 //   시작 = 문두 또는 마침표 직후. 끝 = quoted 자체가 문장부호로 끝나거나(스스로 종결) — 아니면(예:
@@ -246,16 +253,19 @@ export function checkGenerationBlock(o: CoachOutput, studentDraft?: string): str
     }
     // (2) 붙여넣기용 완성문장 인용 — 단, 학생 원고에 그대로 있는 인용(echo)은 정당한 코칭이라 면제.
     let quoteHit = false;
-    for (const m of text.matchAll(LONG_QUOTE)) {
+    const quoteMatches = Array.from(text.matchAll(LONG_QUOTE));
+    for (let mi = 0; mi < quoteMatches.length; mi++) {
+      const m = quoteMatches[mi];
       const quoted = m[1].trim();
       if (!SENTENCE_END.test(quoted)) continue;
       if (draftKey && isWholeSentenceEcho(collapseWhitespace(quoted), draftKey)) {
-        // 재작성 지시(QUOTE_REWRITE_DIRECTIVE)는 **인용 직후 지역 문맥**에서만 검사한다(Codex #155 5R —
-        //   text 전체에 걸면, 인용과 무관한 다른 문장의 일반 코칭 표현("마지막 표현은 고쳐 보자.")에도
-        //   걸려 정상 echo 케이스가 다시 막힌다). quotedInsertionSuggestion과 동일한 국소 근접 원칙.
-        const REWRITE_WINDOW = 30;
-        const after = text.slice(m.index! + m[0].length, m.index! + m[0].length + REWRITE_WINDOW);
-        if (!QUOTE_REWRITE_DIRECTIVE.test(after)) continue; // 인용 직후에 재작성 지시 없음 — echo로 통과
+        // 재작성 지시(QUOTE_REWRITE_DIRECTIVE)는 **이 인용 종료 직후부터 다음 인용(있으면) 또는 text
+        //   끝까지**를 검사한다(Codex #155 5R: text 전체면 인용과 무관한 다른 문장의 일반 코칭 표현에
+        //   오탐 / 6R: 고정된 짧은 윈도우면 위치·설명 문구를 늘려 지시어를 창 밖으로 밀어내는 우회 가능).
+        //   "이 인용 다음, 다른 인용이 나오기 전까지"로 좁혀 오탐도 우회도 동시에 막는다.
+        const windowEnd = mi + 1 < quoteMatches.length ? quoteMatches[mi + 1].index! : text.length;
+        const after = text.slice(m.index! + m[0].length, windowEnd);
+        if (!QUOTE_REWRITE_DIRECTIVE.test(after)) continue; // 인용~다음 인용 사이에 재작성 지시 없음 — echo로 통과
       }
       quoteHit = true;
       break;
