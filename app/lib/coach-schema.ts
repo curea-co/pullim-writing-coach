@@ -242,11 +242,16 @@ function tryEchoMatch(quoted: string, draftKey: string): boolean {
   }
 }
 
-// (2) 붙여넣기용 완성문장 인용 위반 여부 — **단일 필드**(diagnosis 또는 question) 안에서만 검사한다
-//   (Codex #155 8R — diagnosis+question을 합친 문자열에서 지역 윈도우를 계산하면, 한 필드가 문장부호
-//   없이 끝나는 흔한 경우 필드 경계가 사라져 앞 필드의 무관한 재작성 지시가 뒤 필드의 정상 echo까지
-//   오염시킨다). fieldText 하나에 국한되므로 인용 앞뒤 지역 윈도우도 자동으로 필드 밖을 넘지 않는다.
-function hasLongQuoteViolation(fieldText: string, draftKey: string | null): boolean {
+// (2) 붙여넣기용 완성문장 인용 위반 여부 — 인용·지역 재작성 지시(같은 문장/절)는 **단일 필드**
+//   (diagnosis 또는 question) 안에서만 검사한다(Codex #155 8R — 합친 문자열에서 지역 윈도우를 계산
+//   하면, 한 필드가 문장부호 없이 끝나는 흔한 경우 필드 경계가 사라져 앞 필드의 무관한 재작성 지시가
+//   뒤 필드의 정상 echo까지 오염시킨다). fieldText 하나에 국한되므로 그 오탐은 재발하지 않는다.
+//   단, otherFieldText(같은 nudge의 반대 필드) **어디에든** 재작성 지시가 있으면 echo 면제를 아예
+//   거부한다(Codex #155 10R — "인용은 diagnosis, 지시는 question" 같은 교차 필드 분산 우회를 안전
+//   쪽으로 닫는다. 대필 불변식이 걸린 사안이라, 무관한 반대 필드 표현이 드물게 오차단을 유발하더라도
+//   미탐지보다 낫다고 판단 — 8R이 고친 "동일 필드 내 무관 지시 오탐"과는 다른 계층의 트레이드오프).
+function hasLongQuoteViolation(fieldText: string, otherFieldText: string, draftKey: string | null): boolean {
+  const otherFieldHasRewriteDirective = QUOTE_REWRITE_DIRECTIVE.test(otherFieldText);
   const matches = Array.from(fieldText.matchAll(LONG_QUOTE));
   for (let mi = 0; mi < matches.length; mi++) {
     const m = matches[mi];
@@ -276,7 +281,8 @@ function hasLongQuoteViolation(fieldText: string, draftKey: string | null): bool
         return idxs.length > 0 ? Math.min(...idxs) : followingSlice.length;
       })();
       const after = followingSlice.slice(0, firstLocalBreak);
-      if (!QUOTE_REWRITE_DIRECTIVE.test(before) && !QUOTE_REWRITE_DIRECTIVE.test(after)) continue; // 재작성 지시 없음 — echo로 통과
+      const hasLocalDirective = QUOTE_REWRITE_DIRECTIVE.test(before) || QUOTE_REWRITE_DIRECTIVE.test(after);
+      if (!hasLocalDirective && !otherFieldHasRewriteDirective) continue; // 지역·교차 필드 모두 재작성 지시 없음 — echo로 통과
     }
     return true;
   }
@@ -310,7 +316,7 @@ export function checkGenerationBlock(o: CoachOutput, studentDraft?: string): str
     //   diagnosis·question 필드를 **각각 독립적으로** 검사한다(Codex #155 8R) — 둘을 text로 합쳐서
     //   지역 윈도우를 계산하면, 한 필드가 문장부호 없이 끝나는 흔한 경우 그 경계가 사라져 앞 필드의
     //   무관한 재작성 지시가 뒤 필드의 정상 echo까지 오염시킬 수 있다.
-    if (hasLongQuoteViolation(diagnosis, draftKey) || hasLongQuoteViolation(question, draftKey)) {
+    if (hasLongQuoteViolation(diagnosis, question, draftKey) || hasLongQuoteViolation(question, diagnosis, draftKey)) {
       v.push(`[${i}] 완성문장 인용(대필) 감지`);
       return;
     }
