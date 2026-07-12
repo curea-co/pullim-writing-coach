@@ -249,11 +249,14 @@ export function checkGenerationBlock(o: CoachOutput, studentDraft?: string): str
     for (const m of text.matchAll(LONG_QUOTE)) {
       const quoted = m[1].trim();
       if (!SENTENCE_END.test(quoted)) continue;
-      if (
-        draftKey &&
-        isWholeSentenceEcho(collapseWhitespace(quoted), draftKey) &&
-        !QUOTE_REWRITE_DIRECTIVE.test(text) // 재작성 지시 동반 시 면제 안 함(Codex #155 4R)
-      ) continue; // 학생 자기 문장 전체 echo(되짚어 묻기) — 통과
+      if (draftKey && isWholeSentenceEcho(collapseWhitespace(quoted), draftKey)) {
+        // 재작성 지시(QUOTE_REWRITE_DIRECTIVE)는 **인용 직후 지역 문맥**에서만 검사한다(Codex #155 5R —
+        //   text 전체에 걸면, 인용과 무관한 다른 문장의 일반 코칭 표현("마지막 표현은 고쳐 보자.")에도
+        //   걸려 정상 echo 케이스가 다시 막힌다). quotedInsertionSuggestion과 동일한 국소 근접 원칙.
+        const REWRITE_WINDOW = 30;
+        const after = text.slice(m.index! + m[0].length, m.index! + m[0].length + REWRITE_WINDOW);
+        if (!QUOTE_REWRITE_DIRECTIVE.test(after)) continue; // 인용 직후에 재작성 지시 없음 — echo로 통과
+      }
       quoteHit = true;
       break;
     }

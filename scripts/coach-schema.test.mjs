@@ -233,6 +233,17 @@ test("echo 검증 통과해도 '그대로 옮겨' 재작성 지시가 있으면 
   assert.ok(checkGenerationBlock(o, draft).length > 0);
 });
 
+// Codex #155 5R — 재작성 지시 판정을 인용 직후 지역 문맥으로 좁혀야 한다. text 전체에 걸면 인용과
+//   무관한 다른 문장의 일반 코칭 표현("마지막 표현은 고쳐 보자")에도 걸려 정상 echo가 다시 막힌다.
+test("재작성 지시가 인용과 무관한 다른 문장에 있으면 echo 면제 유지(오탐 아님)", () => {
+  const o = validOutput();
+  const sentence = "학생들이 자신의 개성을 표현할 수 있기 때문이다.";
+  const draft = `나는 교복 자율화에 찬성한다. ${sentence} 또한 편하다.`;
+  o.nudges[0].diagnosis = "마지막 표현은 고쳐 보자.";
+  o.nudges[0].guiding_question = `네가 쓴 '${sentence}'에서, 왜 그런지 예를 들어볼까?`;
+  assert.deepEqual(checkGenerationBlock(o, draft), []);
+});
+
 test("위반 메시지는 어느 nudge인지(index) 가리킨다", () => {
   const o = validOutput();
   o.nudges = [
