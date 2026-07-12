@@ -242,16 +242,33 @@ function tryEchoMatch(quoted: string, draftKey: string): boolean {
   }
 }
 
-// (2) 붙여넣기용 완성문장 인용 위반 여부 — 인용·지역 재작성 지시(같은 문장/절)는 **단일 필드**
-//   (diagnosis 또는 question) 안에서만 검사한다(Codex #155 8R — 합친 문자열에서 지역 윈도우를 계산
-//   하면, 한 필드가 문장부호 없이 끝나는 흔한 경우 필드 경계가 사라져 앞 필드의 무관한 재작성 지시가
-//   뒤 필드의 정상 echo까지 오염시킨다). fieldText 하나에 국한되므로 그 오탐은 재발하지 않는다.
-//   단, otherFieldText(같은 nudge의 반대 필드) **어디에든** 재작성 지시가 있으면 echo 면제를 아예
-//   거부한다(Codex #155 10R — "인용은 diagnosis, 지시는 question" 같은 교차 필드 분산 우회를 안전
-//   쪽으로 닫는다. 대필 불변식이 걸린 사안이라, 무관한 반대 필드 표현이 드물게 오차단을 유발하더라도
-//   미탐지보다 낫다고 판단 — 8R이 고친 "동일 필드 내 무관 지시 오탐"과는 다른 계층의 트레이드오프).
-function hasLongQuoteViolation(fieldText: string, otherFieldText: string, draftKey: string | null): boolean {
-  const otherFieldHasRewriteDirective = QUOTE_REWRITE_DIRECTIVE.test(otherFieldText);
+// 문자열에서 마지막 SENTENCE_BOUNDARY 위치(없으면 -1) — String.lastIndexOf는 정규식을 못 받으므로
+//   뒤에서부터 훑는다. SENTENCE_BOUNDARY와 동일 기준(마침표류+개행 sentinel)을 지역 윈도우 계산에도
+//   써서 두 곳의 "문장 경계" 정의가 어긋나지 않게 한다(Codex #155 11R — 로컬 윈도우가 `.!?。`만 보고
+//   SENTENCE_BOUNDARY의 `…`·개행 sentinel을 놓치면, 실제로는 다른 문장/줄인 재작성 지시를 같은 절로
+//   오인해 echo 면제가 깨진다).
+function lastBoundaryIndex(s: string): number {
+  for (let i = s.length - 1; i >= 0; i--) if (SENTENCE_BOUNDARY.test(s[i])) return i;
+  return -1;
+}
+function firstBoundaryIndex(s: string): number {
+  for (let i = 0; i < s.length; i++) if (SENTENCE_BOUNDARY.test(s[i])) return i;
+  return s.length;
+}
+
+// (2) 붙여넣기용 완성문장 인용 위반 여부 — **단일 필드**(diagnosis 또는 question) 안에서만 검사한다
+//   (Codex #155 8R — 합친 문자열에서 지역 윈도우를 계산하면, 한 필드가 문장부호 없이 끝나는 흔한
+//   경우 필드 경계가 사라져 앞 필드의 무관한 재작성 지시가 뒤 필드의 정상 echo까지 오염시킨다).
+//
+//   ★ 교차 필드(인용은 diagnosis, 재작성 지시는 question 같은 분산) 방어는 **의도적으로 넣지 않는다**
+//   (Codex #155 10R↔11R 왕복에서 확인된 결론): "반대 필드 어디든 지시가 있으면 거부"로 닫으면(10R)
+//   무관한 반대 필드 표현이 실서비스에서 정상 코칭을 오차단하고(11R이 재지적), 다시 지역으로 좁히면
+//   교차 필드 우회가 열린다(10R이 애초에 지적) — 순수 정규식 휴리스틱으로는 "반대 필드 지시가 이
+//   인용과 같은 내용을 가리키는 코디네이션인지"를 판별할 수 없어 어느 쪽으로도 완전히 만족시킬 수
+//   없다(왕복 자체가 증거). 이 코드베이스의 기존 관례(eval KNOWN_GAP — 정직 기록, LLM-judge 후속
+//   대상)를 따라 지역(같은 필드·같은 절) 검사만 적용하고, 교차 필드는 잔여 gap으로 문서화한다
+//   (scripts/coach-schema.test.mjs "[known_gap]" 테스트).
+function hasLongQuoteViolation(fieldText: string, draftKey: string | null): boolean {
   const matches = Array.from(fieldText.matchAll(LONG_QUOTE));
   for (let mi = 0; mi < matches.length; mi++) {
     const m = matches[mi];
@@ -259,30 +276,17 @@ function hasLongQuoteViolation(fieldText: string, otherFieldText: string, draftK
     if (!SENTENCE_END.test(quoted)) continue;
     if (draftKey && isWholeSentenceEcho(collapseWhitespace(quoted), draftKey)) {
       // 재작성 지시(QUOTE_REWRITE_DIRECTIVE)는 이 인용과 **같은 문장/절**(앞뒤 모두, 이 필드 안에서만)
-      //   에서만 검사한다. 범위는 "가장 가까운 문장 경계(.!?。 또는 이전/다음 인용)"까지로 제한 —
-      //   Codex #155 5R(전체면 무관한 다른 문장의 일반 코칭 표현에 오탐)·6R(인용 뒤 고정 윈도우는
-      //   문구를 늘려 우회 가능)·7R(지시어가 인용 앞에 오는 어순은 뒤쪽만 보면 놓침)를 좌우 대칭으로
-      //   막는다. 문장 경계 문자 자체는 지역 구간에서 제외(다음 문장으로 안 새게).
+      //   에서만 검사한다. 범위는 "가장 가까운 문장 경계(SENTENCE_BOUNDARY — .!?。…·개행 sentinel)
+      //   또는 이전/다음 인용"까지로 제한 — Codex #155 5R(전체면 무관한 다른 문장의 일반 코칭 표현에
+      //   오탐)·6R(인용 뒤 고정 윈도우는 문구를 늘려 우회 가능)·7R(지시어가 인용 앞에 오는 어순은
+      //   뒤쪽만 보면 놓침)·11R(경계 문자 불일치로 다른 절이 같은 절로 오인)을 모두 막는다.
       const prevBound = mi > 0 ? matches[mi - 1].index! + matches[mi - 1][0].length : 0;
       const precedingSlice = fieldText.slice(prevBound, m.index!);
-      const lastLocalBreak = Math.max(
-        precedingSlice.lastIndexOf("."),
-        precedingSlice.lastIndexOf("!"),
-        precedingSlice.lastIndexOf("?"),
-        precedingSlice.lastIndexOf("。"),
-      );
-      const before = precedingSlice.slice(lastLocalBreak + 1);
+      const before = precedingSlice.slice(lastBoundaryIndex(precedingSlice) + 1);
       const nextBound = mi + 1 < matches.length ? matches[mi + 1].index! : fieldText.length;
       const followingSlice = fieldText.slice(m.index! + m[0].length, nextBound);
-      const firstLocalBreak = (() => {
-        const idxs = [".", "!", "?", "。"]
-          .map((c) => followingSlice.indexOf(c))
-          .filter((idx) => idx !== -1);
-        return idxs.length > 0 ? Math.min(...idxs) : followingSlice.length;
-      })();
-      const after = followingSlice.slice(0, firstLocalBreak);
-      const hasLocalDirective = QUOTE_REWRITE_DIRECTIVE.test(before) || QUOTE_REWRITE_DIRECTIVE.test(after);
-      if (!hasLocalDirective && !otherFieldHasRewriteDirective) continue; // 지역·교차 필드 모두 재작성 지시 없음 — echo로 통과
+      const after = followingSlice.slice(0, firstBoundaryIndex(followingSlice));
+      if (!QUOTE_REWRITE_DIRECTIVE.test(before) && !QUOTE_REWRITE_DIRECTIVE.test(after)) continue; // 재작성 지시 없음 — echo로 통과
     }
     return true;
   }
@@ -316,7 +320,7 @@ export function checkGenerationBlock(o: CoachOutput, studentDraft?: string): str
     //   diagnosis·question 필드를 **각각 독립적으로** 검사한다(Codex #155 8R) — 둘을 text로 합쳐서
     //   지역 윈도우를 계산하면, 한 필드가 문장부호 없이 끝나는 흔한 경우 그 경계가 사라져 앞 필드의
     //   무관한 재작성 지시가 뒤 필드의 정상 echo까지 오염시킬 수 있다.
-    if (hasLongQuoteViolation(diagnosis, question, draftKey) || hasLongQuoteViolation(question, diagnosis, draftKey)) {
+    if (hasLongQuoteViolation(diagnosis, draftKey) || hasLongQuoteViolation(question, draftKey)) {
       v.push(`[${i}] 완성문장 인용(대필) 감지`);
       return;
     }
