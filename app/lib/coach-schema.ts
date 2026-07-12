@@ -101,6 +101,13 @@ export function validateCoachOutput(o: unknown): string[] {
 const WRITE_DIRECTIVE =
   /이렇게\s*(써|쓰|적|작성|고쳐)|다음과\s*같이\s*(써|쓰|적|작성|고쳐)|라고\s*(써|쓰|적)|예시\s*문장|예문|추천\s*(문장|표현)|모범\s*(답안|문장|글)|이런\s*식으로\s*(써|적|고쳐)|대신\s*(써|작성)/;
 
+// 학생 자기 문장 echo 면제(아래 (2))의 안전 범위를 좁히는 지시 패턴(Codex #155 4R) — echo 면제는
+//   "학생이 쓴 문장을 되짚어 질문"하는 문맥에만 해당해야 하는데, 인용 뒤에 "다시 써/고쳐 써/바꿔 써/
+//   그대로 옮겨" 류가 붙으면 "이 문장을 그대로(또는 손봐서) 다른 자리에 다시 쓰라"는 **지시**가 되어
+//   기계적 복붙/재작성을 유도한다 — 대필은 아니어도 스스로 고쳐 쓰게 만드는 코칭 취지에 어긋난다.
+const QUOTE_REWRITE_DIRECTIVE =
+  /다시\s*(써|쓰|적)|고쳐\s*(써|쓰|보자|볼까|보아)|바꿔\s*(써|쓰|보자|볼까)|옮겨\s*(써|쓰)|그대로\s*(써|쓰|사용|옮기|옮겨)/;
+
 // 인용부호 종류(ASCII·스마트·낫표·겹낫표)
 const QUOTE_CHARS = "'\"‘’“”「」『』";
 // (2) 붙여넣기용 완성문장 신호: 인용 안 내용이 15자 이상이고 문장부호 또는 한국어 종결어미로 끝남.
@@ -242,7 +249,11 @@ export function checkGenerationBlock(o: CoachOutput, studentDraft?: string): str
     for (const m of text.matchAll(LONG_QUOTE)) {
       const quoted = m[1].trim();
       if (!SENTENCE_END.test(quoted)) continue;
-      if (draftKey && isWholeSentenceEcho(collapseWhitespace(quoted), draftKey)) continue; // 학생 자기 문장 전체 echo — 통과
+      if (
+        draftKey &&
+        isWholeSentenceEcho(collapseWhitespace(quoted), draftKey) &&
+        !QUOTE_REWRITE_DIRECTIVE.test(text) // 재작성 지시 동반 시 면제 안 함(Codex #155 4R)
+      ) continue; // 학생 자기 문장 전체 echo(되짚어 묻기) — 통과
       quoteHit = true;
       break;
     }
