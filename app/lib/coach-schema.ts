@@ -184,14 +184,18 @@ function collapseWhitespace(s: string): string {
 }
 
 // 문장 경계 문자(공백 제거 후 기준) — 인용 echo가 "문장 전체"인지 확인할 때 시작 위치가 이 뒤이거나
-//   원고 맨 앞이어야 한다(Codex #155 — 단순 부분 문자열 포함만으로는 두 문장에 걸친 15자+ 조각이나
+//   원고 맨 앞이어야 한다(Codex #155 1R — 단순 부분 문자열 포함만으로는 두 문장에 걸친 15자+ 조각이나
 //   문장 중간에서 잘라낸 조각도 통과해 가드에 구멍이 생긴다).
 const SENTENCE_BOUNDARY = /[.!?。…]/;
 
-// quoted(공백 제거·정규화됨)가 draftKey(공백 제거된 학생 원고) 안에서 **문장 시작 지점**에 등장하는지.
-//   SENTENCE_END가 이미 quoted의 끝을 문장 종결로 제한하므로, 여기서는 시작 경계만 확인하면 된다
-//   (원고에 같은 조각이 여러 번 나올 수 있어 모든 등장 위치를 확인 — 하나라도 경계에 걸리면 echo로 인정).
+// quoted(공백 제거·정규화됨)가 draftKey(공백 제거된 학생 원고) 안에서 **정확히 한 문장**으로 등장하는지.
+//   시작 = 문두 또는 마침표 직후. 끝 = quoted 내부(마지막 글자 제외)에 문장 경계 문자가 없어야 한다
+//   (Codex #155 2R — 시작 경계만 보면 여러 문장을 통째로 이어 붙인 인용도 통과해 가드가 다시 느슨해짐).
+//   quoted 자체의 마지막 글자가 마침표류일 수 있으므로(SENTENCE_END 통과 조건) 그 글자는 검사에서 제외.
+//   원고에 같은 조각이 여러 번 나올 수 있어 모든 등장 위치를 확인 — 하나라도 두 경계를 만족하면 echo로 인정.
 function isWholeSentenceEcho(quoted: string, draftKey: string): boolean {
+  const interior = quoted.slice(0, -1); // 마지막 글자(종결 문장부호일 수 있음) 제외한 나머지
+  if (SENTENCE_BOUNDARY.test(interior)) return false; // 내부에 문장 경계 있음 = 여러 문장 이어붙임
   let from = 0;
   for (;;) {
     const idx = draftKey.indexOf(quoted, from);
