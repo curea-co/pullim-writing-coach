@@ -11,6 +11,7 @@ import { railItems, tabItems } from "./nav-adapter";
 import { AuthProvider, useAuth } from "@/app/lib/use-auth";
 import { loginUrl, signupUrl, osHubUrl } from "@/app/lib/pullim-login";
 import ServiceSwitcher from "@/app/components/service-switcher";
+import RailFooter from "@/app/components/rail-footer";
 import { MemberGate } from "@/app/components/login-wall";
 
 // os.pullim.ai 헤더 우측 정합(실측 스펙): 아이콘 38·radius11·#45555c · pill h42·radius12·#f4faff/#0362da · 앱런처 36 · 간격 6.
@@ -108,7 +109,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         //   + [아이콘 라이팅 코치 ▾](스위처 트리거) — OS 마스트+스위처 병렬 구조 정합.
         brand={{ logo: <ServiceIcon name="writing" size={32} />, title: "풀림", sub: "라이팅 코치", href: "/" }}
         switcher={<ServiceSwitcher />}
-        rail={<OsRail head="둘러보기" items={railItems(pathname)} linkComponent={Link} />}
+        rail={
+          // flex-col h-full 래퍼 — RailFooter(mt-auto)가 목록 아래 바닥에 고정되게(pullim-web .rail-foot 정합).
+          <div className="flex h-full flex-col">
+            <OsRail head="둘러보기" items={railItems(pathname)} linkComponent={Link} />
+            <RailFooter />
+          </div>
+        }
         tabbar={<OsTabbar items={tabItems(pathname)} linkComponent={Link} />}
         actions={<HeaderActions />}
         as="div"
